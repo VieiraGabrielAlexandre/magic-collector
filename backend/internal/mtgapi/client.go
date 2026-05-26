@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -35,6 +36,10 @@ type ExternalCard struct {
 	Toughness   string            `json:"toughness"`
 	Prices      map[string]string `json:"prices"`
 	ScryfallURI string            `json:"scryfall_uri"`
+}
+
+type scryfallList struct {
+	Data []scryfallCard `json:"data"`
 }
 
 type scryfallCard struct {
@@ -117,6 +122,63 @@ func (c *Client) Search(setCode, number, lang, artist string) (*ExternalCard, er
 
 	// fallback para EN (ou idioma original quando lang era EN)
 	return c.fetch(fmt.Sprintf("%s/%s/%s", apiBase, set, number))
+}
+
+// SearchPreRelease busca uma carta pré-release pelo nome usando o endpoint de busca do Scryfall.
+// Cartas pré-release têm set codes diferentes (ex: "pgrn") e não são encontradas por set+número normal.
+func (c *Client) SearchPreRelease(name, lang, artist string) (*ExternalCard, error) {
+	if name == "" {
+		return nil, nil
+	}
+
+	q := fmt.Sprintf(`is:prerelease name:"%s"`, name)
+	endpoint := fmt.Sprintf("https://api.scryfall.com/cards/search?q=%s&order=released&dir=desc",
+		url.QueryEscape(q))
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "magic-collector/1.0")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+
+	var list scryfallList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	if len(list.Data) == 0 {
+		return nil, nil
+	}
+
+	// Prefere o resultado cujo artista bate com o cadastrado.
+	best := &list.Data[0]
+	if artist != "" {
+		for i := range list.Data {
+			if artistsMatch(artist, list.Data[i].Artist) {
+				best = &list.Data[i]
+				break
+			}
+		}
+	}
+
+	// Se não for EN, tenta buscar a versão localizada pelo set+número do resultado.
+	if langCode := toLangCode(lang); langCode != "en" && best.Set != "" && best.CollectorNumber != "" {
+		langEndpoint := fmt.Sprintf("%s/%s/%s/%s", apiBase, best.Set, best.CollectorNumber, langCode)
+		if langCard, _ := c.fetch(langEndpoint); langCard != nil {
+			return langCard, nil
+		}
+	}
+
+	return best.toExternal(), nil
 }
 
 // GetByMTGID busca pelo UUID Scryfall armazenado em cache.

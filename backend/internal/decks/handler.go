@@ -1,0 +1,62 @@
+package decks
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Handler struct {
+	repo *Repository
+}
+
+func NewHandler(repo *Repository) *Handler {
+	return &Handler{repo: repo}
+}
+
+func (h *Handler) List(c *gin.Context) {
+	decks, err := h.repo.List()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar decks"})
+		return
+	}
+	if decks == nil {
+		decks = []Deck{}
+	}
+	c.JSON(http.StatusOK, decks)
+}
+
+func (h *Handler) Create(c *gin.Context) {
+	var input DeckInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	id, err := h.repo.Create(input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar deck"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "Deck criado com sucesso"})
+}
+
+func (h *Handler) Update(c *gin.Context) {
+	var input DeckInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.repo.Update(c.Param("id"), input); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar deck"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Deck atualizado com sucesso"})
+}
+
+func (h *Handler) Delete(c *gin.Context) {
+	if err := h.repo.Delete(c.Param("id")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover deck"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Deck removido com sucesso"})
+}

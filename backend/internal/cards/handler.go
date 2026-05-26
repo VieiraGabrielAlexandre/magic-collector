@@ -43,12 +43,20 @@ func (h *Handler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
+	var deckIDFilter *int
+	if deckStr := c.Query("deck_id"); deckStr != "" {
+		if v, err := strconv.Atoi(deckStr); err == nil {
+			deckIDFilter = &v
+		}
+	}
+
 	params := ListParams{
-		Search:   c.Query("q"),
-		Page:     page,
-		PageSize: pageSize,
-		Sort:     c.DefaultQuery("sort", "name"),
-		Order:    c.DefaultQuery("order", "asc"),
+		Search:       c.Query("q"),
+		Page:         page,
+		PageSize:     pageSize,
+		Sort:         c.DefaultQuery("sort", "name"),
+		Order:        c.DefaultQuery("order", "asc"),
+		DeckIDFilter: deckIDFilter,
 	}
 
 	result, err := h.service.List(params)
@@ -60,11 +68,12 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":        result.Cards,
-		"total":       result.Total,
-		"page":        result.Page,
-		"page_size":   result.PageSize,
-		"total_pages": result.TotalPages,
+		"data":           result.Cards,
+		"total":          result.Total,
+		"total_quantity": result.TotalQuantity,
+		"page":           result.Page,
+		"page_size":      result.PageSize,
+		"total_pages":    result.TotalPages,
 	})
 }
 
@@ -80,6 +89,19 @@ func (h *Handler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, card)
 }
 
+func (h *Handler) Update(c *gin.Context) {
+	var input UpdateCardInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.service.Update(c.Param("id"), input); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar carta"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Carta atualizada com sucesso"})
+}
+
 func (h *Handler) Delete(c *gin.Context) {
 	err := h.service.Delete(c.Param("id"))
 	if err != nil {
@@ -92,4 +114,28 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Carta removida com sucesso",
 	})
+}
+
+func (h *Handler) SetDeck(c *gin.Context) {
+	var input struct {
+		DeckID int `json:"deck_id"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.service.SetDeck(c.Param("id"), input.DeckID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atribuir deck"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+func (h *Handler) Export(c *gin.Context) {
+	cards, err := h.service.ExportAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao exportar"})
+		return
+	}
+	c.JSON(http.StatusOK, cards)
 }

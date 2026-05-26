@@ -13,15 +13,17 @@ import (
 	"magic-collection-api/internal/database"
 )
 
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
-	csvPath := "data/cards.csv"
+	csvPath := "./data/cards.csv"
 	if len(os.Args) > 1 {
 		csvPath = os.Args[1]
-	}
-
-	dbPath := "data/collection.db"
-	if len(os.Args) > 2 {
-		dbPath = os.Args[2]
 	}
 
 	f, err := os.Open(csvPath)
@@ -30,7 +32,15 @@ func main() {
 	}
 	defer f.Close()
 
-	db, err := database.Open(dbPath)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
+		getenv("DB_USER", "root"),
+		getenv("DB_PASSWORD", ""),
+		getenv("DB_HOST", "localhost"),
+		getenv("DB_PORT", "3306"),
+		getenv("DB_NAME", "magic_collector"),
+	)
+
+	db, err := database.Open(dsn)
 	if err != nil {
 		log.Fatalf("erro ao abrir banco: %v", err)
 	}
