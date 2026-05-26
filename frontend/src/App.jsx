@@ -128,6 +128,58 @@ function ManaColorPicker({ value, onChange }) {
   );
 }
 
+// ── Deck theme colors ───────────────────────────────────────────────────
+const DECK_THEME_COLORS = [
+  { id: "",          label: "Nenhuma"                                                   },
+  { id: "crimson",   label: "Vermelho",  bg: "#3a0c0c", border: "#7a2020", text: "#ff9090" },
+  { id: "sapphire",  label: "Azul",      bg: "#081428", border: "#1a4080", text: "#80c0ff" },
+  { id: "emerald",   label: "Verde",     bg: "#071a0c", border: "#1a5828", text: "#80d890" },
+  { id: "violet",    label: "Roxo",      bg: "#150a28", border: "#4a2890", text: "#c090f0" },
+  { id: "gold",      label: "Dourado",   bg: "#221404", border: "#805010", text: "#e8c060" },
+  { id: "teal",      label: "Turquesa",  bg: "#041820", border: "#0c6878", text: "#60d0c8" },
+  { id: "ember",     label: "Laranja",   bg: "#280e04", border: "#904010", text: "#f09050" },
+  { id: "silver",    label: "Prata",     bg: "#0e1218", border: "#384858", text: "#a0b8c8" },
+  { id: "rose",      label: "Rosa",      bg: "#280a18", border: "#8a1e50", text: "#f080b0" },
+  { id: "bone",      label: "Marfim",    bg: "#1c1608", border: "#6a5828", text: "#e0d8b0" },
+];
+
+function getDeckTheme(themeId) {
+  return DECK_THEME_COLORS.find((c) => c.id === themeId) || DECK_THEME_COLORS[0];
+}
+
+function getDeckItemStyle(themeId) {
+  const t = getDeckTheme(themeId);
+  if (!t?.bg) return {};
+  return { background: t.bg, borderColor: t.border, borderLeftColor: t.border };
+}
+
+function getDeckBadgeStyle(themeId) {
+  const t = getDeckTheme(themeId);
+  if (!t?.bg) return {};
+  return { background: t.bg, borderColor: t.border, color: t.text };
+}
+
+function DeckColorSelect({ value, onChange }) {
+  const theme = getDeckTheme(value);
+  return (
+    <label>
+      Cor do deck
+      <div className="deck-color-select-row">
+        {theme?.bg && <span className="deck-color-swatch" style={{ background: theme.bg, borderColor: theme.border }} />}
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={theme?.bg ? { background: theme.bg, borderColor: theme.border, color: theme.text } : {}}
+        >
+          {DECK_THEME_COLORS.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+      </div>
+    </label>
+  );
+}
+
 export default function App() {
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -149,15 +201,19 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState("collection");
   const [decks, setDecks] = useState([]);
-  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "" });
+  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
   const [editDeckModal, setEditDeckModal] = useState(null);
 
   const [managingDeck, setManagingDeck] = useState(null);
   const [deckCards, setDeckCards] = useState([]);
   const [unassignedCards, setUnassignedCards] = useState([]);
+  const [unassignedPage, setUnassignedPage] = useState(1);
+  const [unassignedTotalPages, setUnassignedTotalPages] = useState(1);
+  const [unassignedTotal, setUnassignedTotal] = useState(0);
   const [deckSearch, setDeckSearch] = useState("");
 
   const searchTimer = useRef(null);
+  const deckSearchTimer = useRef(null);
 
   async function loadCards(opts = {}) {
     const result = await listCards({
@@ -179,13 +235,17 @@ export default function App() {
     setDecks(data ?? []);
   }
 
-  async function refreshDeckManagement(deckId) {
-    const [dc, uc] = await Promise.all([
-      listCards({ deckId, pageSize: 500 }),
-      listCards({ deckId: 0, pageSize: 500 }),
-    ]);
+  async function loadDeckCards(deckId) {
+    const dc = await listCards({ deckId, pageSize: 500 });
     setDeckCards(dc.data ?? []);
-    setUnassignedCards(uc.data ?? []);
+  }
+
+  async function loadUnassigned(pg = 1, q = "") {
+    const result = await listCards({ deckId: 0, pageSize: 20, page: pg, q });
+    setUnassignedCards(result.data ?? []);
+    setUnassignedPage(result.page ?? 1);
+    setUnassignedTotalPages(result.total_pages ?? 1);
+    setUnassignedTotal(result.total ?? 0);
   }
 
   useEffect(() => { loadCards(); }, [sort, order]);
@@ -272,7 +332,7 @@ export default function App() {
   async function handleDeckCreate(e) {
     e.preventDefault();
     await createDeck(deckForm);
-    setDeckForm({ name: "", description: "", commander: false, colors: "", set_code: "" });
+    setDeckForm({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
     loadDecks();
   }
 
@@ -289,6 +349,7 @@ export default function App() {
       commander: editDeckModal.commander || false,
       colors: editDeckModal.colors || "",
       set_code: editDeckModal.set_code || "",
+      theme_color: editDeckModal.theme_color || "",
     });
     setEditDeckModal(null);
     loadDecks();
@@ -297,7 +358,8 @@ export default function App() {
   async function handleManageDeck(deck) {
     setManagingDeck(deck);
     setDeckSearch("");
-    await refreshDeckManagement(deck.id);
+    setUnassignedPage(1);
+    await Promise.all([loadDeckCards(deck.id), loadUnassigned(1, "")]);
     if (deck.set_code && !deck.icon_uri) {
       const result = await fetchDeckIcon(deck.id);
       if (result?.icon_uri) {
@@ -309,13 +371,13 @@ export default function App() {
 
   async function handleAssignCard(cardId) {
     await assignCardToDeck(cardId, managingDeck.id);
-    await refreshDeckManagement(managingDeck.id);
+    await Promise.all([loadDeckCards(managingDeck.id), loadUnassigned(unassignedPage, deckSearch)]);
     loadDecks();
   }
 
   async function handleUnassignCard(cardId) {
     await assignCardToDeck(cardId, 0);
-    await refreshDeckManagement(managingDeck.id);
+    await Promise.all([loadDeckCards(managingDeck.id), loadUnassigned(unassignedPage, deckSearch)]);
     loadDecks();
   }
 
@@ -351,12 +413,7 @@ export default function App() {
     return order === "asc" ? " ↑" : " ↓";
   };
 
-  const filteredUnassigned = deckSearch
-    ? unassignedCards.filter((c) =>
-        c.name.toLowerCase().includes(deckSearch.toLowerCase()) ||
-        (c.set_code || "").toLowerCase().includes(deckSearch.toLowerCase())
-      )
-    : unassignedCards;
+  const deckTotalQuantity = deckCards.reduce((sum, c) => sum + (c.quantity || 1), 0);
 
   return (
     <main className="app">
@@ -387,8 +444,9 @@ export default function App() {
                   </h2>
                   <div className="deck-manage-meta">
                     <ColorPips colors={managingDeck.colors} />
-                    <span className="total-badge">{deckCards.length} cartas no deck</span>
-                    <span className="unique-badge">{unassignedCards.length} sem deck</span>
+                    <span className="total-badge">{deckTotalQuantity} cartas</span>
+                    <span className="unique-badge">{deckCards.length} únicas</span>
+                    <span className="unique-badge">{unassignedTotal} sem deck</span>
                   </div>
                 </div>
               </div>
@@ -397,7 +455,7 @@ export default function App() {
             <div className="deck-manage-grid">
               <section className="card list-section">
                 <div className="list-header">
-                  <h3 className="section-title">No deck <span className="total-badge">{deckCards.length}</span></h3>
+                  <h3 className="section-title">No deck <span className="total-badge">{deckTotalQuantity}</span><span className="unique-badge">{deckCards.length} únicas</span></h3>
                 </div>
                 <div className="list">
                   {deckCards.map((card) => (
@@ -409,7 +467,7 @@ export default function App() {
                           <CardColorIcons card={card} />
                           {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                         </div>
-                        <small>{card.set_code || "—"} · {card.language} · ×{card.quantity}</small>
+                        <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
                       </div>
                       <div className="actions">
                         <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
@@ -423,13 +481,18 @@ export default function App() {
               <section className="card list-section">
                 <div className="list-header">
                   <div className="list-header-top">
-                    <h3 className="section-title">Sem deck <span className="unique-badge">{unassignedCards.length}</span></h3>
+                    <h3 className="section-title">Sem deck <span className="unique-badge">{unassignedTotal}</span></h3>
                   </div>
                   <input className="search-input" type="search" placeholder="Filtrar por nome ou coleção..."
-                    value={deckSearch} onChange={(e) => setDeckSearch(e.target.value)} />
+                    value={deckSearch} onChange={(e) => {
+                      const q = e.target.value;
+                      setDeckSearch(q);
+                      clearTimeout(deckSearchTimer.current);
+                      deckSearchTimer.current = setTimeout(() => loadUnassigned(1, q), 350);
+                    }} />
                 </div>
                 <div className="list">
-                  {filteredUnassigned.map((card) => (
+                  {unassignedCards.map((card) => (
                     <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
                       <div className="list-item-info">
                         <div className="list-item-name">
@@ -438,15 +501,33 @@ export default function App() {
                           <CardColorIcons card={card} />
                           {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                         </div>
-                        <small>{card.set_code || "—"} · {card.language} · ×{card.quantity}</small>
+                        <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
                       </div>
                       <div className="actions">
                         <button type="button" onClick={() => handleAssignCard(card.id)}>+ Deck</button>
                       </div>
                     </div>
                   ))}
-                  {filteredUnassigned.length === 0 && <p className="empty">Nenhuma carta disponível.</p>}
+                  {unassignedCards.length === 0 && <p className="empty">Nenhuma carta disponível.</p>}
                 </div>
+                {unassignedTotalPages > 1 && (
+                  <div className="pagination">
+                    <button type="button" onClick={() => loadUnassigned(unassignedPage - 1, deckSearch)} disabled={unassignedPage <= 1}>‹</button>
+                    {Array.from({ length: unassignedTotalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === unassignedTotalPages || Math.abs(p - unassignedPage) <= 2)
+                      .reduce((acc, p, idx, arr) => {
+                        if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((p, i) =>
+                        p === "…"
+                          ? <span key={`e-${i}`} className="pagination-ellipsis">…</span>
+                          : <button key={p} type="button" className={p === unassignedPage ? "active" : ""} onClick={() => loadUnassigned(p, deckSearch)}>{p}</button>
+                      )}
+                    <button type="button" onClick={() => loadUnassigned(unassignedPage + 1, deckSearch)} disabled={unassignedPage >= unassignedTotalPages}>›</button>
+                  </div>
+                )}
               </section>
             </div>
           </div>
@@ -478,6 +559,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              <DeckColorSelect value={deckForm.theme_color} onChange={(v) => setDeckForm({ ...deckForm, theme_color: v })} />
               <button type="submit">Criar Deck</button>
             </form>
 
@@ -489,7 +571,7 @@ export default function App() {
               </div>
               <div className="list deck-list">
                 {decks.map((deck) => (
-                  <div className="deck-list-item" key={deck.id}>
+                  <div className="deck-list-item" key={deck.id} style={getDeckItemStyle(deck.theme_color)}>
                     <div className="deck-list-icon">
                       {deck.icon_uri
                         ? <img src={deck.icon_uri} className="set-icon" alt={deck.set_code} />
@@ -554,6 +636,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
+              <DeckColorSelect value={editDeckModal.theme_color || ""} onChange={(v) => setEditDeckModal({ ...editDeckModal, theme_color: v })} />
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditDeckModal(null)}>Cancelar</button>
                 <button type="submit" className="save-btn">Salvar</button>
@@ -676,33 +759,41 @@ export default function App() {
           </div>
 
           <div className="list">
-            {cards.map((card) => (
-              <div
-                className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
-                key={card.id}
-              >
-                <div className="list-item-info">
-                  <div className="list-item-name">
-                    <strong className={card.foil ? "foil-text" : ""}>
-                      {card.name}
-                    </strong>
-                    {card.foil && <span className="foil-text">✦</span>}
-                    <CardColorIcons card={card} />
-                    {card.rarity && (
-                      <span className={`rarity r-${card.rarity.toLowerCase()}`}>
-                        {card.rarity}
-                      </span>
-                    )}
+            {cards.map((card) => {
+              const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
+              return (
+                <div
+                  className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                  key={card.id}
+                >
+                  <div className="list-item-info">
+                    <div className="list-item-name">
+                      <strong className={card.foil ? "foil-text" : ""}>
+                        {card.name}
+                      </strong>
+                      {card.foil && <span className="foil-text">✦</span>}
+                      <CardColorIcons card={card} />
+                      {card.rarity && (
+                        <span className={`rarity r-${card.rarity.toLowerCase()}`}>
+                          {card.rarity}
+                        </span>
+                      )}
+                      {assignedDeck && (
+                        <span className="deck-badge" style={getDeckBadgeStyle(assignedDeck.theme_color)}>
+                          {assignedDeck.name}
+                        </span>
+                      )}
+                    </div>
+                    <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"}</span>
+                    <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""} · ×{card.quantity}</small>
                   </div>
-                  <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"}</span>
-                  <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""} · ×{card.quantity}</small>
+                  <div className="actions">
+                    <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
+                    <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
+                  </div>
                 </div>
-                <div className="actions">
-                  <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
-                  <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {cards.length === 0 && <p className="empty">Nenhuma carta encontrada.</p>}
           </div>
 
@@ -761,7 +852,8 @@ export default function App() {
 
                 <div className="modal-divider" />
                 <div className="modal-grid">
-                  <div><span>Cor</span>
+                  <div className="modal-grid-cell-color">
+                    <span>Cor</span>
                     <span className="modal-color-icons">
                       <CardColorIcons card={selectedCard.local} />
                       {!parseCardColorIcons(selectedCard.local).length && (selectedCard.local.color || "—")}
@@ -778,9 +870,15 @@ export default function App() {
                   <div><span>Quantidade</span>{selectedCard.local.quantity}</div>
                   <div><span>Condição</span>{selectedCard.local.condition || "—"}</div>
                   <div><span>Foil</span>{selectedCard.local.foil ? "Sim" : "Não"}</div>
-                  {selectedCard.local.deck_id > 0 && (
-                    <div><span>Deck</span>{decks.find(d => d.id === selectedCard.local.deck_id)?.name ?? "—"}</div>
-                  )}
+                  {selectedCard.local.deck_id > 0 && (() => {
+                    const d = decks.find(dd => dd.id === selectedCard.local.deck_id);
+                    return d ? (
+                      <div>
+                        <span>Deck</span>
+                        <span className="modal-deck-badge" style={getDeckBadgeStyle(d.theme_color)}>{d.name}</span>
+                      </div>
+                    ) : null;
+                  })()}
                   {selectedCard.external?.power && (
                     <div><span>Força/Resistência</span>{selectedCard.external.power}/{selectedCard.external.toughness}</div>
                   )}

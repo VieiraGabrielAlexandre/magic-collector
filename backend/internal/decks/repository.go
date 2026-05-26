@@ -12,7 +12,7 @@ func NewRepository(db *sql.DB) *Repository {
 
 func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
-		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, COUNT(c.id) AS card_count
+		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color, COUNT(c.id) AS card_count
 		FROM decks d
 		LEFT JOIN cards c ON c.deck_id = d.id
 		GROUP BY d.id
@@ -27,7 +27,7 @@ func (r *Repository) List() ([]Deck, error) {
 	for rows.Next() {
 		var d Deck
 		var commanderInt int
-		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.CardCount); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.ThemeColor, &d.CardCount); err != nil {
 			return nil, err
 		}
 		d.Commander = commanderInt == 1
@@ -38,10 +38,10 @@ func (r *Repository) List() ([]Deck, error) {
 
 func (r *Repository) GetByID(id string) (*Deck, error) {
 	row := r.db.QueryRow(
-		`SELECT id, name, description, commander, colors, set_code, icon_uri FROM decks WHERE id = ?`, id)
+		`SELECT id, name, description, commander, colors, set_code, icon_uri, theme_color FROM decks WHERE id = ?`, id)
 	var d Deck
 	var commanderInt int
-	if err := row.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI); err != nil {
+	if err := row.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.ThemeColor); err != nil {
 		return nil, err
 	}
 	d.Commander = commanderInt == 1
@@ -54,8 +54,8 @@ func (r *Repository) Create(input DeckInput) (int64, error) {
 		commanderInt = 1
 	}
 	res, err := r.db.Exec(
-		`INSERT INTO decks (name, description, commander, colors, set_code) VALUES (?, ?, ?, ?, ?)`,
-		input.Name, input.Description, commanderInt, input.Colors, input.SetCode,
+		`INSERT INTO decks (name, description, commander, colors, set_code, theme_color) VALUES (?, ?, ?, ?, ?, ?)`,
+		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor,
 	)
 	if err != nil {
 		return 0, err
@@ -69,8 +69,8 @@ func (r *Repository) Update(id string, input DeckInput) error {
 		commanderInt = 1
 	}
 	_, err := r.db.Exec(
-		`UPDATE decks SET name=?, description=?, commander=?, colors=?, set_code=? WHERE id=?`,
-		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, id,
+		`UPDATE decks SET name=?, description=?, commander=?, colors=?, set_code=?, theme_color=? WHERE id=?`,
+		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor, id,
 	)
 	return err
 }

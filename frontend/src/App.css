@@ -971,13 +971,33 @@ button.danger:hover:not(:disabled) {
   border-radius: 50%;
 }
 .modal-color-icons {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
 }
 .modal-color-icons .mana-icon {
   width: 16px;
   height: 16px;
+}
+
+/* Cor cell in modal grid: center its content */
+.modal-grid-cell-color {
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.modal-grid-cell-color > span:first-child {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 /* ── Mana color picker (form) ──────────────────────────────────────────── */
@@ -1215,6 +1235,58 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── Deck badge in card list ───────────────────────────────────────────── */
+.list-item-info .deck-badge {
+  display: inline-flex !important;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  flex-shrink: 1;
+  margin-top: 0;
+}
+
+/* ── Deck badge inside modal grid ──────────────────────────────────────── */
+.modal-deck-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ── Deck color select ─────────────────────────────────────────────────── */
+.deck-color-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.deck-color-swatch {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1px solid var(--border-dim);
+  flex-shrink: 0;
+}
+.deck-color-select-row select {
+  flex: 1;
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */

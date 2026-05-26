@@ -8,6 +8,7 @@ type Deck struct {
 	Colors      string `json:"colors"`
 	SetCode     string `json:"set_code"`
 	IconURI     string `json:"icon_uri"`
+	ThemeColor  string `json:"theme_color"`
 	CardCount   int    `json:"card_count"`
 }
 
@@ -17,4 +18,5 @@ type DeckInput struct {
 	Commander   bool   `json:"commander"`
 	Colors      string `json:"colors"`
 	SetCode     string `json:"set_code"`
+	ThemeColor  string `json:"theme_color"`
 }
