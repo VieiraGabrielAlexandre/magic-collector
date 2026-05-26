@@ -40,7 +40,8 @@ func main() {
 	handler := cards.NewHandler(service)
 
 	deckRepo := decks.NewRepository(db)
-	deckHandler := decks.NewHandler(deckRepo)
+	deckSvc := decks.NewService(deckRepo, mtgClient)
+	deckHandler := decks.NewHandler(deckSvc)
 
 	router := gin.Default()
 
@@ -60,6 +61,7 @@ func main() {
 	router.POST("/decks", deckHandler.Create)
 	router.PUT("/decks/:id", deckHandler.Update)
 	router.DELETE("/decks/:id", deckHandler.Delete)
+	router.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
 
 	router.Run(":8080")
 }

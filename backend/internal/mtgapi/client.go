@@ -212,6 +212,44 @@ func (c *Client) fetch(endpoint string) (*ExternalCard, error) {
 	return card.toExternal(), nil
 }
 
+// SetInfo contém os dados relevantes de um set do Scryfall.
+type SetInfo struct {
+	Code       string `json:"code"`
+	Name       string `json:"name"`
+	IconSVGURI string `json:"icon_svg_uri"`
+	ReleasedAt string `json:"released_at"`
+	SetType    string `json:"set_type"`
+	CardCount  int    `json:"card_count"`
+}
+
+// GetSetByCode busca dados de um set pelo seu código (ex: "dmu", "bro").
+func (c *Client) GetSetByCode(code string) (*SetInfo, error) {
+	if code == "" {
+		return nil, nil
+	}
+	endpoint := "https://api.scryfall.com/sets/" + url.PathEscape(strings.ToLower(strings.TrimSpace(code)))
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "magic-collector/1.0")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+	var set SetInfo
+	if err := json.NewDecoder(resp.Body).Decode(&set); err != nil {
+		return nil, err
+	}
+	return &set, nil
+}
+
 // toLangCode converte os códigos de idioma do nosso DB para os do Scryfall.
 func toLangCode(lang string) string {
 	switch strings.ToUpper(lang) {

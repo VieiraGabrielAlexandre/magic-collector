@@ -956,6 +956,196 @@ button.danger:hover:not(:disabled) {
   flex-shrink: 0;
 }
 
+/* ── Mana icons in card list ───────────────────────────────────────────── */
+.card-color-icons {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.mana-icon {
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.modal-color-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.modal-color-icons .mana-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Mana color picker (form) ──────────────────────────────────────────── */
+.mana-color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mana-color-picker-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+.mana-color-picker-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.mana-picker-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 2px solid var(--border-dim);
+  padding: 5px;
+  cursor: pointer;
+  opacity: 0.38;
+  transition: opacity 0.15s, border-color 0.15s, box-shadow 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mana-picker-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.mana-picker-btn:hover {
+  opacity: 0.75;
+  box-shadow: none;
+}
+.mana-picker-btn.active {
+  opacity: 1;
+  border-color: var(--gold-dim);
+  box-shadow: 0 0 8px rgba(200, 155, 60, 0.25);
+}
+
+/* ── Set icon ──────────────────────────────────────────────────────────── */
+.set-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: invert(1);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+.set-icon-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.deck-icon-lg {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: invert(1) sepia(0.3) saturate(1.5);
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.deck-set-code-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--gold-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ── Deck list ─────────────────────────────────────────────────────────── */
+.deck-list { gap: 6px; }
+
+.deck-list-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-left: 3px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.deck-list-item:hover {
+  border-color: var(--border);
+  border-left-color: var(--gold-dim);
+  background: var(--surface-3);
+}
+.deck-list-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.deck-list-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deck-list-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.deck-list-name strong {
+  font-size: 14px;
+  color: var(--text);
+}
+.deck-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.deck-set-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+.deck-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+/* ── Hint de campo ─────────────────────────────────────────────────────── */
+.field-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 1px;
+}
+
 /* ── Gerenciar deck ────────────────────────────────────────────────────── */
 .deck-manage {
   display: flex;
@@ -966,10 +1156,24 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
-.deck-manage-header h2 {
+.deck-manage-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+.deck-manage-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.deck-manage-title-text h2 {
   font-family: 'Cinzel', serif;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--gold);
   letter-spacing: 0.06em;
@@ -977,6 +1181,12 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+.deck-manage-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .back-btn {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createCard, createDeck, deleteCard, deleteDeck, exportCards, getCard, listCards, listDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createCard, createDeck, deleteCard, deleteDeck, exportCards, fetchDeckIcon, getCard, listCards, listDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -44,6 +44,90 @@ function ColorPips({ colors }) {
   );
 }
 
+// ── Mana / card colors ──────────────────────────────────────────────────
+const CARD_COLORS = [
+  { icon: "white",    pt: "Branco",   code: "W" },
+  { icon: "blue",     pt: "Azul",     code: "U" },
+  { icon: "black",    pt: "Preto",    code: "B" },
+  { icon: "red",      pt: "Vermelho", code: "R" },
+  { icon: "green",    pt: "Verde",    code: "G" },
+  { icon: "incolour", pt: "Incolor",  code: "C" },
+];
+
+const PTBR_TO_ICON = {
+  branco: "white", azul: "blue", preto: "black", preta: "black",
+  verde: "green", vermelha: "red", vermelho: "red", incolor: "incolour", incolour: "incolour",
+};
+const ICON_TO_PTBR = {
+  white: "Branco", blue: "Azul", black: "Preto", red: "Vermelho", green: "Verde", incolour: "Incolor",
+};
+const MTG_CODE_TO_ICON = { W: "white", U: "blue", B: "black", R: "red", G: "green", C: "incolour" };
+
+function colorStrToIconSet(colorStr) {
+  const parts = (colorStr || "").split(/[,/]+/).map((s) => s.trim().toLowerCase());
+  const set = new Set();
+  for (const p of parts) {
+    const icon = PTBR_TO_ICON[p];
+    if (icon) set.add(icon);
+  }
+  return set;
+}
+
+function iconSetToColorStr(iconSet) {
+  return [...iconSet].map((icon) => ICON_TO_PTBR[icon]).filter(Boolean).join("/");
+}
+
+function parseCardColorIcons(card) {
+  if (card.colors && card.colors !== "[]" && card.colors !== "") {
+    try {
+      const arr = JSON.parse(card.colors);
+      if (Array.isArray(arr) && arr.length > 0) {
+        return [...new Set(arr.map((c) => MTG_CODE_TO_ICON[c.toUpperCase()]).filter(Boolean))];
+      }
+    } catch {}
+  }
+  if (!card.color) return [];
+  return [...colorStrToIconSet(card.color)];
+}
+
+function CardColorIcons({ card }) {
+  const icons = parseCardColorIcons(card);
+  if (!icons.length) return null;
+  return (
+    <span className="card-color-icons">
+      {icons.map((icon) => (
+        <img key={icon} src={`/mana-icons/${icon}.svg`} className="mana-icon" alt={icon} />
+      ))}
+    </span>
+  );
+}
+
+function ManaColorPicker({ value, onChange }) {
+  const iconSet = colorStrToIconSet(value);
+  return (
+    <div className="mana-color-picker">
+      <span className="mana-color-picker-label">Cor</span>
+      <div className="mana-color-picker-row">
+        {CARD_COLORS.map(({ icon, pt, code }) => {
+          const active = iconSet.has(icon);
+          return (
+            <button key={code} type="button" title={pt}
+              className={`mana-picker-btn${active ? " active" : ""}`}
+              onClick={() => {
+                const s = new Set(iconSet);
+                if (active) s.delete(icon); else s.add(icon);
+                onChange(iconSetToColorStr(s));
+              }}
+            >
+              <img src={`/mana-icons/${icon}.svg`} alt={pt} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -65,8 +149,8 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState("collection");
   const [decks, setDecks] = useState([]);
-  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "" });
-  const [editingDeck, setEditingDeck] = useState(null);
+  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "" });
+  const [editDeckModal, setEditDeckModal] = useState(null);
 
   const [managingDeck, setManagingDeck] = useState(null);
   const [deckCards, setDeckCards] = useState([]);
@@ -188,7 +272,7 @@ export default function App() {
   async function handleDeckCreate(e) {
     e.preventDefault();
     await createDeck(deckForm);
-    setDeckForm({ name: "", description: "", commander: false, colors: "" });
+    setDeckForm({ name: "", description: "", commander: false, colors: "", set_code: "" });
     loadDecks();
   }
 
@@ -199,13 +283,14 @@ export default function App() {
 
   async function handleDeckUpdate(e) {
     e.preventDefault();
-    await updateDeck(editingDeck.id, {
-      name: editingDeck.name,
-      description: editingDeck.description || "",
-      commander: editingDeck.commander || false,
-      colors: editingDeck.colors || "",
+    await updateDeck(editDeckModal.id, {
+      name: editDeckModal.name,
+      description: editDeckModal.description || "",
+      commander: editDeckModal.commander || false,
+      colors: editDeckModal.colors || "",
+      set_code: editDeckModal.set_code || "",
     });
-    setEditingDeck(null);
+    setEditDeckModal(null);
     loadDecks();
   }
 
@@ -213,6 +298,13 @@ export default function App() {
     setManagingDeck(deck);
     setDeckSearch("");
     await refreshDeckManagement(deck.id);
+    if (deck.set_code && !deck.icon_uri) {
+      const result = await fetchDeckIcon(deck.id);
+      if (result?.icon_uri) {
+        setManagingDeck((prev) => ({ ...prev, icon_uri: result.icon_uri }));
+        loadDecks();
+      }
+    }
   }
 
   async function handleAssignCard(cardId) {
@@ -283,13 +375,25 @@ export default function App() {
           <div className="deck-manage">
             <div className="deck-manage-header">
               <button type="button" className="back-btn" onClick={() => setManagingDeck(null)}>← Voltar</button>
-              <h2>
-                {managingDeck.name}
-                {managingDeck.commander && <span className="commander-badge">CMD</span>}
-                <ColorPips colors={managingDeck.colors} />
-                <span className="total-badge">{deckCards.length} cartas</span>
-              </h2>
+              <div className="deck-manage-title">
+                {managingDeck.icon_uri
+                  ? <img src={managingDeck.icon_uri} className="deck-icon-lg" alt={managingDeck.set_code} />
+                  : managingDeck.set_code && <span className="deck-set-code-lg">{managingDeck.set_code.toUpperCase()}</span>
+                }
+                <div className="deck-manage-title-text">
+                  <h2>
+                    {managingDeck.name}
+                    {managingDeck.commander && <span className="commander-badge">CMD</span>}
+                  </h2>
+                  <div className="deck-manage-meta">
+                    <ColorPips colors={managingDeck.colors} />
+                    <span className="total-badge">{deckCards.length} cartas no deck</span>
+                    <span className="unique-badge">{unassignedCards.length} sem deck</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <div className="deck-manage-grid">
               <section className="card list-section">
                 <div className="list-header">
@@ -301,9 +405,11 @@ export default function App() {
                       <div className="list-item-info">
                         <div className="list-item-name">
                           <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                          {card.foil && <span className="foil-text">✦</span>}
+                          <CardColorIcons card={card} />
                           {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                         </div>
-                        <small>{card.set_code} · {card.language} · ×{card.quantity}</small>
+                        <small>{card.set_code || "—"} · {card.language} · ×{card.quantity}</small>
                       </div>
                       <div className="actions">
                         <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
@@ -328,9 +434,11 @@ export default function App() {
                       <div className="list-item-info">
                         <div className="list-item-name">
                           <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                          {card.foil && <span className="foil-text">✦</span>}
+                          <CardColorIcons card={card} />
                           {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                         </div>
-                        <small>{card.set_code} · {card.language} · ×{card.quantity}</small>
+                        <small>{card.set_code || "—"} · {card.language} · ×{card.quantity}</small>
                       </div>
                       <div className="actions">
                         <button type="button" onClick={() => handleAssignCard(card.id)}>+ Deck</button>
@@ -347,6 +455,11 @@ export default function App() {
             <form className="card form" onSubmit={handleDeckCreate}>
               <h2>Novo Deck</h2>
               <label>Nome *<input required value={deckForm.name} onChange={(e) => setDeckForm({ ...deckForm, name: e.target.value })} placeholder="Ex: Eldrazi Unbound" /></label>
+              <label>
+                Código do set
+                <input value={deckForm.set_code} onChange={(e) => setDeckForm({ ...deckForm, set_code: e.target.value })} placeholder="Ex: dmu, bro, mkm" />
+                <span className="field-hint">Usado para buscar o ícone do set no Scryfall</span>
+              </label>
               <label>Descrição<textarea value={deckForm.description} onChange={(e) => setDeckForm({ ...deckForm, description: e.target.value })} placeholder="Notas sobre o deck..." /></label>
               <label className="checkbox-label">
                 <input type="checkbox" checked={deckForm.commander} onChange={(e) => setDeckForm({ ...deckForm, commander: e.target.checked })} />
@@ -374,48 +487,32 @@ export default function App() {
                   <h2>Meus Decks <span className="total-badge">{decks.length}</span></h2>
                 </div>
               </div>
-              <div className="list">
+              <div className="list deck-list">
                 {decks.map((deck) => (
-                  <div className="list-item" key={deck.id}>
-                    {editingDeck?.id === deck.id ? (
-                      <form className="deck-edit-inline" onSubmit={handleDeckUpdate}>
-                        <input required value={editingDeck.name} onChange={(e) => setEditingDeck({ ...editingDeck, name: e.target.value })} />
-                        <input value={editingDeck.description || ""} onChange={(e) => setEditingDeck({ ...editingDeck, description: e.target.value })} placeholder="Descrição" />
-                        <label className="checkbox-label" style={{ flexDirection: "row", gap: 6 }}>
-                          <input type="checkbox" checked={editingDeck.commander || false} onChange={(e) => setEditingDeck({ ...editingDeck, commander: e.target.checked })} />
-                          <span style={{ fontSize: 12 }}>CMD</span>
-                        </label>
-                        <div className="color-pips-row-inline">
-                          {MTG_COLORS.map(({ code, cls }) => (
-                            <button key={code} type="button"
-                              className={`cp-toggle cp-${cls}${(editingDeck.colors||"").split(",").filter(Boolean).includes(code) ? " active" : ""}`}
-                              onClick={() => setEditingDeck({ ...editingDeck, colors: toggleColor(editingDeck.colors || "", code) })}
-                            >{code}</button>
-                          ))}
-                        </div>
-                        <div className="actions">
-                          <button type="submit">✓</button>
-                          <button type="button" onClick={() => setEditingDeck(null)}>✕</button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        <div className="list-item-info">
-                          <div className="list-item-name">
-                            <strong>{deck.name}</strong>
-                            {deck.commander && <span className="commander-badge">CMD</span>}
-                            <ColorPips colors={deck.colors} />
-                            <span className="total-badge">{deck.card_count}</span>
-                          </div>
-                          {deck.description && <small>{deck.description}</small>}
-                        </div>
-                        <div className="actions">
-                          <button type="button" onClick={() => handleManageDeck(deck)}>Cartas</button>
-                          <button type="button" onClick={() => setEditingDeck({ ...deck })}>Editar</button>
-                          <button type="button" className="danger" onClick={() => handleDeckDelete(deck.id)}>✕</button>
-                        </div>
-                      </>
-                    )}
+                  <div className="deck-list-item" key={deck.id}>
+                    <div className="deck-list-icon">
+                      {deck.icon_uri
+                        ? <img src={deck.icon_uri} className="set-icon" alt={deck.set_code} />
+                        : <span className="set-icon-placeholder">{deck.set_code ? deck.set_code.slice(0,3).toUpperCase() : "—"}</span>
+                      }
+                    </div>
+                    <div className="deck-list-body">
+                      <div className="deck-list-name">
+                        <strong>{deck.name}</strong>
+                        {deck.commander && <span className="commander-badge">CMD</span>}
+                        <ColorPips colors={deck.colors} />
+                      </div>
+                      <div className="deck-list-meta">
+                        {deck.set_code && <span className="deck-set-label">{deck.set_code.toUpperCase()}</span>}
+                        <span className="total-badge">{deck.card_count} cartas</span>
+                        {deck.description && <span className="deck-desc">{deck.description}</span>}
+                      </div>
+                    </div>
+                    <div className="actions">
+                      <button type="button" onClick={() => handleManageDeck(deck)}>Cartas</button>
+                      <button type="button" onClick={() => setEditDeckModal({ ...deck })}>Editar</button>
+                      <button type="button" className="danger" onClick={() => handleDeckDelete(deck.id)}>✕</button>
+                    </div>
                   </div>
                 ))}
                 {decks.length === 0 && <p className="empty">Nenhum deck cadastrado.</p>}
@@ -425,12 +522,53 @@ export default function App() {
         )
       )}
 
+      {/* ── MODAL EDITAR DECK ── */}
+      {editDeckModal && (
+        <div className="modal-overlay" onClick={() => setEditDeckModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setEditDeckModal(null)}>✕</button>
+            <form className="edit-form" onSubmit={handleDeckUpdate}>
+              <h2>Editar Deck</h2>
+              <div className="edit-grid">
+                <label>Nome *<input required value={editDeckModal.name} onChange={(e) => setEditDeckModal({ ...editDeckModal, name: e.target.value })} /></label>
+                <label>
+                  Código do set
+                  <input value={editDeckModal.set_code || ""} onChange={(e) => setEditDeckModal({ ...editDeckModal, set_code: e.target.value })} placeholder="Ex: dmu, bro" />
+                </label>
+              </div>
+              <label>Descrição<textarea value={editDeckModal.description || ""} onChange={(e) => setEditDeckModal({ ...editDeckModal, description: e.target.value })} /></label>
+              <label className="checkbox-label">
+                <input type="checkbox" checked={editDeckModal.commander || false} onChange={(e) => setEditDeckModal({ ...editDeckModal, commander: e.target.checked })} />
+                Commander
+              </label>
+              <div className="color-picker">
+                <span className="color-picker-label">Cores do deck</span>
+                <div className="color-pips-row">
+                  {MTG_COLORS.map(({ code, cls }) => (
+                    <label key={code} className={`color-pip-check cp-${cls}${(editDeckModal.colors||"").split(",").filter(Boolean).includes(code) ? " selected" : ""}`}>
+                      <input type="checkbox"
+                        checked={(editDeckModal.colors||"").split(",").filter(Boolean).includes(code)}
+                        onChange={() => setEditDeckModal({ ...editDeckModal, colors: toggleColor(editDeckModal.colors || "", code) })} />
+                      {code}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setEditDeckModal(null)}>Cancelar</button>
+                <button type="submit" className="save-btn">Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {activeTab === "collection" && <section className="grid">
         {/* ── FORMULÁRIO ── */}
         <form className="card form" onSubmit={handleSubmit}>
           <h2>Cadastrar Carta</h2>
           {field("Nome *", "name", { placeholder: "Ex: Lightning Bolt", required: true })}
-          {field("Cor", "color", { placeholder: "Ex: Vermelha, Azul, Incolor" })}
+          <ManaColorPicker value={form.color} onChange={(v) => setForm({ ...form, color: v })} />
           {field("Tipo", "type", { placeholder: "Ex: Criatura, Instant" })}
           {field("Subtítulo", "subtitle", { placeholder: "Ex: Humano Soldado" })}
           {field("Nº na coleção", "collection_number", { placeholder: "Ex: 17" })}
@@ -549,6 +687,7 @@ export default function App() {
                       {card.name}
                     </strong>
                     {card.foil && <span className="foil-text">✦</span>}
+                    <CardColorIcons card={card} />
                     {card.rarity && (
                       <span className={`rarity r-${card.rarity.toLowerCase()}`}>
                         {card.rarity}
@@ -556,7 +695,7 @@ export default function App() {
                     )}
                   </div>
                   <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"}</span>
-                  <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}{card.color ? ` · ${card.color}` : ""} · ×{card.quantity}</small>
+                  <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""} · ×{card.quantity}</small>
                 </div>
                 <div className="actions">
                   <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
@@ -622,7 +761,12 @@ export default function App() {
 
                 <div className="modal-divider" />
                 <div className="modal-grid">
-                  <div><span>Cor</span>{selectedCard.local.color || "—"}</div>
+                  <div><span>Cor</span>
+                    <span className="modal-color-icons">
+                      <CardColorIcons card={selectedCard.local} />
+                      {!parseCardColorIcons(selectedCard.local).length && (selectedCard.local.color || "—")}
+                    </span>
+                  </div>
                   <div><span>Raridade</span>{selectedCard.external?.rarity || selectedCard.local.rarity || "—"}</div>
                   <div><span>Coleção</span>{selectedCard.local.set_code || "—"}</div>
                   <div><span>Nº</span>{selectedCard.local.collection_number || "—"}</div>
@@ -678,7 +822,6 @@ export default function App() {
                 <h2>Editar carta</h2>
                 <div className="edit-grid">
                   <label>Nome *<input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
-                  <label>Cor<input value={editForm.color} onChange={(e) => setEditForm({ ...editForm, color: e.target.value })} /></label>
                   <label>Tipo<input value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} /></label>
                   <label>Subtítulo<input value={editForm.subtitle} onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })} /></label>
                   <label>Nº na coleção<input value={editForm.collection_number} onChange={(e) => setEditForm({ ...editForm, collection_number: e.target.value })} /></label>
@@ -726,6 +869,7 @@ export default function App() {
                     </select>
                   </label>
                 </div>
+                <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
                 <label>Observações<textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
                 <label className="checkbox-label propagate-label">
                   <input type="checkbox" checked={propagate} onChange={(e) => setPropagate(e.target.checked)} />

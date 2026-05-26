@@ -68,6 +68,8 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE cards ADD COLUMN deck_id     INT          NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN commander   TINYINT      NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN colors      VARCHAR(50)  NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE decks ADD COLUMN set_code    VARCHAR(20)  NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE decks ADD COLUMN icon_uri    VARCHAR(500) NOT NULL DEFAULT ''`)
 
 	return db, nil
 }

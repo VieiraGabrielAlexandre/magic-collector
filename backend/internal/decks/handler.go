@@ -7,15 +7,15 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
+	svc *Service
 }
 
-func NewHandler(repo *Repository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 func (h *Handler) List(c *gin.Context) {
-	decks, err := h.repo.List()
+	decks, err := h.svc.List()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao listar decks"})
 		return
@@ -32,7 +32,7 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
 		return
 	}
-	id, err := h.repo.Create(input)
+	id, err := h.svc.Create(input)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar deck"})
 		return
@@ -46,7 +46,7 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
 		return
 	}
-	if err := h.repo.Update(c.Param("id"), input); err != nil {
+	if err := h.svc.Update(c.Param("id"), input); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar deck"})
 		return
 	}
@@ -54,9 +54,18 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	if err := h.repo.Delete(c.Param("id")); err != nil {
+	if err := h.svc.Delete(c.Param("id")); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao remover deck"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Deck removido com sucesso"})
+}
+
+func (h *Handler) FetchIcon(c *gin.Context) {
+	iconURI, err := h.svc.FetchIcon(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar ícone"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"icon_uri": iconURI})
 }

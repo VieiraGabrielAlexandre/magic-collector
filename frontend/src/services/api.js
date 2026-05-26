@@ -87,3 +87,9 @@ export async function deleteDeck(id) {
   if (!res.ok) throw new Error("Erro ao remover deck");
   return res.json();
 }
+
+export async function fetchDeckIcon(id) {
+  const res = await fetch(`${BASE_URL}/decks/${id}/icon`, { method: "PATCH" });
+  if (!res.ok) return null;
+  return res.json();
+}
