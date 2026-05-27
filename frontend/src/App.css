@@ -1289,6 +1289,66 @@ button.danger:hover:not(:disabled) {
   flex: 1;
 }
 
+/* ── Import Pré-con ────────────────────────────────────────────────────── */
+.import-precon-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+  border: 1px solid var(--gold-dim);
+  color: var(--gold-light);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.import-precon-btn:hover {
+  background: var(--gold-glow);
+  border-color: var(--gold);
+}
+.modal-import {
+  max-width: 520px;
+}
+.import-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  color: var(--gold-light);
+  font-size: 14px;
+}
+.import-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gold-dim);
+  border-top-color: var(--gold-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.import-result {
+  text-align: center;
+  padding: 24px 0 8px;
+}
+.import-result-icon {
+  font-size: 40px;
+  color: #60d890;
+  margin-bottom: 12px;
+}
+.import-result p {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+.import-result-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.form-error {
+  color: #f07070;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   .app { padding: 20px 16px 48px; }

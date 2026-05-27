@@ -93,3 +93,25 @@ export async function fetchDeckIcon(id) {
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function importDeckList(data) {
+  const res = await fetch(`${BASE_URL}/decks/import-list`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao importar lista");
+  return json;
+}
+
+export async function importPrecon(data) {
+  const res = await fetch(`${BASE_URL}/decks/import-precon`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao importar pré-con");
+  return json;
+}

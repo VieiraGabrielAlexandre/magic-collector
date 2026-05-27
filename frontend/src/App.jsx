@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createCard, createDeck, deleteCard, deleteDeck, exportCards, fetchDeckIcon, getCard, listCards, listDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createCard, createDeck, deleteCard, deleteDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listCards, listDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -212,6 +212,20 @@ export default function App() {
   const [unassignedTotal, setUnassignedTotal] = useState(0);
   const [deckSearch, setDeckSearch] = useState("");
 
+  const EMPTY_IMPORT_FORM = { set_code: "", deck_name: "", language: "PT", colors: "", commander: false, theme_color: "", description: "" };
+  const [importModal, setImportModal] = useState(false);
+  const [importForm, setImportForm] = useState(EMPTY_IMPORT_FORM);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState("");
+
+  const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "PT", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
+  const [listModal, setListModal] = useState(false);
+  const [listForm, setListForm] = useState(EMPTY_LIST_FORM);
+  const [listLoading, setListLoading] = useState(false);
+  const [listResult, setListResult] = useState(null);
+  const [listError, setListError] = useState("");
+
   const searchTimer = useRef(null);
   const deckSearchTimer = useRef(null);
 
@@ -401,6 +415,38 @@ export default function App() {
     XLSX.writeFile(wb, "colecao.xlsx");
   }
 
+  async function handleImportList(e) {
+    e.preventDefault();
+    setListLoading(true);
+    setListError("");
+    setListResult(null);
+    try {
+      const result = await importDeckList(listForm);
+      setListResult(result);
+      await loadDecks();
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
+  async function handleImportPrecon(e) {
+    e.preventDefault();
+    setImportLoading(true);
+    setImportError("");
+    setImportResult(null);
+    try {
+      const result = await importPrecon(importForm);
+      setImportResult(result);
+      await loadDecks();
+    } catch (err) {
+      setImportError(err.message);
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   const field = (label, key, extra = {}) => (
     <label>
       {label}
@@ -567,6 +613,8 @@ export default function App() {
               <div className="list-header">
                 <div className="list-header-top">
                   <h2>Meus Decks <span className="total-badge">{decks.length}</span></h2>
+                  <button type="button" className="import-precon-btn" onClick={() => { setImportModal(true); setImportResult(null); setImportError(""); setImportForm(EMPTY_IMPORT_FORM); }}>Importar Pré-con</button>
+                  <button type="button" className="import-precon-btn" onClick={() => { setListModal(true); setListResult(null); setListError(""); setListForm(EMPTY_LIST_FORM); }}>Importar Lista</button>
                 </div>
               </div>
               <div className="list deck-list">
@@ -642,6 +690,171 @@ export default function App() {
                 <button type="submit" className="save-btn">Salvar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL IMPORTAR LISTA ── */}
+      {listModal && (
+        <div className="modal-overlay" onClick={() => { if (!listLoading) setListModal(false); }}>
+          <div className="modal modal-import" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => { if (!listLoading) setListModal(false); }}>✕</button>
+            <h2>Importar Lista de Cartas</h2>
+
+            {listResult ? (
+              <div className="import-result">
+                <div className="import-result-icon">✓</div>
+                <p><strong>{listResult.imported}</strong> cartas importadas com sucesso!</p>
+                <p className="import-result-sub">{listResult.failed > 0 && <span>{listResult.failed} falhas · </span>}{listResult.total_from_api} cartas na lista · Deck: <em>{listResult.deck_name}</em></p>
+                <div className="modal-actions">
+                  <button type="button" onClick={() => { setListModal(false); setListResult(null); }}>Fechar</button>
+                  <button type="button" className="save-btn" onClick={() => { setListResult(null); setListForm(EMPTY_LIST_FORM); }}>Importar outro</button>
+                </div>
+              </div>
+            ) : (
+              <form className="edit-form" onSubmit={handleImportList}>
+                <div className="edit-grid">
+                  <label>
+                    Nome do deck *
+                    <input required placeholder="Ex: Perrie, the Pulverizer" value={listForm.deck_name}
+                      onChange={(e) => setListForm({ ...listForm, deck_name: e.target.value })} />
+                  </label>
+                  <label>
+                    Código do set (opcional)
+                    <input placeholder="Ex: ncc, dmu" value={listForm.set_code}
+                      onChange={(e) => setListForm({ ...listForm, set_code: e.target.value.toLowerCase().trim() })} />
+                  </label>
+                </div>
+                <label>
+                  Idioma
+                  <select value={listForm.language} onChange={(e) => setListForm({ ...listForm, language: e.target.value })}>
+                    <option value="PT">Português (~15s para 100 cartas)</option>
+                    <option value="EN">Inglês (~8s para 100 cartas)</option>
+                  </select>
+                </label>
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={listForm.commander}
+                    onChange={(e) => setListForm({ ...listForm, commander: e.target.checked })} />
+                  Deck Commander
+                </label>
+                <div className="color-picker">
+                  <span className="color-picker-label">Cores do deck</span>
+                  <div className="color-pips-row">
+                    {MTG_COLORS.map(({ code, cls }) => (
+                      <label key={code} className={`color-pip-check cp-${cls}${(listForm.colors||"").split(",").filter(Boolean).includes(code) ? " selected" : ""}`}>
+                        <input type="checkbox"
+                          checked={(listForm.colors||"").split(",").filter(Boolean).includes(code)}
+                          onChange={() => setListForm({ ...listForm, colors: toggleColor(listForm.colors, code) })} />
+                        {code}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <DeckColorSelect value={listForm.theme_color} onChange={(v) => setListForm({ ...listForm, theme_color: v })} />
+                <label>Descrição<textarea value={listForm.description} onChange={(e) => setListForm({ ...listForm, description: e.target.value })} /></label>
+                <label>
+                  Lista de cartas *
+                  <textarea required rows={12} style={{ fontFamily: "monospace", fontSize: 12 }}
+                    placeholder={"Commander\n1 Perrie, the Pulverizer\nCreatures (30)\n1 Aven Courier\n..."}
+                    value={listForm.deck_list}
+                    onChange={(e) => setListForm({ ...listForm, deck_list: e.target.value })} />
+                </label>
+
+                {listLoading && (
+                  <div className="import-loading">
+                    <span className="import-spinner" />
+                    Importando cartas{listForm.language === "PT" ? " em PT…" : "…"} (buscando uma a uma no Scryfall)
+                  </div>
+                )}
+                {listError && <p className="form-error">{listError}</p>}
+
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setListModal(false)} disabled={listLoading}>Cancelar</button>
+                  <button type="submit" className="save-btn" disabled={listLoading}>
+                    {listLoading ? "Importando…" : "Importar"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL IMPORTAR PRÉ-CON ── */}
+      {importModal && (
+        <div className="modal-overlay" onClick={() => { if (!importLoading) setImportModal(false); }}>
+          <div className="modal modal-import" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => { if (!importLoading) setImportModal(false); }}>✕</button>
+            <h2>Importar Pré-con</h2>
+
+            {importResult ? (
+              <div className="import-result">
+                <div className="import-result-icon">✓</div>
+                <p><strong>{importResult.imported}</strong> cartas importadas com sucesso!</p>
+                <p className="import-result-sub">{importResult.failed > 0 && <span>{importResult.failed} falhas · </span>}{importResult.total_from_api} cartas no set · Deck: <em>{importResult.deck_name}</em></p>
+                <div className="modal-actions">
+                  <button type="button" onClick={() => { setImportModal(false); setImportResult(null); }}>Fechar</button>
+                  <button type="button" className="save-btn" onClick={() => { setImportResult(null); setImportForm(EMPTY_IMPORT_FORM); }}>Importar outro</button>
+                </div>
+              </div>
+            ) : (
+              <form className="edit-form" onSubmit={handleImportPrecon}>
+                <div className="edit-grid">
+                  <label>
+                    Código do set *
+                    <input required placeholder="Ex: ncc, dmu, bro" value={importForm.set_code}
+                      onChange={(e) => setImportForm({ ...importForm, set_code: e.target.value.toLowerCase().trim() })} />
+                  </label>
+                  <label>
+                    Nome do deck *
+                    <input required placeholder="Ex: New Capenna Commander" value={importForm.deck_name}
+                      onChange={(e) => setImportForm({ ...importForm, deck_name: e.target.value })} />
+                  </label>
+                </div>
+                <label>
+                  Idioma
+                  <select value={importForm.language} onChange={(e) => setImportForm({ ...importForm, language: e.target.value })}>
+                    <option value="PT">Português (busca versão PT de cada carta)</option>
+                    <option value="EN">Inglês (importação rápida)</option>
+                  </select>
+                </label>
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={importForm.commander}
+                    onChange={(e) => setImportForm({ ...importForm, commander: e.target.checked })} />
+                  Deck Commander
+                </label>
+                <div className="color-picker">
+                  <span className="color-picker-label">Cores do deck</span>
+                  <div className="color-pips-row">
+                    {MTG_COLORS.map(({ code, cls }) => (
+                      <label key={code} className={`color-pip-check cp-${cls}${(importForm.colors||"").split(",").filter(Boolean).includes(code) ? " selected" : ""}`}>
+                        <input type="checkbox"
+                          checked={(importForm.colors||"").split(",").filter(Boolean).includes(code)}
+                          onChange={() => setImportForm({ ...importForm, colors: toggleColor(importForm.colors, code) })} />
+                        {code}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <DeckColorSelect value={importForm.theme_color} onChange={(v) => setImportForm({ ...importForm, theme_color: v })} />
+                <label>Descrição<textarea value={importForm.description} onChange={(e) => setImportForm({ ...importForm, description: e.target.value })} /></label>
+
+                {importLoading && (
+                  <div className="import-loading">
+                    <span className="import-spinner" />
+                    Importando cartas{importForm.language === "PT" ? " em PT (pode levar ~30s)…" : "…"}
+                  </div>
+                )}
+                {importError && <p className="form-error">{importError}</p>}
+
+                <div className="modal-actions">
+                  <button type="button" onClick={() => setImportModal(false)} disabled={importLoading}>Cancelar</button>
+                  <button type="submit" className="save-btn" disabled={importLoading}>
+                    {importLoading ? "Importando…" : "Importar"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
