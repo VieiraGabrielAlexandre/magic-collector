@@ -44,5 +44,13 @@ yarn-debug.log*
 # ── Claude Code ─────────────────────────────────────────────────────────────────
 .claude/
 
+# ── Terraform ───────────────────────────────────────────────────────────────────
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/*.tfplan
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
 # ── Documentação externa clonada (não faz parte do projeto) ─────────────────────
 doc-api-magictgr/
