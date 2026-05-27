@@ -39,30 +39,42 @@ type ExternalCard struct {
 }
 
 type scryfallList struct {
-	Data []scryfallCard `json:"data"`
+	Data     []scryfallCard `json:"data"`
+	HasMore  bool           `json:"has_more"`
+	NextPage string         `json:"next_page"`
+}
+
+type scryfallCardFace struct {
+	ImageURIs   map[string]string `json:"image_uris"`
+	PrintedName string            `json:"printed_name"`
+	ManaCost    string            `json:"mana_cost"`
+	Colors      []string          `json:"colors"`
 }
 
 type scryfallCard struct {
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	PrintedName     string            `json:"printed_name"`
-	Set             string            `json:"set"`
-	SetName         string            `json:"set_name"`
-	Rarity          string            `json:"rarity"`
-	TypeLine        string            `json:"type_line"`
-	PrintedTypeLine string            `json:"printed_type_line"`
-	ManaCost        string            `json:"mana_cost"`
-	Colors          []string          `json:"colors"`
-	ImageURIs       map[string]string `json:"image_uris"`
-	OracleText      string            `json:"oracle_text"`
-	PrintedText     string            `json:"printed_text"`
-	FlavorText      string            `json:"flavor_text"`
-	Artist          string            `json:"artist"`
-	CollectorNumber string            `json:"collector_number"`
-	Power           string            `json:"power"`
-	Toughness       string            `json:"toughness"`
-	Prices          map[string]string `json:"prices"`
-	ScryfallURI     string            `json:"scryfall_uri"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	PrintedName     string             `json:"printed_name"`
+	Set             string             `json:"set"`
+	SetName         string             `json:"set_name"`
+	Rarity          string             `json:"rarity"`
+	TypeLine        string             `json:"type_line"`
+	PrintedTypeLine string             `json:"printed_type_line"`
+	ManaCost        string             `json:"mana_cost"`
+	Colors          []string           `json:"colors"`
+	ColorIdentity   []string           `json:"color_identity"`
+	ImageURIs       map[string]string  `json:"image_uris"`
+	CardFaces       []scryfallCardFace `json:"card_faces"`
+	OracleText      string             `json:"oracle_text"`
+	PrintedText     string             `json:"printed_text"`
+	FlavorText      string             `json:"flavor_text"`
+	Artist          string             `json:"artist"`
+	CollectorNumber string             `json:"collector_number"`
+	Power           string             `json:"power"`
+	Toughness       string             `json:"toughness"`
+	Prices          map[string]string  `json:"prices"`
+	ScryfallURI     string             `json:"scryfall_uri"`
+	Layout          string             `json:"layout"`
 }
 
 func (s *scryfallCard) toExternal() *ExternalCard {
@@ -71,18 +83,33 @@ func (s *scryfallCard) toExternal() *ExternalCard {
 		if u, ok := s.ImageURIs["normal"]; ok {
 			imageURL = u
 		}
+	} else if len(s.CardFaces) > 0 && s.CardFaces[0].ImageURIs != nil {
+		if u, ok := s.CardFaces[0].ImageURIs["normal"]; ok {
+			imageURL = u
+		}
 	}
+
+	printedName := s.PrintedName
+	if printedName == "" && len(s.CardFaces) > 0 {
+		printedName = s.CardFaces[0].PrintedName
+	}
+
+	colors := s.Colors
+	if len(colors) == 0 && len(s.ColorIdentity) > 0 {
+		colors = s.ColorIdentity
+	}
+
 	return &ExternalCard{
 		ID:          s.ID,
 		Name:        s.Name,
-		PrintedName: s.PrintedName,
+		PrintedName: printedName,
 		Set:         strings.ToUpper(s.Set),
 		SetName:     s.SetName,
 		Rarity:      s.Rarity,
 		Type:        s.TypeLine,
 		PrintedType: s.PrintedTypeLine,
 		ManaCost:    s.ManaCost,
-		Colors:      s.Colors,
+		Colors:      colors,
 		ImageURL:    imageURL,
 		Text:        s.OracleText,
 		PrintedText: s.PrintedText,
@@ -248,6 +275,102 @@ func (c *Client) GetSetByCode(code string) (*SetInfo, error) {
 		return nil, err
 	}
 	return &set, nil
+}
+
+// FetchSetCards busca todas as cartas de um set, paginando automaticamente.
+// Se lang != "en", busca a versão localizada de cada carta individualmente.
+func (c *Client) FetchSetCards(setCode, lang string) ([]*ExternalCard, error) {
+	setCode = strings.ToLower(strings.TrimSpace(setCode))
+	langCode := toLangCode(lang)
+
+	searchURL := fmt.Sprintf(
+		"https://api.scryfall.com/cards/search?include_extras=true&include_variations=true&order=set&q=%s&unique=prints",
+		url.QueryEscape("e:"+setCode),
+	)
+
+	var enCards []scryfallCard
+	for searchURL != "" {
+		page, err := c.fetchPage(searchURL)
+		if err != nil {
+			return nil, err
+		}
+		enCards = append(enCards, page.Data...)
+		if page.HasMore && page.NextPage != "" {
+			searchURL = page.NextPage
+			time.Sleep(100 * time.Millisecond)
+		} else {
+			searchURL = ""
+		}
+	}
+
+	result := make([]*ExternalCard, 0, len(enCards))
+	for _, sc := range enCards {
+		if langCode != "en" && sc.Set != "" && sc.CollectorNumber != "" {
+			time.Sleep(75 * time.Millisecond)
+			langEndpoint := fmt.Sprintf("%s/%s/%s/%s", apiBase, sc.Set, sc.CollectorNumber, langCode)
+			if langCard, _ := c.fetch(langEndpoint); langCard != nil {
+				result = append(result, langCard)
+				continue
+			}
+		}
+		result = append(result, sc.toExternal())
+	}
+
+	return result, nil
+}
+
+func (c *Client) fetchPage(endpoint string) (*scryfallList, error) {
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "magic-collector/1.0")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("scryfall retornou %d para %s", resp.StatusCode, endpoint)
+	}
+
+	var list scryfallList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	return &list, nil
+}
+
+// SearchByName busca uma carta pelo nome exato no Scryfall.
+// Se setCode for fornecido, tenta encontrar a impressão daquele set primeiro.
+// Se lang != "en", tenta buscar a versão localizada.
+func (c *Client) SearchByName(name, setCode, lang string) (*ExternalCard, error) {
+	base := "https://api.scryfall.com/cards/named?exact=" + url.QueryEscape(name)
+	langCode := toLangCode(lang)
+
+	var enCard *ExternalCard
+	if setCode != "" {
+		enCard, _ = c.fetch(base + "&set=" + url.QueryEscape(strings.ToLower(strings.TrimSpace(setCode))))
+	}
+	if enCard == nil {
+		var err error
+		enCard, err = c.fetch(base)
+		if err != nil || enCard == nil {
+			return nil, err
+		}
+	}
+
+	if langCode != "en" {
+		time.Sleep(75 * time.Millisecond)
+		langEndpoint := fmt.Sprintf("%s/%s/%s/%s", apiBase, strings.ToLower(enCard.Set), enCard.Number, langCode)
+		if langCard, _ := c.fetch(langEndpoint); langCard != nil {
+			return langCard, nil
+		}
+	}
+
+	return enCard, nil
 }
 
 // toLangCode converte os códigos de idioma do nosso DB para os do Scryfall.
