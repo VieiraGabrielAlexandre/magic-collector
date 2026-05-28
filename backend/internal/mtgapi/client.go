@@ -343,20 +343,25 @@ func (c *Client) fetchPage(endpoint string) (*scryfallList, error) {
 	return &list, nil
 }
 
-// SearchByName busca uma carta pelo nome exato no Scryfall.
-// Se setCode for fornecido, tenta encontrar a impressão daquele set primeiro.
+// SearchByName busca uma carta pelo nome no Scryfall.
+// Tenta exact match primeiro (com set hint se fornecido), depois fuzzy como fallback.
 // Se lang != "en", tenta buscar a versão localizada.
 func (c *Client) SearchByName(name, setCode, lang string) (*ExternalCard, error) {
-	base := "https://api.scryfall.com/cards/named?exact=" + url.QueryEscape(name)
 	langCode := toLangCode(lang)
+	exactBase := "https://api.scryfall.com/cards/named?exact=" + url.QueryEscape(name)
 
 	var enCard *ExternalCard
 	if setCode != "" {
-		enCard, _ = c.fetch(base + "&set=" + url.QueryEscape(strings.ToLower(strings.TrimSpace(setCode))))
+		enCard, _ = c.fetch(exactBase + "&set=" + url.QueryEscape(strings.ToLower(strings.TrimSpace(setCode))))
 	}
 	if enCard == nil {
+		enCard, _ = c.fetch(exactBase)
+	}
+	if enCard == nil {
+		// Fallback: fuzzy permite variações de pontuação, &, // em DFCs, etc.
+		fuzzy := "https://api.scryfall.com/cards/named?fuzzy=" + url.QueryEscape(name)
 		var err error
-		enCard, err = c.fetch(base)
+		enCard, err = c.fetch(fuzzy)
 		if err != nil || enCard == nil {
 			return nil, err
 		}

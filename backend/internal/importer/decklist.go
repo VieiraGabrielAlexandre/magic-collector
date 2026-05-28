@@ -46,6 +46,12 @@ func ParseDeckList(text string) []DeckListEntry {
 			continue
 		}
 
+		// Ignora linhas de rodapé como "100 Cards Total" ou "99 Cards"
+		lower := strings.ToLower(name)
+		if strings.HasPrefix(lower, "card") || strings.Contains(lower, "cards total") {
+			continue
+		}
+
 		entries = append(entries, DeckListEntry{Quantity: qty, Name: name})
 	}
 

@@ -22,11 +22,12 @@ type ImportPreconInput struct {
 }
 
 type ImportResult struct {
-	DeckID       int64  `json:"deck_id"`
-	DeckName     string `json:"deck_name"`
-	Imported     int    `json:"imported"`
-	Failed       int    `json:"failed"`
-	TotalFromAPI int    `json:"total_from_api"`
+	DeckID       int64    `json:"deck_id"`
+	DeckName     string   `json:"deck_name"`
+	Imported     int      `json:"imported"`
+	Failed       int      `json:"failed"`
+	TotalFromAPI int      `json:"total_from_api"`
+	FailedCards  []string `json:"failed_cards,omitempty"`
 }
 
 type Service struct {
@@ -137,17 +138,55 @@ func (s *Service) ImportDeckList(input ImportDeckListInput) (ImportResult, error
 		return ImportResult{}, fmt.Errorf("criando deck: %w", err)
 	}
 
-	result := ImportResult{
-		DeckID:       deckID,
-		DeckName:     input.DeckName,
-		TotalFromAPI: len(entries),
+	result := s.importEntries(entries, deckID, input.SetCode, lang)
+	result.DeckID = deckID
+	result.DeckName = input.DeckName
+	return result, nil
+}
+
+type ImportCardsToDeckInput struct {
+	DeckList string `json:"deck_list" binding:"required"`
+	SetCode  string `json:"set_code"`
+	Language string `json:"language"`
+}
+
+func (s *Service) ImportCardsIntoDeck(deckID int64, input ImportCardsToDeckInput) (ImportResult, error) {
+	lang := strings.ToUpper(strings.TrimSpace(input.Language))
+	if lang == "" {
+		lang = "EN"
 	}
+
+	entries := ParseDeckList(input.DeckList)
+	if len(entries) == 0 {
+		return ImportResult{}, fmt.Errorf("nenhuma carta encontrada na lista")
+	}
+
+	result := s.importEntries(entries, deckID, input.SetCode, lang)
+	result.DeckID = deckID
+	return result, nil
+}
+
+// importEntries busca cada carta na API e insere no banco. Reutilizado por ImportDeckList e ImportCardsIntoDeck.
+func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, lang string) ImportResult {
+	result := ImportResult{TotalFromAPI: len(entries)}
 
 	for _, entry := range entries {
 		time.Sleep(75 * time.Millisecond)
-		ext, err := s.mtgClient.SearchByName(entry.Name, input.SetCode, lang)
-		if err != nil || ext == nil {
+
+		// 3 tentativas na API com backoff; insert só ocorre após sucesso — sem risco de duplicata.
+		var ext *mtgapi.ExternalCard
+		for attempt := 1; attempt <= 3; attempt++ {
+			if attempt > 1 {
+				time.Sleep(time.Duration(attempt) * time.Second)
+			}
+			ext, _ = s.mtgClient.SearchByName(entry.Name, setCode, lang)
+			if ext != nil {
+				break
+			}
+		}
+		if ext == nil {
 			result.Failed++
+			result.FailedCards = append(result.FailedCards, entry.Name)
 			continue
 		}
 
@@ -155,7 +194,6 @@ func (s *Service) ImportDeckList(input ImportDeckListInput) (ImportResult, error
 		if cardName == "" {
 			cardName = ext.Name
 		}
-
 		colorsJSON, _ := json.Marshal(ext.Colors)
 
 		card := cards.Card{
@@ -175,12 +213,24 @@ func (s *Service) ImportDeckList(input ImportDeckListInput) (ImportResult, error
 			DeckID:           int(deckID),
 		}
 
-		if _, err := s.cardRepo.Create(card); err != nil {
+		// 3 tentativas no DB para absorver broken pipe em conexões ociosas.
+		var insertErr error
+		for dbAttempt := 1; dbAttempt <= 3; dbAttempt++ {
+			if dbAttempt > 1 {
+				time.Sleep(500 * time.Millisecond)
+			}
+			_, insertErr = s.cardRepo.Create(card)
+			if insertErr == nil {
+				break
+			}
+		}
+		if insertErr != nil {
 			result.Failed++
+			result.FailedCards = append(result.FailedCards, entry.Name+" (db: "+insertErr.Error()+")")
 		} else {
 			result.Imported++
 		}
 	}
 
-	return result, nil
+	return result
 }

@@ -94,6 +94,28 @@ export async function fetchDeckIcon(id) {
   return res.json();
 }
 
+export async function listBattles() {
+  const res = await fetch(`${BASE_URL}/battles`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createBattle(data) {
+  const res = await fetch(`${BASE_URL}/battles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Erro ao registrar batalha");
+  return res.json();
+}
+
+export async function deleteBattle(id) {
+  const res = await fetch(`${BASE_URL}/battles/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover batalha");
+  return res.json();
+}
+
 export async function importDeckList(data) {
   const res = await fetch(`${BASE_URL}/decks/import-list`, {
     method: "POST",

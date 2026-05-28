@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createCard, createDeck, deleteCard, deleteDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listCards, listDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -219,6 +219,10 @@ export default function App() {
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState("");
 
+  const [battles, setBattles] = useState([]);
+  const EMPTY_BATTLE_FORM = { result: "win", opponents: ["", "", ""], player_count: 4, game_style: "Commander", deck_id: 0, deck_name: "", deck_is_mine: true, notes: "" };
+  const [battleForm, setBattleForm] = useState(EMPTY_BATTLE_FORM);
+
   const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "PT", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
   const [listForm, setListForm] = useState(EMPTY_LIST_FORM);
@@ -249,6 +253,23 @@ export default function App() {
     setDecks(data ?? []);
   }
 
+  async function loadBattles() {
+    const data = await listBattles();
+    setBattles(data ?? []);
+  }
+
+  async function handleBattleSubmit(e) {
+    e.preventDefault();
+    await createBattle(battleForm);
+    setBattleForm(EMPTY_BATTLE_FORM);
+    await loadBattles();
+  }
+
+  async function handleBattleDelete(id) {
+    await deleteBattle(id);
+    await loadBattles();
+  }
+
   async function loadDeckCards(deckId) {
     const dc = await listCards({ deckId, pageSize: 500 });
     setDeckCards(dc.data ?? []);
@@ -264,6 +285,7 @@ export default function App() {
 
   useEffect(() => { loadCards(); }, [sort, order]);
   useEffect(() => { loadDecks(); }, []);
+  useEffect(() => { loadBattles(); }, []);
 
   function handleSearchChange(e) {
     const q = e.target.value;
@@ -471,6 +493,7 @@ export default function App() {
       <nav className="tabs">
         <button type="button" className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>Coleção</button>
         <button type="button" className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>Decks</button>
+        <button type="button" className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>⚔ Batalhas</button>
       </nav>
 
       {activeTab === "decks" && (
@@ -651,6 +674,179 @@ export default function App() {
           </section>
         )
       )}
+
+      {/* ── ABA BATALHAS ── */}
+      {activeTab === "battles" && (() => {
+        const wins   = battles.filter(b => b.result === "win").length;
+        const losses = battles.filter(b => b.result === "loss").length;
+        const total  = battles.length;
+        const rate   = total > 0 ? Math.round((wins / total) * 100) : 0;
+        return (
+          <div className="battles-page">
+
+            {/* Stats */}
+            <div className="battle-stats">
+              <div className="bstat bstat-total">
+                <span className="bstat-num">{total}</span>
+                <span className="bstat-label">Batalhas</span>
+              </div>
+              <div className="bstat bstat-win">
+                <span className="bstat-num">{wins}</span>
+                <span className="bstat-label">⚔ Vitórias</span>
+              </div>
+              <div className="bstat bstat-loss">
+                <span className="bstat-num">{losses}</span>
+                <span className="bstat-label">💀 Derrotas</span>
+              </div>
+              <div className="bstat bstat-rate">
+                <span className="bstat-num">{rate}%</span>
+                <span className="bstat-label">Taxa de vitória</span>
+              </div>
+            </div>
+
+            <div className="battles-grid">
+              {/* Formulário */}
+              <section className="card battle-form-card">
+                <h2>Registrar Batalha</h2>
+                <form onSubmit={handleBattleSubmit}>
+
+                  {/* Resultado */}
+                  <div className="result-toggle">
+                    <button type="button"
+                      className={`result-btn result-win${battleForm.result === "win" ? " active" : ""}`}
+                      onClick={() => setBattleForm({ ...battleForm, result: "win" })}>
+                      ⚔ Vitória
+                    </button>
+                    <button type="button"
+                      className={`result-btn result-loss${battleForm.result === "loss" ? " active" : ""}`}
+                      onClick={() => setBattleForm({ ...battleForm, result: "loss" })}>
+                      💀 Derrota
+                    </button>
+                  </div>
+
+                  <div className="battle-form-row">
+                    <label>Nº de jogadores
+                      <input type="number" min="2" max="8" value={battleForm.player_count}
+                        onChange={e => {
+                          const n = Math.max(2, Math.min(8, +e.target.value));
+                          const opp = Array.from({ length: n - 1 }, (_, i) => battleForm.opponents[i] ?? "");
+                          setBattleForm({ ...battleForm, player_count: n, opponents: opp });
+                        }} />
+                    </label>
+                    <label>Formato
+                      <select value={battleForm.game_style}
+                        onChange={e => setBattleForm({ ...battleForm, game_style: e.target.value })}>
+                        <option value="Commander">Commander</option>
+                        <option value="1v1">1v1</option>
+                        <option value="Draft">Draft</option>
+                        <option value="Sealed">Sealed</option>
+                        <option value="Cube">Cube</option>
+                        <option value="Casual">Casual</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  {/* Deck */}
+                  <div className="deck-origin-toggle">
+                    <button type="button"
+                      className={`origin-btn${battleForm.deck_is_mine ? " active" : ""}`}
+                      onClick={() => setBattleForm({ ...battleForm, deck_is_mine: true, deck_id: 0, deck_name: "" })}>
+                      Meu deck
+                    </button>
+                    <button type="button"
+                      className={`origin-btn${!battleForm.deck_is_mine ? " active" : ""}`}
+                      onClick={() => setBattleForm({ ...battleForm, deck_is_mine: false, deck_id: 0, deck_name: "" })}>
+                      Deck externo
+                    </button>
+                  </div>
+
+                  <div className="opponents-list">
+                    {battleForm.opponents.map((name, i) => (
+                      <label key={i}>
+                        Oponente {i + 1}
+                        <input placeholder={`Nome do oponente ${i + 1}`} value={name}
+                          onChange={e => {
+                            const opp = [...battleForm.opponents];
+                            opp[i] = e.target.value;
+                            setBattleForm({ ...battleForm, opponents: opp });
+                          }} />
+                      </label>
+                    ))}
+                  </div>
+
+                  {battleForm.deck_is_mine ? (
+                    <label>Deck utilizado
+                      <select value={battleForm.deck_id}
+                        onChange={e => {
+                          const id = +e.target.value;
+                          const d = decks.find(d => d.id === id);
+                          setBattleForm({ ...battleForm, deck_id: id, deck_name: d ? d.name : "" });
+                        }}>
+                        <option value={0}>— selecione —</option>
+                        {decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </label>
+                  ) : (
+                    <label>Nome do deck externo
+                      <input placeholder="Ex: Ur-Dragon precon" value={battleForm.deck_name}
+                        onChange={e => setBattleForm({ ...battleForm, deck_name: e.target.value })} />
+                    </label>
+                  )}
+
+                  <label>Observações
+                    <textarea rows={2} placeholder="Opcional…" value={battleForm.notes}
+                      onChange={e => setBattleForm({ ...battleForm, notes: e.target.value })} />
+                  </label>
+
+                  <button type="submit" className={`submit-battle${battleForm.result === "win" ? " win" : " loss"}`}>
+                    {battleForm.result === "win" ? "⚔ Registrar Vitória" : "💀 Registrar Derrota"}
+                  </button>
+                </form>
+              </section>
+
+              {/* Lista */}
+              <section className="card list-section">
+                <div className="list-header">
+                  <div className="list-header-top">
+                    <h2>Histórico <span className="total-badge">{total}</span></h2>
+                  </div>
+                </div>
+                <div className="list battles-list">
+                  {battles.map(b => {
+                    const isWin = b.result === "win";
+                    const date = b.played_at ? new Date(b.played_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : "";
+                    return (
+                      <div key={b.id} className={`battle-item ${isWin ? "battle-win" : "battle-loss"}`}>
+                        <div className="battle-result-icon">{isWin ? "⚔" : "💀"}</div>
+                        <div className="battle-info">
+                          <div className="battle-main">
+                            <strong className="battle-deck-name">{b.deck_name || "—"}</strong>
+                            {!b.deck_is_mine && <span className="ext-badge">externo</span>}
+                            <span className={`battle-result-label ${isWin ? "lbl-win" : "lbl-loss"}`}>
+                              {isWin ? "VITÓRIA" : "DERROTA"}
+                            </span>
+                          </div>
+                          <div className="battle-sub">
+                            {b.opponents?.filter(Boolean).length > 0 && (
+                              <span>vs <em>{b.opponents.filter(Boolean).join(", ")}</em></span>
+                            )}
+                            {b.game_style && <span className="battle-tag">{b.game_style}</span>}
+                            {b.player_count > 0 && <span className="battle-tag">{b.player_count}p</span>}
+                            {date && <span className="battle-date">{date}</span>}
+                          </div>
+                          {b.notes && <div className="battle-notes">{b.notes}</div>}
+                        </div>
+                        <button type="button" className="danger battle-del" onClick={() => handleBattleDelete(b.id)}>✕</button>
+                      </div>
+                    );
+                  })}
+                  {battles.length === 0 && <p className="empty">Nenhuma batalha registrada ainda.</p>}
+                </div>
+              </section>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── MODAL EDITAR DECK ── */}
       {editDeckModal && (

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -15,6 +16,12 @@ func Open(dsn string) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("não foi possível conectar ao banco de dados: %w", err)
 	}
+
+	// Evita broken pipe: fecha conexões ociosas antes que o servidor remoto as derrube.
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(3 * time.Minute)
+	db.SetConnMaxIdleTime(30 * time.Second)
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS cards (
@@ -71,6 +78,27 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE decks ADD COLUMN set_code    VARCHAR(20)  NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN icon_uri     VARCHAR(500) NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN theme_color  VARCHAR(30)  NOT NULL DEFAULT ''`)
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS battles (
+			id           INT         NOT NULL AUTO_INCREMENT,
+			result       VARCHAR(10) NOT NULL,
+			opponents    TEXT        NOT NULL,
+			player_count INT         NOT NULL DEFAULT 2,
+			game_style   VARCHAR(50) NOT NULL DEFAULT '',
+			deck_id      INT         NOT NULL DEFAULT 0,
+			deck_name    VARCHAR(255) NOT NULL DEFAULT '',
+			deck_is_mine TINYINT     NOT NULL DEFAULT 1,
+			notes        TEXT        NOT NULL,
+			played_at    DATETIME    DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	db.Exec(`ALTER TABLE battles ADD COLUMN opponents TEXT`)
+	db.Exec(`ALTER TABLE battles DROP COLUMN opponent`)
+	if err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }

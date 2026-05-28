@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"magic-collection-api/internal/battles"
 	"magic-collection-api/internal/cards"
 	"magic-collection-api/internal/database"
 	"magic-collection-api/internal/decks"
@@ -47,6 +48,9 @@ func main() {
 	importerSvc := importer.NewService(deckRepo, repository, mtgClient)
 	importerHandler := importer.NewHandler(importerSvc)
 
+	battleRepo := battles.NewRepository(db)
+	battleHandler := battles.NewHandler(battleRepo)
+
 	router := gin.Default()
 
 	router.GET("/health", func(c *gin.Context) {
@@ -68,6 +72,11 @@ func main() {
 	router.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
 	router.POST("/decks/import-precon", importerHandler.ImportPrecon)
 	router.POST("/decks/import-list", importerHandler.ImportDeckList)
+	router.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
+
+	router.GET("/battles", battleHandler.List)
+	router.POST("/battles", battleHandler.Create)
+	router.DELETE("/battles/:id", battleHandler.Delete)
 
 	router.Run(":8080")
 }
