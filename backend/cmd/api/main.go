@@ -23,7 +23,7 @@ func getenv(key, fallback string) string {
 }
 
 func main() {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=10s&readTimeout=10s&writeTimeout=10s",
 		getenv("DB_USER", "root"),
 		getenv("DB_PASSWORD", ""),
 		getenv("DB_HOST", "localhost"),

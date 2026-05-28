@@ -171,13 +171,13 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 	result := ImportResult{TotalFromAPI: len(entries)}
 
 	for _, entry := range entries {
-		time.Sleep(75 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 
-		// 3 tentativas na API com backoff; insert só ocorre após sucesso — sem risco de duplicata.
+		// 3 tentativas na API com backoff curto; insert só ocorre após sucesso — sem risco de duplicata.
 		var ext *mtgapi.ExternalCard
 		for attempt := 1; attempt <= 3; attempt++ {
 			if attempt > 1 {
-				time.Sleep(time.Duration(attempt) * time.Second)
+				time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
 			}
 			ext, _ = s.mtgClient.SearchByName(entry.Name, setCode, lang)
 			if ext != nil {
@@ -213,20 +213,10 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 			DeckID:           int(deckID),
 		}
 
-		// 3 tentativas no DB para absorver broken pipe em conexões ociosas.
-		var insertErr error
-		for dbAttempt := 1; dbAttempt <= 3; dbAttempt++ {
-			if dbAttempt > 1 {
-				time.Sleep(500 * time.Millisecond)
-			}
-			_, insertErr = s.cardRepo.Create(card)
-			if insertErr == nil {
-				break
-			}
-		}
-		if insertErr != nil {
+		// database/sql já faz retry automático em ErrBadConn (broken pipe detectado antes do envio).
+		if _, err := s.cardRepo.Create(card); err != nil {
 			result.Failed++
-			result.FailedCards = append(result.FailedCards, entry.Name+" (db: "+insertErr.Error()+")")
+			result.FailedCards = append(result.FailedCards, entry.Name+" (db: "+err.Error()+")")
 		} else {
 			result.Imported++
 		}

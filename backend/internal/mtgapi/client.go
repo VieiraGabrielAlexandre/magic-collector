@@ -214,29 +214,47 @@ func (c *Client) GetByMTGID(id string) (*ExternalCard, error) {
 }
 
 func (c *Client) fetch(endpoint string) (*ExternalCard, error) {
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "magic-collector/1.0")
-	req.Header.Set("Accept", "application/json")
+	const maxAttempts = 3
+	var delay time.Duration
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if delay > 0 {
+			time.Sleep(delay)
+		}
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
+		req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "magic-collector/1.0")
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			delay = 10 * time.Second // rate limit: aguarda 10s antes do retry
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, nil // 404 ou outro erro não-transitório
+		}
+
+		var card scryfallCard
+		err = json.NewDecoder(resp.Body).Decode(&card)
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		if card.ID == "" {
+			return nil, nil
+		}
+		return card.toExternal(), nil
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil
-	}
-	var card scryfallCard
-	if err := json.NewDecoder(resp.Body).Decode(&card); err != nil {
-		return nil, err
-	}
-	if card.ID == "" {
-		return nil, nil
-	}
-	return card.toExternal(), nil
+	return nil, nil // ainda em rate limit após todas as tentativas
 }
 
 // SetInfo contém os dados relevantes de um set do Scryfall.
@@ -358,7 +376,8 @@ func (c *Client) SearchByName(name, setCode, lang string) (*ExternalCard, error)
 		enCard, _ = c.fetch(exactBase)
 	}
 	if enCard == nil {
-		// Fallback: fuzzy permite variações de pontuação, &, // em DFCs, etc.
+		// Pausa antes do fuzzy para não ultrapassar o rate limit do Scryfall.
+		time.Sleep(110 * time.Millisecond)
 		fuzzy := "https://api.scryfall.com/cards/named?fuzzy=" + url.QueryEscape(name)
 		var err error
 		enCard, err = c.fetch(fuzzy)

@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 """
 Importa o deck TMNT "Michelangelo & Leonardo" em inglês.
-Uso: python3 import_tmnt.py
-     python3 import_tmnt.py http://34.196.63.122/api   # produção
+Uso:
+  python3 import_tmnt.py                        # novo import completo (localhost)
+  python3 import_tmnt.py --retry 11             # importa só as que falharam para o deck 11
+  python3 import_tmnt.py http://IP/api          # novo import completo (produção)
+  python3 import_tmnt.py http://IP/api --retry 11
 """
 import json
 import sys
 import urllib.request
 import urllib.error
 
-BASE_URL = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8080"
+args = sys.argv[1:]
+BASE_URL = "http://localhost:8080"
+RETRY_DECK_ID = None
+
+for i, a in enumerate(args):
+    if a == "--retry" and i + 1 < len(args):
+        RETRY_DECK_ID = int(args[i + 1])
+    elif a.startswith("http"):
+        BASE_URL = a.rstrip("/")
 
 DECK_LIST = """\
 Commander
@@ -114,64 +125,110 @@ Lands (39)
 100 Cards Total
 """
 
-payload = {
-    "deck_name":   "TMNT — Michelangelo & Leonardo",
-    "set_code":    "",
-    "language":    "EN",
-    "commander":   True,
-    "colors":      "W,U,B,R,G",
-    "theme_color": "forest",
-    "description": "Teenage Mutant Ninja Turtles Commander — 5 cores",
-    "deck_list":   DECK_LIST,
-}
-
-url = f"{BASE_URL}/decks/import-list"
-card_lines = [l for l in DECK_LIST.splitlines() if l.strip() and l.strip()[0].isdigit()]
-print(f"→ POST {url}")
-print(f"  {len(card_lines)} entradas na lista, idioma EN")
-print("  Aguarde (~30s)…\n")
-
-data = json.dumps(payload).encode("utf-8")
-req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-
-def do_request(url, payload, timeout=180):
+def do_request(url, payload, timeout=600):
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
-try:
-    result = do_request(url, payload)
+def print_result(result, deck_id=None):
     print(f"✓ {result['imported']} cartas importadas!")
     failed = result.get("failed_cards", [])
     if failed:
-        print(f"  ⚠ {result['failed']} falhas:")
+        print(f"  ⚠ {result['failed']} ainda falharam:")
         for name in failed:
-            print(f"    - {name}")
+            print(f"    ✗ {name}")
+    print(f"  Total processado: {result['total_from_api']}")
+    if deck_id:
+        print(f"  Deck ID: {deck_id}")
 
-        # Retry automático: importa só as que falharam para o mesmo deck
-        retry_names = [n for n in failed if not n.endswith(")")]  # exclui erros com sufixo "(db: ...)"
-        retry_names += [n[:n.rfind(" (db:")] for n in failed if " (db:" in n]
-        if retry_names:
-            retry_list = "\n".join(f"1\t{name}" for name in retry_names)
-            retry_payload = {
-                "deck_list": retry_list,
-                "set_code": payload["set_code"],
-                "language": payload["language"],
-            }
-            retry_url = f"{BASE_URL}/decks/{result['deck_id']}/import-cards"
-            print(f"\n  → Retry de {len(retry_names)} cartas em {retry_url}…")
-            try:
-                r2 = do_request(retry_url, retry_payload, timeout=180)
-                print(f"  ✓ Retry: {r2['imported']} importadas, {r2['failed']} ainda falharam")
-                if r2.get("failed_cards"):
-                    for name in r2["failed_cards"]:
-                        print(f"    ✗ {name}")
-            except Exception as e2:
-                print(f"  ✗ Retry falhou: {e2}")
+# Modo retry: importa só cartas específicas para um deck existente
+FAILED_CARDS = [
+    "Dimension X Pizzasaur",
+    "Electric Seaweed",
+    "Rat King, Pale Piper",
+    "Acidic Slime",
+    "Biogenic Ooze",
+    "Heroes in a Half Shell",
+    "Krang, the All-Powerful",
+    "Raphael, the Muscle",
+    "Shredder, Shadow Master",
+    "Vigor",
+    "Leatherhead, Iron Gator",
+    "Shellshock",
+    "Assassin's Trophy",
+    "Continue?",
+    "Super Combo",
+    "Cultivate",
+    "Here Comes a New Hero!",
+    "Special Move",
+    "Swift Demise",
+    "Double Jump // Flying Kick",
+    "Harmonize",
+    "Lessons from Life",
+    "Wave Goodbye",
+    "Fast Forward",
+    "Game Over",
+    "Vanquish the Horde",
+    "Blasphemous Act",
+    "Sol Ring",
+    "Arcane Signet",
+    "Everything Pizza",
+    "Foot Chopper",
+    "Arcade Cabinet",
+    "Chromatic Lantern",
+    "Exploding Barrel",
+    "Coin of Mastery",
+    "Mole Module",
+    "Level Up",
+    "Together Forever",
+    "Endless Foot Assault",
+    "High Score",
+    "Ninja Pizza",
+    "Ash Barrens",
+    "Big Apple, 3 a.m.",
+    "Cinder Glade",
+    "City of Brass",
+    "Command Tower",
+    "Dragonskull Summit",
+    "Escape Tunnel",
+    "Evolving Wilds",
+    "Exotic Orchard",
+    "Fabled Passage",
+    "Forest",
+    "Grand Coliseum",
+]
 
-    print(f"\n  Total na lista: {result['total_from_api']}")
-    print(f"  Deck ID: {result['deck_id']} — {result.get('deck_name', '')}")
+try:
+    if RETRY_DECK_ID:
+        retry_list = "\n".join(f"1\t{name}" for name in FAILED_CARDS)
+        retry_url = f"{BASE_URL}/decks/{RETRY_DECK_ID}/import-cards"
+        print(f"→ POST {retry_url}")
+        print(f"  {len(FAILED_CARDS)} cartas para retry no deck {RETRY_DECK_ID}")
+        print("  Aguarde (~60s)…\n")
+        result = do_request(retry_url, {"deck_list": retry_list, "set_code": "", "language": "EN"})
+        print_result(result, RETRY_DECK_ID)
+    else:
+        payload = {
+            "deck_name":   "TMNT — Michelangelo & Leonardo",
+            "set_code":    "",
+            "language":    "EN",
+            "commander":   True,
+            "colors":      "W,U,B,R,G",
+            "theme_color": "forest",
+            "description": "Teenage Mutant Ninja Turtles Commander — 5 cores",
+            "deck_list":   DECK_LIST,
+        }
+        card_lines = [l for l in DECK_LIST.splitlines() if l.strip() and l.strip()[0].isdigit()]
+        url = f"{BASE_URL}/decks/import-list"
+        print(f"→ POST {url}")
+        print(f"  {len(card_lines)} entradas na lista, idioma EN")
+        print("  Aguarde (~60s)…\n")
+        result = do_request(url, payload)
+        deck_id = result['deck_id']
+        print(f"  Deck ID: {deck_id} — {result.get('deck_name', '')}")
+        print_result(result, deck_id)
+
 except urllib.error.HTTPError as e:
     body = e.read().decode()
     print(f"✗ HTTP {e.code}: {body}")
