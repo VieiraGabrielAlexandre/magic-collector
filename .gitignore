@@ -42,7 +42,8 @@ npm-debug.log*
 yarn-debug.log*
 
 # ── Claude Code ─────────────────────────────────────────────────────────────────
-.claude/
+# skills/ e commands/ são compartilháveis — só o arquivo de config local é ignorado
+.claude/settings.local.json
 
 # ── Terraform ───────────────────────────────────────────────────────────────────
 terraform/.terraform/
