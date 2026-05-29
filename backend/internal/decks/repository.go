@@ -12,7 +12,10 @@ func NewRepository(db *sql.DB) *Repository {
 
 func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
-		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color, COUNT(c.id) AS card_count
+		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color,
+		       COUNT(c.id) AS card_count,
+		       COALESCE(d.evaluation, '') AS evaluation,
+		       COALESCE(DATE_FORMAT(d.evaluated_at, '%Y-%m-%dT%H:%i:%s'), '') AS evaluated_at
 		FROM decks d
 		LEFT JOIN cards c ON c.deck_id = d.id
 		GROUP BY d.id
@@ -27,7 +30,7 @@ func (r *Repository) List() ([]Deck, error) {
 	for rows.Next() {
 		var d Deck
 		var commanderInt int
-		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.ThemeColor, &d.CardCount); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.ThemeColor, &d.CardCount, &d.Evaluation, &d.EvaluatedAt); err != nil {
 			return nil, err
 		}
 		d.Commander = commanderInt == 1
@@ -77,6 +80,11 @@ func (r *Repository) Update(id string, input DeckInput) error {
 
 func (r *Repository) UpdateIcon(id, iconURI string) error {
 	_, err := r.db.Exec(`UPDATE decks SET icon_uri=? WHERE id=?`, iconURI, id)
+	return err
+}
+
+func (r *Repository) UpdateEvaluation(id, evaluation string) error {
+	_, err := r.db.Exec(`UPDATE decks SET evaluation=?, evaluated_at=NOW() WHERE id=?`, evaluation, id)
 	return err
 }
 

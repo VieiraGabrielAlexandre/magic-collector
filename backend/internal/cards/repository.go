@@ -278,3 +278,31 @@ func (r *Repository) ListAll() ([]Card, error) {
 	}
 	return result, nil
 }
+
+// EvalCardInfo contém os campos mínimos necessários para gerar a avaliação IA de um deck.
+type EvalCardInfo struct {
+	Name     string
+	Type     string
+	ManaCost string
+	Rarity   string
+}
+
+// ListForEval retorna nome, tipo, custo de mana e raridade de todas as cartas de um deck.
+func (r *Repository) ListForEval(deckID int) ([]EvalCardInfo, error) {
+	rows, err := r.db.Query(
+		`SELECT name, COALESCE(` + "`type`" + `, ''), COALESCE(mana_cost, ''), COALESCE(rarity, '')
+		 FROM cards WHERE deck_id = ? ORDER BY ` + "`type`" + `, name`, deckID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []EvalCardInfo
+	for rows.Next() {
+		var c EvalCardInfo
+		if err := rows.Scan(&c.Name, &c.Type, &c.ManaCost, &c.Rarity); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}

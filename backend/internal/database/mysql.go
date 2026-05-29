@@ -78,6 +78,8 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE decks ADD COLUMN set_code    VARCHAR(20)  NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN icon_uri     VARCHAR(500) NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN theme_color  VARCHAR(30)  NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE decks ADD COLUMN evaluation   LONGTEXT`)
+	db.Exec(`ALTER TABLE decks ADD COLUMN evaluated_at DATETIME NULL`)
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS battles (

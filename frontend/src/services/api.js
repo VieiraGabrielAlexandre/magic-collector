@@ -137,3 +137,10 @@ export async function importPrecon(data) {
   if (!res.ok) throw new Error(json.error || "Erro ao importar pré-con");
   return json;
 }
+
+export async function evaluateDeck(id) {
+  const res = await fetch(`${BASE_URL}/decks/${id}/evaluate`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao gerar avaliação");
+  return json;
+}

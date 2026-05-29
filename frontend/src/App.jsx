@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -128,6 +128,43 @@ function ManaColorPicker({ value, onChange }) {
   );
 }
 
+// ── AI Evaluation markdown renderer ─────────────────────────────────────
+function renderInlineBold(text) {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
+}
+
+function renderEvalMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const elements = [];
+  let listItems = [];
+
+  const flushList = (key) => {
+    if (listItems.length > 0) {
+      elements.push(<ul key={`ul-${key}`} className="eval-list">{listItems}</ul>);
+      listItems = [];
+    }
+  };
+
+  lines.forEach((line, i) => {
+    const t = line.trim();
+    if (t.startsWith("## ")) {
+      flushList(i);
+      elements.push(<h3 key={i} className="eval-heading">{t.slice(3)}</h3>);
+    } else if (t.startsWith("- ")) {
+      listItems.push(<li key={i}>{renderInlineBold(t.slice(2))}</li>);
+    } else if (t === "") {
+      flushList(i);
+    } else {
+      flushList(i);
+      elements.push(<p key={i} className="eval-para">{renderInlineBold(t)}</p>);
+    }
+  });
+  flushList("end");
+  return elements;
+}
+
 // ── Deck theme colors ───────────────────────────────────────────────────
 const DECK_THEME_COLORS = [
   { id: "",          label: "Nenhuma"                                                   },
@@ -211,6 +248,8 @@ export default function App() {
   const [unassignedTotalPages, setUnassignedTotalPages] = useState(1);
   const [unassignedTotal, setUnassignedTotal] = useState(0);
   const [deckSearch, setDeckSearch] = useState("");
+  const [deckInnerTab, setDeckInnerTab] = useState("cards");
+  const [evaluating, setEvaluating] = useState(false);
 
   const EMPTY_IMPORT_FORM = { set_code: "", deck_name: "", language: "PT", colors: "", commander: false, theme_color: "", description: "" };
   const [importModal, setImportModal] = useState(false);
@@ -394,6 +433,7 @@ export default function App() {
   async function handleManageDeck(deck) {
     setManagingDeck(deck);
     setDeckSearch("");
+    setDeckInnerTab("cards");
     setUnassignedPage(1);
     await Promise.all([loadDeckCards(deck.id), loadUnassigned(1, "")]);
     if (deck.set_code && !deck.icon_uri) {
@@ -402,6 +442,19 @@ export default function App() {
         setManagingDeck((prev) => ({ ...prev, icon_uri: result.icon_uri }));
         loadDecks();
       }
+    }
+  }
+
+  async function handleEvaluate() {
+    setEvaluating(true);
+    try {
+      const result = await evaluateDeck(managingDeck.id);
+      setManagingDeck((prev) => ({ ...prev, evaluation: result.evaluation, evaluated_at: result.evaluated_at }));
+      setDecks((prev) => prev.map((d) => d.id === managingDeck.id ? { ...d, evaluation: result.evaluation, evaluated_at: result.evaluated_at } : d));
+    } catch (e) {
+      alert("Erro ao gerar avaliação: " + e.message);
+    } finally {
+      setEvaluating(false);
     }
   }
 
@@ -521,84 +574,122 @@ export default function App() {
               </div>
             </div>
 
-            <div className="deck-manage-grid">
-              <section className="card list-section">
-                <div className="list-header">
-                  <h3 className="section-title">No deck <span className="total-badge">{deckTotalQuantity}</span><span className="unique-badge">{deckCards.length} únicas</span></h3>
-                </div>
-                <div className="list">
-                  {deckCards.map((card) => (
-                    <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
-                      <div className="list-item-info">
-                        <div className="list-item-name">
-                          <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
-                          {card.foil && <span className="foil-text">✦</span>}
-                          <CardColorIcons card={card} />
-                          {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
-                        </div>
-                        <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
-                      </div>
-                      <div className="actions">
-                        <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
-                      </div>
-                    </div>
-                  ))}
-                  {deckCards.length === 0 && <p className="empty">Nenhuma carta no deck.</p>}
-                </div>
-              </section>
+            <div className="deck-inner-tabs">
+              <button type="button" className={`deck-inner-tab${deckInnerTab === "cards" ? " active" : ""}`} onClick={() => setDeckInnerTab("cards")}>🃏 Cartas</button>
+              <button type="button" className={`deck-inner-tab${deckInnerTab === "eval" ? " active" : ""}`} onClick={() => setDeckInnerTab("eval")}>
+                🤖 Avaliação IA
+                {managingDeck.evaluated_at && <span className="eval-badge">✓</span>}
+              </button>
+            </div>
 
-              <section className="card list-section">
-                <div className="list-header">
-                  <div className="list-header-top">
-                    <h3 className="section-title">Sem deck <span className="unique-badge">{unassignedTotal}</span></h3>
+            {deckInnerTab === "cards" && (
+              <div className="deck-manage-grid">
+                <section className="card list-section">
+                  <div className="list-header">
+                    <h3 className="section-title">No deck <span className="total-badge">{deckTotalQuantity}</span><span className="unique-badge">{deckCards.length} únicas</span></h3>
                   </div>
-                  <input className="search-input" type="search" placeholder="Filtrar por nome ou coleção..."
-                    value={deckSearch} onChange={(e) => {
-                      const q = e.target.value;
-                      setDeckSearch(q);
-                      clearTimeout(deckSearchTimer.current);
-                      deckSearchTimer.current = setTimeout(() => loadUnassigned(1, q), 350);
-                    }} />
-                </div>
-                <div className="list">
-                  {unassignedCards.map((card) => (
-                    <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
-                      <div className="list-item-info">
-                        <div className="list-item-name">
-                          <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
-                          {card.foil && <span className="foil-text">✦</span>}
-                          <CardColorIcons card={card} />
-                          {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
+                  <div className="list">
+                    {deckCards.map((card) => (
+                      <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                        <div className="list-item-info">
+                          <div className="list-item-name">
+                            <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                            {card.foil && <span className="foil-text">✦</span>}
+                            <CardColorIcons card={card} />
+                            {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
+                          </div>
+                          <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
                         </div>
-                        <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
+                        <div className="actions">
+                          <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
+                        </div>
                       </div>
-                      <div className="actions">
-                        <button type="button" onClick={() => handleAssignCard(card.id)}>+ Deck</button>
-                      </div>
+                    ))}
+                    {deckCards.length === 0 && <p className="empty">Nenhuma carta no deck.</p>}
+                  </div>
+                </section>
+
+                <section className="card list-section">
+                  <div className="list-header">
+                    <div className="list-header-top">
+                      <h3 className="section-title">Sem deck <span className="unique-badge">{unassignedTotal}</span></h3>
                     </div>
-                  ))}
-                  {unassignedCards.length === 0 && <p className="empty">Nenhuma carta disponível.</p>}
-                </div>
-                {unassignedTotalPages > 1 && (
-                  <div className="pagination">
-                    <button type="button" onClick={() => loadUnassigned(unassignedPage - 1, deckSearch)} disabled={unassignedPage <= 1}>‹</button>
-                    {Array.from({ length: unassignedTotalPages }, (_, i) => i + 1)
-                      .filter((p) => p === 1 || p === unassignedTotalPages || Math.abs(p - unassignedPage) <= 2)
-                      .reduce((acc, p, idx, arr) => {
-                        if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
-                        acc.push(p);
-                        return acc;
-                      }, [])
-                      .map((p, i) =>
-                        p === "…"
-                          ? <span key={`e-${i}`} className="pagination-ellipsis">…</span>
-                          : <button key={p} type="button" className={p === unassignedPage ? "active" : ""} onClick={() => loadUnassigned(p, deckSearch)}>{p}</button>
-                      )}
-                    <button type="button" onClick={() => loadUnassigned(unassignedPage + 1, deckSearch)} disabled={unassignedPage >= unassignedTotalPages}>›</button>
+                    <input className="search-input" type="search" placeholder="Filtrar por nome ou coleção..."
+                      value={deckSearch} onChange={(e) => {
+                        const q = e.target.value;
+                        setDeckSearch(q);
+                        clearTimeout(deckSearchTimer.current);
+                        deckSearchTimer.current = setTimeout(() => loadUnassigned(1, q), 350);
+                      }} />
+                  </div>
+                  <div className="list">
+                    {unassignedCards.map((card) => (
+                      <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                        <div className="list-item-info">
+                          <div className="list-item-name">
+                            <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                            {card.foil && <span className="foil-text">✦</span>}
+                            <CardColorIcons card={card} />
+                            {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
+                          </div>
+                          <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
+                        </div>
+                        <div className="actions">
+                          <button type="button" onClick={() => handleAssignCard(card.id)}>+ Deck</button>
+                        </div>
+                      </div>
+                    ))}
+                    {unassignedCards.length === 0 && <p className="empty">Nenhuma carta disponível.</p>}
+                  </div>
+                  {unassignedTotalPages > 1 && (
+                    <div className="pagination">
+                      <button type="button" onClick={() => loadUnassigned(unassignedPage - 1, deckSearch)} disabled={unassignedPage <= 1}>‹</button>
+                      {Array.from({ length: unassignedTotalPages }, (_, i) => i + 1)
+                        .filter((p) => p === 1 || p === unassignedTotalPages || Math.abs(p - unassignedPage) <= 2)
+                        .reduce((acc, p, idx, arr) => {
+                          if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, i) =>
+                          p === "…"
+                            ? <span key={`e-${i}`} className="pagination-ellipsis">…</span>
+                            : <button key={p} type="button" className={p === unassignedPage ? "active" : ""} onClick={() => loadUnassigned(p, deckSearch)}>{p}</button>
+                        )}
+                      <button type="button" onClick={() => loadUnassigned(unassignedPage + 1, deckSearch)} disabled={unassignedPage >= unassignedTotalPages}>›</button>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+
+            {deckInnerTab === "eval" && (
+              <div className="eval-panel">
+                {evaluating ? (
+                  <div className="eval-loading">
+                    <div className="eval-spinner">⚙</div>
+                    <p className="eval-loading-text">Analisando o deck com IA… pode levar alguns segundos.</p>
+                  </div>
+                ) : managingDeck.evaluation ? (
+                  <>
+                    <div className="eval-header">
+                      <span className="eval-meta">Gerado em {managingDeck.evaluated_at?.replace("T", " ") ?? ""}</span>
+                      <button type="button" className="eval-redo-btn" onClick={handleEvaluate} disabled={evaluating}>♻ Refazer Avaliação</button>
+                    </div>
+                    <div className="eval-content">{renderEvalMarkdown(managingDeck.evaluation)}</div>
+                  </>
+                ) : (
+                  <div className="eval-empty">
+                    <div className="eval-empty-icon">🤖</div>
+                    <p>Nenhuma avaliação gerada para este deck ainda.</p>
+                    <p className="eval-empty-sub">A IA irá analisar todas as cartas e gerar uma avaliação estratégica completa.</p>
+                    <button type="button" className="eval-generate-btn" onClick={handleEvaluate} disabled={evaluating}>
+                      ✨ Gerar Avaliação com IA
+                    </button>
                   </div>
                 )}
-              </section>
-            </div>
+              </div>
+            )}
           </div>
         ) : (
           <section className="grid">

@@ -10,6 +10,8 @@ type Deck struct {
 	IconURI     string `json:"icon_uri"`
 	ThemeColor  string `json:"theme_color"`
 	CardCount   int    `json:"card_count"`
+	Evaluation  string `json:"evaluation,omitempty"`
+	EvaluatedAt string `json:"evaluated_at,omitempty"`
 }
 
 type DeckInput struct {

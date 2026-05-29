@@ -69,3 +69,12 @@ func (h *Handler) FetchIcon(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"icon_uri": iconURI})
 }
+
+func (h *Handler) Evaluate(c *gin.Context) {
+	deck, err := h.svc.EvaluateDeck(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, deck)
+}

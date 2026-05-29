@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"magic-collection-api/internal/ai"
 	"magic-collection-api/internal/battles"
 	"magic-collection-api/internal/cards"
 	"magic-collection-api/internal/database"
@@ -41,8 +42,10 @@ func main() {
 	service := cards.NewService(repository, mtgClient)
 	handler := cards.NewHandler(service)
 
+	aiClient := ai.NewClient(getenv("OPENAI_API_KEY", ""))
+
 	deckRepo := decks.NewRepository(db)
-	deckSvc := decks.NewService(deckRepo, mtgClient)
+	deckSvc := decks.NewService(deckRepo, mtgClient, repository, aiClient)
 	deckHandler := decks.NewHandler(deckSvc)
 
 	importerSvc := importer.NewService(deckRepo, repository, mtgClient)
@@ -70,6 +73,7 @@ func main() {
 	router.PUT("/decks/:id", deckHandler.Update)
 	router.DELETE("/decks/:id", deckHandler.Delete)
 	router.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
+	router.POST("/decks/:id/evaluate", deckHandler.Evaluate)
 	router.POST("/decks/import-precon", importerHandler.ImportPrecon)
 	router.POST("/decks/import-list", importerHandler.ImportDeckList)
 	router.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
