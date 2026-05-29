@@ -57,6 +57,8 @@ func (h *Handler) List(c *gin.Context) {
 		Sort:         c.DefaultQuery("sort", "name"),
 		Order:        c.DefaultQuery("order", "asc"),
 		DeckIDFilter: deckIDFilter,
+		FoilOnly:     c.Query("foil") == "1",
+		RarityFilter: c.Query("rarity"),
 	}
 
 	result, err := h.service.List(params)

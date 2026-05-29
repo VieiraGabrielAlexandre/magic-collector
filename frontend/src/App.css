@@ -261,6 +261,28 @@ button.danger:hover:not(:disabled) {
   box-shadow: 0 0 0 2px rgba(200, 155, 60, 0.15);
 }
 
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface-2, #1c1508);
+  color: var(--text);
+  border: 1px solid var(--border-dim);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  appearance: auto;
+}
+.filter-select:focus, .filter-select:hover { border-color: var(--gold-dim); outline: none; }
+.filter-select option { background: #1a1408; }
+
 .sort-bar {
   display: flex;
   flex-wrap: wrap;

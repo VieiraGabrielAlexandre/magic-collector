@@ -1,8 +1,10 @@
 const BASE_URL = "/api";
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId } = {}) {
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, rarity } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
+  if (foil) params.set("foil", "1");
+  if (rarity) params.set("rarity", rarity);
   const res = await fetch(`${BASE_URL}/cards?${params}`);
   if (!res.ok) return { data: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 };
   return res.json();

@@ -229,6 +229,9 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("name");
   const [order, setOrder] = useState("asc");
+  const [filterFoil, setFilterFoil] = useState("");
+  const [filterRarity, setFilterRarity] = useState("");
+  const [filterDeck, setFilterDeck] = useState("");
 
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -273,12 +276,16 @@ export default function App() {
   const deckSearchTimer = useRef(null);
 
   async function loadCards(opts = {}) {
+    const deckId = (opts.filterDeck ?? filterDeck) === "" ? undefined : parseInt(opts.filterDeck ?? filterDeck);
     const result = await listCards({
       q: opts.q ?? search,
       page: opts.page ?? page,
       sort: opts.sort ?? sort,
       order: opts.order ?? order,
       pageSize: 20,
+      foil: opts.filterFoil ?? filterFoil,
+      rarity: opts.filterRarity ?? filterRarity,
+      deckId,
     });
     setCards(result.data ?? []);
     setTotal(result.total ?? 0);
@@ -322,7 +329,7 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { loadCards(); }, [sort, order]);
+  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterRarity, filterDeck]);
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
 
@@ -1244,6 +1251,25 @@ export default function App() {
               value={search}
               onChange={handleSearchChange}
             />
+            <div className="filter-bar">
+              <select className="filter-select" value={filterDeck} onChange={(e) => { setFilterDeck(e.target.value); setPage(1); }}>
+                <option value="">Todos os decks</option>
+                <option value="0">Sem deck</option>
+              </select>
+              <select className="filter-select" value={filterFoil} onChange={(e) => { setFilterFoil(e.target.value); setPage(1); }}>
+                <option value="">Todas as cartas</option>
+                <option value="1">✦ Somente Foil</option>
+              </select>
+              <select className="filter-select" value={filterRarity} onChange={(e) => { setFilterRarity(e.target.value); setPage(1); }}>
+                <option value="">Todas as raridades</option>
+                <option value="L">Land (L)</option>
+                <option value="C">Common (C)</option>
+                <option value="U">Uncommon (U)</option>
+                <option value="R">Rare (R)</option>
+                <option value="M">Mythic (M)</option>
+                <option value="T">Token (T)</option>
+              </select>
+            </div>
             <div className="sort-bar">
               {SORT_OPTIONS.map((opt) => (
                 <button

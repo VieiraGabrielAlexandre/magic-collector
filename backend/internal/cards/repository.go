@@ -20,7 +20,9 @@ type ListParams struct {
 	PageSize     int
 	Sort         string
 	Order        string
-	DeckIDFilter *int // nil = all; 0 = without deck; >0 = specific deck
+	DeckIDFilter *int  // nil = all; 0 = without deck; >0 = specific deck
+	FoilOnly     bool  // true = somente foil
+	RarityFilter string // "" = todas; "L","C","U","R","M","T" = raridade específica
 }
 
 type ListResult struct {
@@ -64,21 +66,27 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 		order = "DESC"
 	}
 
-	where := ""
+	var clauses []string
 	args := []any{}
 	if params.Search != "" {
-		where = "WHERE name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ?"
+		clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ?)")
 		like := "%" + params.Search + "%"
 		args = append(args, like, like, like, like, like)
 	}
 	if params.DeckIDFilter != nil {
-		clause := "deck_id = ?"
-		if where == "" {
-			where = "WHERE " + clause
-		} else {
-			where += " AND " + clause
-		}
+		clauses = append(clauses, "deck_id = ?")
 		args = append(args, *params.DeckIDFilter)
+	}
+	if params.FoilOnly {
+		clauses = append(clauses, "foil = 1")
+	}
+	if params.RarityFilter != "" {
+		clauses = append(clauses, "rarity = ?")
+		args = append(args, params.RarityFilter)
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
 	}
 
 	countQuery := fmt.Sprintf(`SELECT COUNT(*), COALESCE(SUM(quantity), 0) FROM cards %s`, where)
