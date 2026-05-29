@@ -295,6 +295,45 @@ type EvalCardInfo struct {
 	Rarity   string
 }
 
+// DeckBuilderCard representa uma carta (agrupada por nome) para análise de deck-building.
+type DeckBuilderCard struct {
+	Name     string
+	Type     string
+	ManaCost string
+	Rarity   string
+	Colors   string
+	Quantity int
+}
+
+// ListForDeckBuilder retorna todas as cartas sem deck agrupadas por nome,
+// com a quantidade total disponível de cada uma.
+func (r *Repository) ListForDeckBuilder() ([]DeckBuilderCard, error) {
+	rows, err := r.db.Query(`
+		SELECT name,
+		       COALESCE(MAX(` + "`type`" + `), '') AS type,
+		       COALESCE(MAX(mana_cost), '') AS mana_cost,
+		       COALESCE(MAX(rarity), '') AS rarity,
+		       COALESCE(MAX(colors), '') AS colors,
+		       SUM(quantity) AS total_qty
+		FROM cards
+		WHERE deck_id = 0
+		GROUP BY name
+		ORDER BY ` + "`type`" + `, name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []DeckBuilderCard
+	for rows.Next() {
+		var c DeckBuilderCard
+		if err := rows.Scan(&c.Name, &c.Type, &c.ManaCost, &c.Rarity, &c.Colors, &c.Quantity); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}
+
 // ListForEval retorna nome, tipo, custo de mana e raridade de todas as cartas de um deck.
 func (r *Repository) ListForEval(deckID int) ([]EvalCardInfo, error) {
 	rows, err := r.db.Query(

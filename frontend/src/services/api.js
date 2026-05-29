@@ -140,6 +140,13 @@ export async function importPrecon(data) {
   return json;
 }
 
+export async function suggestDecks() {
+  const res = await fetch(`${BASE_URL}/cards/suggest-decks`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao gerar sugestão");
+  return json;
+}
+
 export async function evaluateDeck(id) {
   const res = await fetch(`${BASE_URL}/decks/${id}/evaluate`, { method: "POST" });
   const json = await res.json();

@@ -1706,3 +1706,109 @@ button.danger:hover:not(:disabled) {
   .eval-panel { padding: 18px 16px; }
   .deck-inner-tab { padding: 8px 12px; font-size: 13px; }
 }
+
+/* ── Deck Builder Button ─────────────────────────────────────────── */
+.deck-builder-btn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #2a1a04, #5a3a08, #2a1a04);
+  background-size: 200% 200%;
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  color: var(--gold-light);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: deck-builder-pulse 3s ease-in-out infinite;
+  box-shadow: 0 0 18px rgba(200,155,60,0.25), inset 0 1px 0 rgba(255,200,80,0.1);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.deck-builder-btn:hover {
+  box-shadow: 0 0 32px rgba(200,155,60,0.5), inset 0 1px 0 rgba(255,200,80,0.2);
+  transform: translateY(-2px);
+}
+.deck-builder-btn:active { transform: translateY(0); }
+
+@keyframes deck-builder-pulse {
+  0%, 100% { background-position: 0% 50%; border-color: var(--gold-dim); }
+  50%       { background-position: 100% 50%; border-color: var(--gold); box-shadow: 0 0 28px rgba(200,155,60,0.45); }
+}
+
+.deck-builder-btn-shine {
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(to right, transparent, rgba(255,220,100,0.15), transparent);
+  transform: skewX(-20deg);
+  animation: deck-builder-shine 3.5s ease-in-out infinite;
+}
+@keyframes deck-builder-shine {
+  0%   { left: -75%; }
+  40%  { left: 130%; }
+  100% { left: 130%; }
+}
+
+.deck-builder-btn-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gold-dim);
+  letter-spacing: 0.02em;
+}
+
+/* ── Deck Builder Modal ──────────────────────────────────────────── */
+.deck-builder-modal {
+  max-width: 780px;
+  width: 96vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.deck-builder-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.deck-builder-modal-header h2 {
+  color: var(--gold-light);
+  font-size: 18px;
+  margin: 0;
+}
+
+.deck-builder-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.deck-builder-content {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+
+.eval-loading-sub {
+  font-size: 12px;
+  color: var(--text-dim, #5a4830);
+  margin-top: 4px;
+}
+
+/* Separador horizontal dentro da análise */
+.deck-builder-content hr,
+.eval-content hr {
+  border: none;
+  border-top: 1px solid var(--border-dim);
+  margin: 16px 0;
+}

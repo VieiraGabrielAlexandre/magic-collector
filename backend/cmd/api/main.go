@@ -37,12 +37,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	aiClient := ai.NewClient(getenv("OPENAI_API_KEY", ""))
+
 	repository := cards.NewRepository(db)
 	mtgClient := mtgapi.NewClient()
 	service := cards.NewService(repository, mtgClient)
-	handler := cards.NewHandler(service)
-
-	aiClient := ai.NewClient(getenv("OPENAI_API_KEY", ""))
+	handler := cards.NewHandler(service, aiClient)
 
 	deckRepo := decks.NewRepository(db)
 	deckSvc := decks.NewService(deckRepo, mtgClient, repository, aiClient)
@@ -62,6 +62,7 @@ func main() {
 
 	router.GET("/cards", handler.List)
 	router.GET("/cards/export", handler.Export)
+	router.POST("/cards/suggest-decks", handler.SuggestDecks)
 	router.POST("/cards", handler.Create)
 	router.GET("/cards/:id", handler.GetByID)
 	router.PUT("/cards/:id", handler.Update)

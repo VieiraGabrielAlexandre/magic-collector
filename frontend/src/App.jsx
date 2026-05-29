@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, suggestDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -232,6 +232,9 @@ export default function App() {
   const [filterFoil, setFilterFoil] = useState("");
   const [filterRarity, setFilterRarity] = useState("");
   const [filterDeck, setFilterDeck] = useState("");
+  const [deckBuilderModal, setDeckBuilderModal] = useState(false);
+  const [deckBuilderLoading, setDeckBuilderLoading] = useState(false);
+  const [deckBuilderResult, setDeckBuilderResult] = useState(null);
 
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -449,6 +452,20 @@ export default function App() {
         setManagingDeck((prev) => ({ ...prev, icon_uri: result.icon_uri }));
         loadDecks();
       }
+    }
+  }
+
+  async function handleSuggestDecks() {
+    setDeckBuilderModal(true);
+    setDeckBuilderLoading(true);
+    setDeckBuilderResult(null);
+    try {
+      const result = await suggestDecks();
+      setDeckBuilderResult(result);
+    } catch (e) {
+      setDeckBuilderResult({ error: e.message });
+    } finally {
+      setDeckBuilderLoading(false);
     }
   }
 
@@ -946,6 +963,39 @@ export default function App() {
         );
       })()}
 
+      {/* ── MODAL DECK BUILDER IA ── */}
+      {deckBuilderModal && (
+        <div className="modal-overlay" onClick={() => !deckBuilderLoading && setDeckBuilderModal(false)}>
+          <div className="modal deck-builder-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="deck-builder-modal-header">
+              <h2>✨ Montar Deck com IA</h2>
+              {!deckBuilderLoading && (
+                <button className="modal-close" onClick={() => setDeckBuilderModal(false)}>✕</button>
+              )}
+            </div>
+            {deckBuilderLoading ? (
+              <div className="eval-loading">
+                <div className="eval-spinner">⚙</div>
+                <p className="eval-loading-text">Analisando suas cartas e montando sugestões de decks…</p>
+                <p className="eval-loading-sub">Isso pode levar alguns segundos.</p>
+              </div>
+            ) : deckBuilderResult?.error ? (
+              <div className="eval-empty">
+                <div className="eval-empty-icon">⚠️</div>
+                <p>{deckBuilderResult.error}</p>
+              </div>
+            ) : deckBuilderResult ? (
+              <>
+                <p className="deck-builder-meta">{deckBuilderResult.card_count} cartas únicas analisadas</p>
+                <div className="eval-content deck-builder-content">
+                  {renderEvalMarkdown(deckBuilderResult.analysis)}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL EDITAR DECK ── */}
       {editDeckModal && (
         <div className="modal-overlay" onClick={() => setEditDeckModal(null)}>
@@ -1270,6 +1320,13 @@ export default function App() {
                 <option value="T">Token (T)</option>
               </select>
             </div>
+            {filterDeck === "0" && filterFoil === "" && filterRarity === "" && (
+              <button type="button" className="deck-builder-btn" onClick={handleSuggestDecks}>
+                <span className="deck-builder-btn-shine" />
+                ✨ Montar Deck com IA
+                <span className="deck-builder-btn-sub">Analisar {total} carta{total !== 1 ? "s" : ""} sem deck</span>
+              </button>
+            )}
             <div className="sort-bar">
               {SORT_OPTIONS.map((opt) => (
                 <button

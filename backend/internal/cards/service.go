@@ -162,3 +162,7 @@ func (s *Service) SetDeck(id string, deckID int) error {
 func (s *Service) ExportAll() ([]Card, error) {
 	return s.repository.ListAll()
 }
+
+func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {
+	return s.repository.ListForDeckBuilder()
+}
