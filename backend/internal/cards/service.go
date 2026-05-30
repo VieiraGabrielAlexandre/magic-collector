@@ -3,6 +3,7 @@ package cards
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"magic-collection-api/internal/mtgapi"
@@ -87,6 +88,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.ManaCost = ext.ManaCost
 		card.Colors = string(colors)
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
+		card.ImageURL = ext.ImageURL
 	}
 
 	return s.repository.Create(card)
@@ -192,6 +194,64 @@ func (s *Service) GetStats() (CollectionStats, error) {
 	return s.repository.GetStats()
 }
 
+// Preview busca a carta na Scryfall sem salvar no banco — usado para confirmar antes de cadastrar.
+func (s *Service) Preview(input CreateCardInput) (*mtgapi.ExternalCard, error) {
+	if input.PreRelease {
+		return s.mtgClient.SearchPreRelease(input.Name, input.Language, input.Artist)
+	}
+	return s.mtgClient.Search(input.SetCode, input.CollectionNumber, input.Language, input.Artist)
+}
+
+// ImageRefreshResult resume o resultado da atualização em lote de imagens.
+type ImageRefreshResult struct {
+	Updated int `json:"updated"`
+	Skipped int `json:"skipped"`
+	Failed  int `json:"failed"`
+	Total   int `json:"total"`
+}
+
+// RefreshImages atualiza image_url de todas as cartas via Scryfall.
+func (s *Service) RefreshImages() (ImageRefreshResult, error) {
+	cards, err := s.repository.ListAllForPriceRefresh()
+	if err != nil {
+		return ImageRefreshResult{}, err
+	}
+
+	result := ImageRefreshResult{Total: len(cards)}
+
+	for _, c := range cards {
+		time.Sleep(80 * time.Millisecond)
+
+		var ext *mtgapi.ExternalCard
+		if c.MTGID != "" {
+			ext, _ = s.mtgClient.GetByMTGID(c.MTGID)
+		}
+		if ext == nil && c.SetCode != "" && c.CollectionNumber != "" {
+			ext, _ = s.mtgClient.Search(c.SetCode, c.CollectionNumber, c.Language, c.Artist)
+		}
+
+		if ext == nil || ext.ImageURL == "" {
+			result.Skipped++
+			continue
+		}
+
+		var updateErr error
+		if c.MTGID == "" && ext.ID != "" {
+			updateErr = s.repository.UpdateImageURLAndMTGID(c.ID, ext.ID, ext.ImageURL)
+		} else {
+			updateErr = s.repository.UpdateImageURL(c.ID, ext.ImageURL)
+		}
+
+		if updateErr != nil {
+			result.Failed++
+		} else {
+			result.Updated++
+		}
+	}
+
+	return result, nil
+}
+
 // PriceRefreshResult resume o resultado da atualização em lote de preços.
 type PriceRefreshResult struct {
 	Updated int `json:"updated"`
@@ -201,9 +261,16 @@ type PriceRefreshResult struct {
 }
 
 // RefreshPrices atualiza price_usd de todas as cartas buscando na Scryfall.
-// Usa GetByMTGID quando possível; caso contrário, tenta Search por set+número.
-func (s *Service) RefreshPrices() (PriceRefreshResult, error) {
-	cards, err := s.repository.ListAllForPriceRefresh()
+// Se emptyOnly=true, processa apenas cartas com price_usd = 0.
+// Para cartas não-EN sem preço, tenta automaticamente a versão EN como fallback.
+func (s *Service) RefreshPrices(emptyOnly bool) (PriceRefreshResult, error) {
+	var cards []CardForPriceRefresh
+	var err error
+	if emptyOnly {
+		cards, err = s.repository.ListEmptyPricesForRefresh()
+	} else {
+		cards, err = s.repository.ListAllForPriceRefresh()
+	}
 	if err != nil {
 		return PriceRefreshResult{}, err
 	}
@@ -215,12 +282,11 @@ func (s *Service) RefreshPrices() (PriceRefreshResult, error) {
 
 		var ext *mtgapi.ExternalCard
 
-		// 1ª tentativa: UUID Scryfall (mais rápido e exato)
+		// 1ª tentativa: UUID Scryfall (rápido e exato)
 		if c.MTGID != "" {
 			ext, _ = s.mtgClient.GetByMTGID(c.MTGID)
 		}
-
-		// 2ª tentativa: set + coleção (para cartas inseridas manualmente)
+		// 2ª tentativa: set + número (cartas sem mtg_id)
 		if ext == nil && c.SetCode != "" && c.CollectionNumber != "" {
 			ext, _ = s.mtgClient.Search(c.SetCode, c.CollectionNumber, c.Language, c.Artist)
 		}
@@ -232,9 +298,17 @@ func (s *Service) RefreshPrices() (PriceRefreshResult, error) {
 
 		price := parsePriceUSD(ext.Prices, c.Foil)
 
+		// Fallback EN: carta não-EN sem preço → busca versão EN para pegar o preço
+		if price == 0 && strings.ToUpper(c.Language) != "EN" && ext.Set != "" && ext.Number != "" {
+			time.Sleep(80 * time.Millisecond)
+			enExt, _ := s.mtgClient.Search(ext.Set, ext.Number, "EN", "")
+			if enExt != nil {
+				price = parsePriceUSD(enExt.Prices, c.Foil)
+			}
+		}
+
 		var updateErr error
 		if c.MTGID == "" && ext.ID != "" {
-			// Aproveita e salva o mtg_id que estava faltando
 			updateErr = s.repository.UpdatePriceAndMTGID(c.ID, ext.ID, price)
 		} else {
 			updateErr = s.repository.UpdatePrice(c.ID, price)

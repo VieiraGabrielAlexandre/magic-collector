@@ -140,8 +140,27 @@ export async function importPrecon(data) {
   return json;
 }
 
-export async function refreshPrices() {
-  const res = await fetch(`${BASE_URL}/cards/refresh-prices`, { method: "POST" });
+export async function previewCard(data) {
+  const res = await fetch(`${BASE_URL}/cards/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar carta");
+  return json;
+}
+
+export async function refreshImages() {
+  const res = await fetch(`${BASE_URL}/cards/refresh-images`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao atualizar imagens");
+  return json;
+}
+
+export async function refreshPrices({ emptyOnly = false } = {}) {
+  const url = `${BASE_URL}/cards/refresh-prices${emptyOnly ? "?empty_only=1" : ""}`;
+  const res = await fetch(url, { method: "POST" });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Erro ao atualizar preços");
   return json;

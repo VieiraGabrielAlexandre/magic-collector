@@ -25,6 +25,7 @@ type Card struct {
 	Condition        string  `json:"condition"`
 	Notes            string  `json:"notes"`
 	PriceUSD         float64 `json:"price_usd"`
+	ImageURL         string  `json:"image_url"`
 }
 
 type CreateCardInput struct {

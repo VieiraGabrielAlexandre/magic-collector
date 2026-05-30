@@ -138,8 +138,36 @@ func (h *Handler) SetDeck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) Preview(c *gin.Context) {
+	var input CreateCardInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	ext, err := h.service.Preview(input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if ext == nil {
+		c.JSON(http.StatusOK, gin.H{"found": false})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"found": true, "card": ext})
+}
+
+func (h *Handler) RefreshImages(c *gin.Context) {
+	result, err := h.service.RefreshImages()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *Handler) RefreshPrices(c *gin.Context) {
-	result, err := h.service.RefreshPrices()
+	emptyOnly := c.Query("empty_only") == "1"
+	result, err := h.service.RefreshPrices(emptyOnly)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

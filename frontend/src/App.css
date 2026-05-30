@@ -2349,3 +2349,351 @@ button.danger:hover:not(:disabled) {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   VIEW TOGGLE (lista / grid)
+   ═══════════════════════════════════════════════════════════════════ */
+.view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.view-btn {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: none;
+  padding: 5px 11px;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: unset;
+  border-radius: 0;
+  letter-spacing: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.view-btn:hover:not(.active) { background: var(--surface-3); color: var(--text); box-shadow: none; }
+.view-btn.active { background: rgba(200,155,60,0.15); color: var(--gold); }
+.view-btn:active:not(:disabled) { transform: none; }
+
+.img-refresh-btn {
+  background: linear-gradient(135deg, #101828, #1a2a40);
+  color: #80b8e8;
+  border-color: #1a3a5c;
+}
+.img-refresh-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1a2840, #2a4060);
+  border-color: #2a5c8a;
+  box-shadow: 0 0 12px rgba(80,130,200,0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CARD GRID VIEW
+   ═══════════════════════════════════════════════════════════════════ */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.card-grid-item {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 0.717;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.card-grid-item:hover {
+  transform: translateY(-5px) scale(1.025);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.7), 0 0 0 1px var(--gold-dim);
+  border-color: var(--gold-dim);
+  z-index: 2;
+}
+.card-grid-item.is-foil {
+  border-color: rgba(200,180,60,0.35);
+  box-shadow: 0 0 8px rgba(200,180,60,0.15);
+}
+/* Rarity left border on grid */
+.card-grid-item.item-r-m { border-top: 2px solid var(--r-m); }
+.card-grid-item.item-r-r { border-top: 2px solid var(--r-r); }
+.card-grid-item.item-r-u { border-top: 2px solid var(--r-u); }
+
+.card-grid-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 9px;
+}
+
+.card-grid-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(160deg, var(--surface-3), var(--surface-2));
+}
+.card-grid-placeholder-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.card-grid-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);
+  padding: 18px 8px 8px;
+  pointer-events: none;
+}
+.card-grid-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin-bottom: 4px;
+}
+.card-grid-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.card-grid-meta .rarity { font-size: 10px; padding: 1px 4px; }
+.card-grid-meta .price-tag { font-size: 10px !important; padding: 1px 5px; }
+
+@media (max-width: 680px) {
+  .cards-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+}
+@media (max-width: 420px) {
+  .cards-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIRM CARD MODAL
+   ═══════════════════════════════════════════════════════════════════ */
+.confirm-card-modal {
+  max-width: 680px;
+  width: 96vw;
+}
+
+.confirm-card-top {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.confirm-card-img {
+  width: 210px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,155,60,0.2);
+}
+
+.confirm-card-info { flex: 1; min-width: 0; }
+
+.confirm-card-title {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  color: var(--gold-light);
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+.confirm-card-en {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  font-style: italic;
+}
+
+.confirm-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.confirm-card-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.confirm-card-grid span {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.confirm-card-grid strong { font-size: 13px; color: var(--text); }
+
+.confirm-card-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin: 0;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.confirm-card-question {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gold-light);
+  text-align: center;
+  margin: 0 0 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-dim);
+}
+
+.confirm-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.confirm-yes {
+  background: linear-gradient(135deg, #1a4028, #2a6040);
+  color: #9aeab0;
+  border-color: #2a5c38;
+  font-size: 14px;
+  padding: 12px;
+}
+.confirm-yes:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2a5038, #3a7050);
+  box-shadow: 0 0 18px rgba(61,158,90,0.35);
+}
+.confirm-no {
+  background: var(--surface-3);
+  color: var(--text-muted);
+  border-color: var(--border);
+  font-size: 14px;
+  padding: 12px;
+}
+.confirm-no:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--gold-dim);
+}
+
+/* Not found state */
+.confirm-not-found {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text-muted);
+}
+.confirm-not-found-icon { font-size: 44px; display: block; margin-bottom: 12px; }
+.confirm-not-found h3 { color: var(--gold); margin: 0 0 10px; font-size: 16px; }
+.confirm-not-found p  { font-size: 14px; line-height: 1.6; margin: 0 0 20px; }
+
+/* Mobile adaptations */
+@media (max-width: 680px) {
+  .confirm-card-top { flex-direction: column; align-items: center; }
+  .confirm-card-img { width: 180px; }
+  .confirm-card-grid { grid-template-columns: 1fr; }
+  .confirm-card-actions { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FOIL EFFECT — efeito holográfico no grid
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Brilho constante sutil (shimmer diagonal) */
+.card-grid-item.is-foil::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: linear-gradient(
+    115deg,
+    transparent 25%,
+    rgba(255,240,160,0.18) 40%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(140,200,255,0.18) 60%,
+    transparent 75%
+  );
+  background-size: 250% 250%;
+  animation: foil-shimmer 2.8s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+
+/* Arco-íris completo que aparece no hover */
+.card-grid-item.is-foil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 50, 80,  0.14)  0%,
+    rgba(255,160, 50,  0.14) 14%,
+    rgba(255,255, 50,  0.10) 28%,
+    rgba( 50,255,100,  0.14) 42%,
+    rgba( 50,160,255,  0.12) 57%,
+    rgba(160, 50,255,  0.14) 71%,
+    rgba(255, 50,200,  0.12) 85%,
+    rgba(255, 50, 80,  0.14)100%
+  );
+  background-size: 400% 400%;
+  animation: foil-rainbow 4s ease-in-out infinite alternate;
+  mix-blend-mode: color-dodge;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.35;
+  transition: opacity 0.3s;
+}
+
+.card-grid-item.is-foil:hover::after { opacity: 1; }
+
+@keyframes foil-shimmer {
+  0%   { background-position: -100% -100%; }
+  100% { background-position: 200%  200%; }
+}
+@keyframes foil-rainbow {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+/* Borda e glow dourado foil */
+.card-grid-item.is-foil {
+  border: 1px solid rgba(220,190,80,0.5);
+  box-shadow: 0 0 10px rgba(220,190,80,0.2), 0 0 24px rgba(160,120,255,0.1);
+}
+.card-grid-item.is-foil:hover {
+  box-shadow:
+    0 12px 32px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(220,190,80,0.6),
+    0 0 18px rgba(220,190,80,0.35),
+    0 0 36px rgba(140,80,255,0.2);
+}
+
+/* Botão preços faltantes */
+.empty-price-btn {
+  background: linear-gradient(135deg, #1e1208, #3a2808);
+  color: #d4a060;
+  border-color: #5a3a10;
+}
+.empty-price-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2a1a08, #4a3010);
+  border-color: #8a5a20;
+  box-shadow: 0 0 12px rgba(200,120,40,0.3);
+}

@@ -62,8 +62,10 @@ func main() {
 
 	router.GET("/cards", handler.List)
 	router.GET("/cards/stats", handler.Stats)
-	router.POST("/cards/refresh-prices", handler.RefreshPrices)
 	router.GET("/cards/export", handler.Export)
+	router.POST("/cards/preview", handler.Preview)
+	router.POST("/cards/refresh-prices", handler.RefreshPrices)
+	router.POST("/cards/refresh-images", handler.RefreshImages)
 	router.POST("/cards/suggest-decks", handler.SuggestDecks)
 	router.POST("/cards", handler.Create)
 	router.GET("/cards/:id", handler.GetByID)

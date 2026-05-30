@@ -49,7 +49,7 @@ var allowedSortFields = map[string]string{
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd`
+	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -115,7 +115,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
 		)
 		if err != nil {
 			return ListResult{}, err
@@ -145,8 +145,8 @@ func (r *Repository) Create(card Card) (int64, error) {
 	stmt, err := r.db.Prepare("INSERT INTO cards " +
 		"(mtg_id, name, color, `type`, subtitle, collection_number," +
 		" rarity, set_code, mana_cost, colors, language, year," +
-		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd)" +
-		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
@@ -169,7 +169,7 @@ func (r *Repository) Create(card Card) (int64, error) {
 		card.MTGID, card.Name, card.Color, card.Type, card.Subtitle,
 		card.CollectionNumber, card.Rarity, card.SetCode, card.ManaCost,
 		card.Colors, card.Language, card.Year, card.Artist, card.Company,
-		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD,
+		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL,
 	)
 	if err != nil {
 		return 0, err
@@ -188,7 +188,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 		&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
+		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
 	)
 	if err != nil {
 		return nil, err
@@ -215,11 +215,11 @@ func (r *Repository) Update(id string, card Card) error {
 	_, err := r.db.Exec(
 		"UPDATE cards SET name=?, color=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?,"+
-			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=? WHERE id=?",
+			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=? WHERE id=?",
 		card.Name, card.Color, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist,
 		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
-		card.Quantity, card.Condition, card.Notes, card.PriceUSD, id,
+		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, id,
 	)
 	return err
 }
@@ -276,7 +276,7 @@ func (r *Repository) ListAll() ([]Card, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
 		)
 		if err != nil {
 			return nil, err
@@ -304,11 +304,25 @@ type CardForPriceRefresh struct {
 }
 
 func (r *Repository) ListAllForPriceRefresh() ([]CardForPriceRefresh, error) {
-	rows, err := r.db.Query(`
-		SELECT id, COALESCE(mtg_id,''), COALESCE(set_code,''),
+	return r.listForPriceRefresh(false)
+}
+
+// ListEmptyPricesForRefresh retorna apenas cartas com price_usd = 0.
+func (r *Repository) ListEmptyPricesForRefresh() ([]CardForPriceRefresh, error) {
+	return r.listForPriceRefresh(true)
+}
+
+func (r *Repository) listForPriceRefresh(emptyOnly bool) ([]CardForPriceRefresh, error) {
+	q := `SELECT id, COALESCE(mtg_id,''), COALESCE(set_code,''),
 		       COALESCE(collection_number,''), COALESCE(language,'EN'),
 		       COALESCE(artist,''), foil, name
-		FROM cards ORDER BY id`)
+		FROM cards`
+	if emptyOnly {
+		q += ` WHERE price_usd = 0`
+	}
+	q += ` ORDER BY id`
+
+	rows, err := r.db.Query(q)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +347,16 @@ func (r *Repository) UpdatePrice(id int, price float64) error {
 
 func (r *Repository) UpdatePriceAndMTGID(id int, mtgID string, price float64) error {
 	_, err := r.db.Exec(`UPDATE cards SET price_usd = ?, mtg_id = ? WHERE id = ?`, price, mtgID, id)
+	return err
+}
+
+func (r *Repository) UpdateImageURL(id int, imageURL string) error {
+	_, err := r.db.Exec(`UPDATE cards SET image_url = ? WHERE id = ?`, imageURL, id)
+	return err
+}
+
+func (r *Repository) UpdateImageURLAndMTGID(id int, mtgID, imageURL string) error {
+	_, err := r.db.Exec(`UPDATE cards SET image_url = ?, mtg_id = ? WHERE id = ?`, imageURL, mtgID, id)
 	return err
 }
 

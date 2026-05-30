@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listDecks, refreshPrices, suggestDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listDecks, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -344,6 +344,9 @@ export default function App() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [priceRefreshing, setPriceRefreshing] = useState(false);
   const [priceRefreshResult, setPriceRefreshResult] = useState(null);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem("card-view-mode") || "list");
+  const [confirmCard, setConfirmCard] = useState(null); // { found, card, formData }
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [deckBuilderModal, setDeckBuilderModal] = useState(false);
   const [deckBuilderLoading, setDeckBuilderLoading] = useState(false);
   const [deckBuilderResult, setDeckBuilderResult] = useState(null);
@@ -475,7 +478,23 @@ export default function App() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    await createCard({ ...form, quantity: Number(form.quantity), year: Number(form.year) || 0 });
+    const payload = { ...form, quantity: Number(form.quantity), year: Number(form.year) || 0 };
+    setConfirmLoading(true);
+    try {
+      const preview = await previewCard(payload);
+      setConfirmCard({ found: preview.found, card: preview.card ?? null, formData: payload });
+    } catch {
+      // Se o preview falhar (sem set_code, por exemplo), permite cadastrar diretamente
+      setConfirmCard({ found: false, card: null, formData: payload });
+    } finally {
+      setConfirmLoading(false);
+    }
+  }
+
+  async function handleConfirmCreate() {
+    if (!confirmCard) return;
+    await createCard(confirmCard.formData);
+    setConfirmCard(null);
     setForm(EMPTY_FORM);
     setPage(1);
     loadCards({ page: 1 });
@@ -567,14 +586,43 @@ export default function App() {
     }
   }
 
+  async function handleRefreshImages() {
+    setPriceRefreshing(true);
+    setPriceRefreshResult(null);
+    try {
+      const result = await refreshImages();
+      setPriceRefreshResult({ ...result, _type: "images" });
+      loadCards({ page: 1 });
+    } catch (e) {
+      setPriceRefreshResult({ error: e.message });
+    } finally {
+      setPriceRefreshing(false);
+    }
+  }
+
   async function handleRefreshPrices() {
     setPriceRefreshing(true);
     setPriceRefreshResult(null);
     try {
       const result = await refreshPrices();
       setPriceRefreshResult(result);
-      setStats(null); // invalida cache de stats para forçar reload
-      loadCards({ page: 1 }); // recarrega lista com novos preços
+      setStats(null);
+      loadCards({ page: 1 });
+    } catch (e) {
+      setPriceRefreshResult({ error: e.message });
+    } finally {
+      setPriceRefreshing(false);
+    }
+  }
+
+  async function handleRefreshMissingPrices() {
+    setPriceRefreshing(true);
+    setPriceRefreshResult(null);
+    try {
+      const result = await refreshPrices({ emptyOnly: true });
+      setPriceRefreshResult({ ...result, _type: "missing" });
+      setStats(null);
+      loadCards({ page: 1 });
     } catch (e) {
       setPriceRefreshResult({ error: e.message });
     } finally {
@@ -1115,6 +1163,67 @@ export default function App() {
         );
       })()}
 
+      {/* ── MODAL CONFIRMAR CADASTRO ── */}
+      {(confirmCard || confirmLoading) && (
+        <div className="modal-overlay" onClick={() => !confirmLoading && setConfirmCard(null)}>
+          <div className="modal confirm-card-modal" onClick={(e) => e.stopPropagation()}>
+            {confirmLoading ? (
+              <div className="eval-loading">
+                <div className="eval-spinner">⚙</div>
+                <p className="eval-loading-text">Buscando na Scryfall…</p>
+              </div>
+            ) : (
+              <>
+                <button className="modal-close" onClick={() => setConfirmCard(null)}>✕</button>
+                {confirmCard?.found && confirmCard.card ? (
+                  <>
+                    <div className="confirm-card-top">
+                      <img
+                        src={confirmCard.card.image_url}
+                        alt={confirmCard.card.name}
+                        className="confirm-card-img"
+                      />
+                      <div className="confirm-card-info">
+                        <h2 className="confirm-card-title">{confirmCard.card.printed_name || confirmCard.card.name}</h2>
+                        {confirmCard.card.printed_name && <p className="confirm-card-en">{confirmCard.card.name}</p>}
+                        <div className="confirm-card-grid">
+                          <div><span>Tipo</span><strong>{confirmCard.card.type || "—"}</strong></div>
+                          <div><span>Custo</span><strong>{confirmCard.card.mana_cost || "—"}</strong></div>
+                          <div><span>Set</span><strong>{confirmCard.card.set || "—"} #{confirmCard.card.number || "—"}</strong></div>
+                          <div><span>Raridade</span><strong className={`rarity r-${(confirmCard.card.rarity || "x")[0].toLowerCase()}`}>{confirmCard.card.rarity || "—"}</strong></div>
+                          <div><span>Artista</span><strong>{confirmCard.card.artist || "—"}</strong></div>
+                          {confirmCard.card.prices?.usd && <div><span>Preço USD</span><strong className="price-tag">${confirmCard.card.prices.usd}</strong></div>}
+                        </div>
+                        {(confirmCard.card.printed_text || confirmCard.card.text) && (
+                          <p className="confirm-card-text">{confirmCard.card.printed_text || confirmCard.card.text}</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="confirm-card-question">Esta é a carta que você quer cadastrar?</p>
+                    <div className="confirm-card-actions">
+                      <button type="button" className="confirm-yes" onClick={handleConfirmCreate}>✓ Sim, cadastrar esta carta</button>
+                      <button type="button" className="confirm-no" onClick={() => setConfirmCard(null)}>← Voltar e editar</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="confirm-not-found">
+                      <span className="confirm-not-found-icon">🔍</span>
+                      <h3>Carta não encontrada na Scryfall</h3>
+                      <p>Não foi possível encontrar esta carta automaticamente. Você pode cadastrá-la assim mesmo ou voltar e verificar os dados.</p>
+                    </div>
+                    <div className="confirm-card-actions">
+                      <button type="button" className="confirm-yes" onClick={handleConfirmCreate}>✓ Cadastrar assim mesmo</button>
+                      <button type="button" className="confirm-no" onClick={() => setConfirmCard(null)}>← Voltar e editar</button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL DECK BUILDER IA ── */}
       {deckBuilderModal && (
         <div className="modal-overlay" onClick={() => !deckBuilderLoading && setDeckBuilderModal(false)}>
@@ -1443,11 +1552,21 @@ export default function App() {
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
               <div className="export-btns">
                 <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
-                  📊 {statsOpen ? "Fechar" : "Estatísticas"}
+                  📊 {statsOpen ? "Fechar" : "Stats"}
                 </button>
-                <button type="button" className="price-refresh-btn" onClick={handleRefreshPrices} disabled={priceRefreshing} title="Atualizar preços de todas as cartas via Scryfall">
-                  {priceRefreshing ? "⏳ Atualizando…" : "💰 Atualizar Preços"}
+                <button type="button" className="price-refresh-btn" onClick={handleRefreshPrices} disabled={priceRefreshing} title="Atualizar todos os preços via Scryfall">
+                  {priceRefreshing ? "⏳…" : "💰 Preços"}
                 </button>
+                <button type="button" className="price-refresh-btn empty-price-btn" onClick={handleRefreshMissingPrices} disabled={priceRefreshing} title="Buscar preços das cartas sem valor (com fallback EN para cartas PT)">
+                  {priceRefreshing ? "⏳…" : "💰 Faltantes"}
+                </button>
+                <button type="button" className="price-refresh-btn img-refresh-btn" onClick={handleRefreshImages} disabled={priceRefreshing} title="Atualizar imagens via Scryfall">
+                  {priceRefreshing ? "⏳…" : "🖼 Imagens"}
+                </button>
+                <div className="view-toggle">
+                  <button type="button" className={`view-btn${viewMode === "list" ? " active" : ""}`} onClick={() => { setViewMode("list"); localStorage.setItem("card-view-mode","list"); }} title="Visualização em lista">☰</button>
+                  <button type="button" className={`view-btn${viewMode === "grid" ? " active" : ""}`} onClick={() => { setViewMode("grid"); localStorage.setItem("card-view-mode","grid"); }} title="Visualização em grid">⊞</button>
+                </div>
                 <button type="button" className="export-btn" onClick={handleExportCSV}>↓ CSV</button>
                 <button type="button" className="export-btn" onClick={handleExportXLSX}>↓ XLSX</button>
               </div>
@@ -1456,7 +1575,11 @@ export default function App() {
               <div className={`price-refresh-banner${priceRefreshResult.error ? " error" : ""}`}>
                 {priceRefreshResult.error
                   ? `⚠ Erro: ${priceRefreshResult.error}`
-                  : `✓ ${priceRefreshResult.updated} preços atualizados · ${priceRefreshResult.skipped} sem dados · ${priceRefreshResult.failed > 0 ? `${priceRefreshResult.failed} falhas` : "nenhuma falha"} (total: ${priceRefreshResult.total})`
+                  : priceRefreshResult._type === "images"
+                    ? `✓ ${priceRefreshResult.updated} imagens atualizadas · ${priceRefreshResult.skipped} sem dados · total: ${priceRefreshResult.total}`
+                    : priceRefreshResult._type === "missing"
+                    ? `✓ ${priceRefreshResult.updated} preços faltantes preenchidos · ${priceRefreshResult.skipped} sem dados na Scryfall · total: ${priceRefreshResult.total}`
+                    : `✓ ${priceRefreshResult.updated} preços atualizados · ${priceRefreshResult.skipped} sem dados · total: ${priceRefreshResult.total}`
                 }
                 <button type="button" className="banner-close" onClick={() => setPriceRefreshResult(null)}>✕</button>
               </div>
@@ -1509,49 +1632,81 @@ export default function App() {
             </div>
           </div>
 
-          <div className="list">
-            {cards.map((card) => {
-              const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
-              return (
+          {viewMode === "grid" ? (
+            <div className="cards-grid">
+              {cards.map((card) => (
                 <div
-                  className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
                   key={card.id}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}`}
+                  onClick={() => handleDetails(card.id)}
+                  title={card.name}
                 >
-                  <div className="list-item-info">
-                    <div className="list-item-name">
-                      <strong className={card.foil ? "foil-text" : ""}>
-                        {card.name}
-                      </strong>
-                      {card.foil && <span className="foil-text">✦</span>}
-                      <CardColorIcons card={card} />
-                      {card.rarity && (
-                        <span className={`rarity r-${card.rarity.toLowerCase()}`}>
-                          {card.rarity}
-                        </span>
-                      )}
-                      {assignedDeck && (
-                        <span className="deck-badge" style={getDeckBadgeStyle(assignedDeck.theme_color)}>
-                          {assignedDeck.name}
-                        </span>
-                      )}
+                  {card.image_url
+                    ? <img src={card.image_url} alt={card.name} loading="lazy" className="card-grid-img" />
+                    : <div className="card-grid-placeholder">
+                        <CardColorIcons card={card} />
+                        <span className="card-grid-placeholder-name">{card.name}</span>
+                      </div>
+                  }
+                  <div className="card-grid-overlay">
+                    <div className="card-grid-name">
+                      {card.foil && <span className="foil-text">✦ </span>}
+                      {card.name}
                     </div>
-                    <div className="list-item-meta">
-                      <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
-                      {card.price_usd > 0 && (
-                        <span className="price-tag">${card.price_usd.toFixed(2)}</span>
-                      )}
+                    <div className="card-grid-meta">
+                      {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
+                      {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}</span>}
                     </div>
-                    <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
-                  </div>
-                  <div className="actions">
-                    <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
-                    <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
                   </div>
                 </div>
-              );
-            })}
-            {cards.length === 0 && <p className="empty">Nenhuma carta encontrada.</p>}
-          </div>
+              ))}
+              {cards.length === 0 && <p className="empty">Nenhuma carta encontrada.</p>}
+            </div>
+          ) : (
+            <div className="list">
+              {cards.map((card) => {
+                const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
+                return (
+                  <div
+                    className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                    key={card.id}
+                  >
+                    <div className="list-item-info">
+                      <div className="list-item-name">
+                        <strong className={card.foil ? "foil-text" : ""}>
+                          {card.name}
+                        </strong>
+                        {card.foil && <span className="foil-text">✦</span>}
+                        <CardColorIcons card={card} />
+                        {card.rarity && (
+                          <span className={`rarity r-${card.rarity.toLowerCase()}`}>
+                            {card.rarity}
+                          </span>
+                        )}
+                        {assignedDeck && (
+                          <span className="deck-badge" style={getDeckBadgeStyle(assignedDeck.theme_color)}>
+                            {assignedDeck.name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="list-item-meta">
+                        <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
+                        {card.price_usd > 0 && (
+                          <span className="price-tag">${card.price_usd.toFixed(2)}</span>
+                        )}
+                      </div>
+                      <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
+                    </div>
+                    <div className="actions">
+                      <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
+                      <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {cards.length === 0 && <p className="empty">Nenhuma carta encontrada.</p>}
+            </div>
+          )}
 
           {totalPages > 1 && (
             <div className="pagination">
