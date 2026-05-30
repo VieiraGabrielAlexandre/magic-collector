@@ -13,12 +13,27 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
 		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color,
-		       COUNT(c.id) AS card_count,
+		       COUNT(DISTINCT c.id) AS card_count,
 		       COALESCE(d.evaluation, '') AS evaluation,
-		       COALESCE(DATE_FORMAT(d.evaluated_at, '%Y-%m-%dT%H:%i:%s'), '') AS evaluated_at
+		       COALESCE(DATE_FORMAT(d.evaluated_at, '%Y-%m-%dT%H:%i:%s'), '') AS evaluated_at,
+		       COALESCE(bs.wins,   0) AS battle_wins,
+		       COALESCE(bs.losses, 0) AS battle_losses,
+		       COALESCE(bs.draws,  0) AS battle_draws,
+		       COALESCE(bs.total,  0) AS battle_total
 		FROM decks d
 		LEFT JOIN cards c ON c.deck_id = d.id
-		GROUP BY d.id
+		LEFT JOIN (
+		    SELECT deck_id,
+		           SUM(CASE WHEN result='win'  THEN 1 ELSE 0 END) AS wins,
+		           SUM(CASE WHEN result='loss' THEN 1 ELSE 0 END) AS losses,
+		           SUM(CASE WHEN result='draw' THEN 1 ELSE 0 END) AS draws,
+		           COUNT(*) AS total
+		    FROM battles WHERE deck_is_mine = 1
+		    GROUP BY deck_id
+		) bs ON bs.deck_id = d.id
+		GROUP BY d.id, d.name, d.description, d.commander, d.colors, d.set_code,
+		         d.icon_uri, d.theme_color, d.evaluation, d.evaluated_at,
+		         bs.wins, bs.losses, bs.draws, bs.total
 		ORDER BY d.name ASC
 	`)
 	if err != nil {
@@ -30,7 +45,11 @@ func (r *Repository) List() ([]Deck, error) {
 	for rows.Next() {
 		var d Deck
 		var commanderInt int
-		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode, &d.IconURI, &d.ThemeColor, &d.CardCount, &d.Evaluation, &d.EvaluatedAt); err != nil {
+		if err := rows.Scan(
+			&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode,
+			&d.IconURI, &d.ThemeColor, &d.CardCount, &d.Evaluation, &d.EvaluatedAt,
+			&d.BattleWins, &d.BattleLosses, &d.BattleDraws, &d.BattleTotal,
+		); err != nil {
 			return nil, err
 		}
 		d.Commander = commanderInt == 1

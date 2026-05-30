@@ -2,9 +2,29 @@ package cards
 
 import (
 	"encoding/json"
+	"strconv"
+	"time"
 
 	"magic-collection-api/internal/mtgapi"
 )
+
+func parsePriceUSD(prices map[string]string, foil bool) float64 {
+	if prices == nil {
+		return 0
+	}
+	key := "usd"
+	if foil {
+		if v, ok := prices["usd_foil"]; ok && v != "" {
+			f, _ := strconv.ParseFloat(v, 64)
+			return f
+		}
+	}
+	if v, ok := prices[key]; ok && v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		return f
+	}
+	return 0
+}
 
 type Service struct {
 	repository *Repository
@@ -66,6 +86,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.Type = ext.Type
 		card.ManaCost = ext.ManaCost
 		card.Colors = string(colors)
+		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 	}
 
 	return s.repository.Create(card)
@@ -165,4 +186,66 @@ func (s *Service) ExportAll() ([]Card, error) {
 
 func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {
 	return s.repository.ListForDeckBuilder()
+}
+
+func (s *Service) GetStats() (CollectionStats, error) {
+	return s.repository.GetStats()
+}
+
+// PriceRefreshResult resume o resultado da atualização em lote de preços.
+type PriceRefreshResult struct {
+	Updated int `json:"updated"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"` // sem mtg_id e sem set+number
+	Total   int `json:"total"`
+}
+
+// RefreshPrices atualiza price_usd de todas as cartas buscando na Scryfall.
+// Usa GetByMTGID quando possível; caso contrário, tenta Search por set+número.
+func (s *Service) RefreshPrices() (PriceRefreshResult, error) {
+	cards, err := s.repository.ListAllForPriceRefresh()
+	if err != nil {
+		return PriceRefreshResult{}, err
+	}
+
+	result := PriceRefreshResult{Total: len(cards)}
+
+	for _, c := range cards {
+		time.Sleep(80 * time.Millisecond)
+
+		var ext *mtgapi.ExternalCard
+
+		// 1ª tentativa: UUID Scryfall (mais rápido e exato)
+		if c.MTGID != "" {
+			ext, _ = s.mtgClient.GetByMTGID(c.MTGID)
+		}
+
+		// 2ª tentativa: set + coleção (para cartas inseridas manualmente)
+		if ext == nil && c.SetCode != "" && c.CollectionNumber != "" {
+			ext, _ = s.mtgClient.Search(c.SetCode, c.CollectionNumber, c.Language, c.Artist)
+		}
+
+		if ext == nil {
+			result.Skipped++
+			continue
+		}
+
+		price := parsePriceUSD(ext.Prices, c.Foil)
+
+		var updateErr error
+		if c.MTGID == "" && ext.ID != "" {
+			// Aproveita e salva o mtg_id que estava faltando
+			updateErr = s.repository.UpdatePriceAndMTGID(c.ID, ext.ID, price)
+		} else {
+			updateErr = s.repository.UpdatePrice(c.ID, price)
+		}
+
+		if updateErr != nil {
+			result.Failed++
+		} else {
+			result.Updated++
+		}
+	}
+
+	return result, nil
 }

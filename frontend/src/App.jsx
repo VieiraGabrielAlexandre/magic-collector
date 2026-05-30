@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, importDeckList, importPrecon, listBattles, listCards, listDecks, suggestDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listDecks, refreshPrices, suggestDecks, updateCard, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -15,6 +15,7 @@ const SORT_OPTIONS = [
   { value: "set_code", label: "Coleção" },
   { value: "color", label: "Cor" },
   { value: "rarity", label: "Raridade" },
+  { value: "price_usd", label: "💰 Preço" },
   { value: "year", label: "Ano" },
   { value: "collection_number", label: "Nº" },
 ];
@@ -128,6 +129,112 @@ function ManaColorPicker({ value, onChange }) {
   );
 }
 
+// ── Rarity display helpers ───────────────────────────────────────────────
+const RARITY_LABEL = { M: "Mythic", R: "Rare", U: "Uncommon", C: "Common", L: "Land", T: "Token", "?": "Sem raridade" };
+const RARITY_COLOR = { M: "#e07030", R: "#c89b3c", U: "#5ab4cc", C: "#9a9a9a", L: "#78a060", T: "#a878cc", "?": "#5a4830" };
+const COLOR_NAME   = { W: "Branco", U: "Azul", B: "Preto", R: "Vermelho", G: "Verde", C: "Incolor" };
+const COLOR_HEX    = { W: "#f5e6c8", U: "#5ab4cc", B: "#9080b0", R: "#e05050", G: "#70b860", C: "#a0a0a0" };
+
+function StatsPanel({ stats, loading }) {
+  if (loading) return (
+    <div className="stats-panel stats-loading">
+      <span className="eval-spinner">⚙</span>
+      <span>Calculando estatísticas…</span>
+    </div>
+  );
+  if (!stats) return null;
+
+  const winRate = stats.battle_total > 0
+    ? Math.round((stats.battle_wins / stats.battle_total) * 100) : null;
+
+  const maxRarityQty = Math.max(...(stats.by_rarity ?? []).map(r => r.quantity), 1);
+
+  return (
+    <div className="stats-panel">
+      {/* ── Row 1: números grandes ── */}
+      <div className="stats-top">
+        <div className="stat-box">
+          <span className="stat-num">{(stats.total_quantity ?? 0).toLocaleString("pt-BR")}</span>
+          <span className="stat-lbl">cartas totais</span>
+        </div>
+        <div className="stat-box">
+          <span className="stat-num">{(stats.unique_cards ?? 0).toLocaleString("pt-BR")}</span>
+          <span className="stat-lbl">únicas</span>
+        </div>
+        <div className="stat-box stat-foil">
+          <span className="stat-num">✦ {stats.foil_quantity ?? 0}</span>
+          <span className="stat-lbl">foil ({stats.foil_count ?? 0} cartas)</span>
+        </div>
+        <div className="stat-box stat-value">
+          <span className="stat-num">
+            {stats.estimated_value_usd > 0
+              ? `$${stats.estimated_value_usd.toFixed(2)}`
+              : "—"}
+          </span>
+          <span className="stat-lbl">
+            valor est.{stats.priced_cards > 0 && stats.priced_cards < stats.unique_cards
+              ? ` (${stats.priced_cards} cartas)` : ""}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Row 2: raridades ── */}
+      {stats.by_rarity?.length > 0 && (
+        <div className="stats-section">
+          <h4 className="stats-section-title">Raridade</h4>
+          <div className="stats-rarity-bars">
+            {stats.by_rarity.map(r => (
+              <div key={r.rarity} className="rarity-row">
+                <span className="rarity-row-label" style={{ color: RARITY_COLOR[r.rarity] ?? "#888" }}>
+                  {RARITY_LABEL[r.rarity] ?? r.rarity}
+                </span>
+                <div className="rarity-bar-track">
+                  <div className="rarity-bar-fill"
+                    style={{ width: `${(r.quantity / maxRarityQty) * 100}%`, background: RARITY_COLOR[r.rarity] ?? "#888" }} />
+                </div>
+                <span className="rarity-row-count">{r.quantity.toLocaleString("pt-BR")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Row 3: cores ── */}
+      {stats.by_color?.length > 0 && (
+        <div className="stats-section">
+          <h4 className="stats-section-title">Cores</h4>
+          <div className="stats-colors">
+            {stats.by_color.map(c => (
+              <div key={c.color} className="color-chip">
+                <img src={`/mana/${c.color.toLowerCase() === "c" ? "incolour" : c.color.toLowerCase()}.svg`}
+                  alt={c.color} className="color-chip-icon" onError={e => { e.target.style.display = "none"; }} />
+                <span className="color-chip-name" style={{ color: COLOR_HEX[c.color] ?? "#888" }}>
+                  {COLOR_NAME[c.color] ?? c.color}
+                </span>
+                <span className="color-chip-count">{c.count.toLocaleString("pt-BR")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Row 4: top sets ── */}
+      {stats.top_sets?.length > 0 && (
+        <div className="stats-section">
+          <h4 className="stats-section-title">Top Sets</h4>
+          <div className="stats-sets">
+            {stats.top_sets.map(s => (
+              <span key={s.set_code} className="set-chip" title={`${s.count} únicas · ${s.quantity} cópias`}>
+                {s.set_code} <em>{s.count}</em>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── AI Evaluation markdown renderer ─────────────────────────────────────
 function renderInlineBold(text) {
   const parts = text.split(/\*\*(.+?)\*\*/g);
@@ -232,6 +339,11 @@ export default function App() {
   const [filterFoil, setFilterFoil] = useState("");
   const [filterRarity, setFilterRarity] = useState("");
   const [filterDeck, setFilterDeck] = useState("");
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [priceRefreshResult, setPriceRefreshResult] = useState(null);
   const [deckBuilderModal, setDeckBuilderModal] = useState(false);
   const [deckBuilderLoading, setDeckBuilderLoading] = useState(false);
   const [deckBuilderResult, setDeckBuilderResult] = useState(null);
@@ -455,6 +567,31 @@ export default function App() {
     }
   }
 
+  async function handleRefreshPrices() {
+    setPriceRefreshing(true);
+    setPriceRefreshResult(null);
+    try {
+      const result = await refreshPrices();
+      setPriceRefreshResult(result);
+      setStats(null); // invalida cache de stats para forçar reload
+      loadCards({ page: 1 }); // recarrega lista com novos preços
+    } catch (e) {
+      setPriceRefreshResult({ error: e.message });
+    } finally {
+      setPriceRefreshing(false);
+    }
+  }
+
+  async function handleOpenStats() {
+    setStatsOpen((prev) => {
+      if (!prev && !stats) {
+        setStatsLoading(true);
+        getCollectionStats().then((s) => { setStats(s); setStatsLoading(false); });
+      }
+      return !prev;
+    });
+  }
+
   async function handleSuggestDecks() {
     setDeckBuilderModal(true);
     setDeckBuilderLoading(true);
@@ -568,9 +705,15 @@ export default function App() {
       </section>
 
       <nav className="tabs">
-        <button type="button" className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>Coleção</button>
-        <button type="button" className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>Decks</button>
-        <button type="button" className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>⚔ Batalhas</button>
+        <button type="button" className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>
+          <span className="tab-icon">🃏</span><span className="tab-label">Coleção</span>
+        </button>
+        <button type="button" className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>
+          <span className="tab-icon">🗂</span><span className="tab-label">Decks</span>
+        </button>
+        <button type="button" className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>
+          <span className="tab-icon">⚔</span><span className="tab-label">Batalhas</span>
+        </button>
       </nav>
 
       {activeTab === "decks" && (
@@ -773,6 +916,15 @@ export default function App() {
                       <div className="deck-list-meta">
                         {deck.set_code && <span className="deck-set-label">{deck.set_code.toUpperCase()}</span>}
                         <span className="total-badge">{deck.card_count} cartas</span>
+                        {deck.battle_total > 0 && (() => {
+                          const rate = Math.round((deck.battle_wins / deck.battle_total) * 100);
+                          const cls = rate >= 60 ? "wr-high" : rate >= 40 ? "wr-mid" : "wr-low";
+                          return (
+                            <span className={`win-rate-badge ${cls}`}>
+                              {deck.battle_wins}V · {deck.battle_losses}D · {rate}%
+                            </span>
+                          );
+                        })()}
                         {deck.description && <span className="deck-desc">{deck.description}</span>}
                       </div>
                     </div>
@@ -1290,10 +1442,26 @@ export default function App() {
             <div className="list-header-top">
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
               <div className="export-btns">
+                <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
+                  📊 {statsOpen ? "Fechar" : "Estatísticas"}
+                </button>
+                <button type="button" className="price-refresh-btn" onClick={handleRefreshPrices} disabled={priceRefreshing} title="Atualizar preços de todas as cartas via Scryfall">
+                  {priceRefreshing ? "⏳ Atualizando…" : "💰 Atualizar Preços"}
+                </button>
                 <button type="button" className="export-btn" onClick={handleExportCSV}>↓ CSV</button>
                 <button type="button" className="export-btn" onClick={handleExportXLSX}>↓ XLSX</button>
               </div>
             </div>
+            {priceRefreshResult && (
+              <div className={`price-refresh-banner${priceRefreshResult.error ? " error" : ""}`}>
+                {priceRefreshResult.error
+                  ? `⚠ Erro: ${priceRefreshResult.error}`
+                  : `✓ ${priceRefreshResult.updated} preços atualizados · ${priceRefreshResult.skipped} sem dados · ${priceRefreshResult.failed > 0 ? `${priceRefreshResult.failed} falhas` : "nenhuma falha"} (total: ${priceRefreshResult.total})`
+                }
+                <button type="button" className="banner-close" onClick={() => setPriceRefreshResult(null)}>✕</button>
+              </div>
+            )}
+            {statsOpen && <StatsPanel stats={stats} loading={statsLoading} />}
             <input
               className="search-input"
               type="search"
@@ -1367,8 +1535,13 @@ export default function App() {
                         </span>
                       )}
                     </div>
-                    <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"}</span>
-                    <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""} · ×{card.quantity}</small>
+                    <div className="list-item-meta">
+                      <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
+                      {card.price_usd > 0 && (
+                        <span className="price-tag">${card.price_usd.toFixed(2)}</span>
+                      )}
+                    </div>
+                    <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
                   </div>
                   <div className="actions">
                     <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>

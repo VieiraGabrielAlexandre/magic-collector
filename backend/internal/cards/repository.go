@@ -2,6 +2,7 @@ package cards
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -41,13 +42,14 @@ var allowedSortFields = map[string]string{
 	"color":             "color",
 	"year":              "year",
 	"collection_number": "collection_number",
+	"price_usd":         "price_usd",
 }
 
 // selectCols lista as colunas na mesma ordem que os Scan abaixo.
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id`
+	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -113,7 +115,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
 		)
 		if err != nil {
 			return ListResult{}, err
@@ -143,8 +145,8 @@ func (r *Repository) Create(card Card) (int64, error) {
 	stmt, err := r.db.Prepare("INSERT INTO cards " +
 		"(mtg_id, name, color, `type`, subtitle, collection_number," +
 		" rarity, set_code, mana_cost, colors, language, year," +
-		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id)" +
-		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
@@ -167,7 +169,7 @@ func (r *Repository) Create(card Card) (int64, error) {
 		card.MTGID, card.Name, card.Color, card.Type, card.Subtitle,
 		card.CollectionNumber, card.Rarity, card.SetCode, card.ManaCost,
 		card.Colors, card.Language, card.Year, card.Artist, card.Company,
-		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
+		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD,
 	)
 	if err != nil {
 		return 0, err
@@ -186,7 +188,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 		&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID,
+		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
 	)
 	if err != nil {
 		return nil, err
@@ -213,11 +215,11 @@ func (r *Repository) Update(id string, card Card) error {
 	_, err := r.db.Exec(
 		"UPDATE cards SET name=?, color=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?,"+
-			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=? WHERE id=?",
+			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=? WHERE id=?",
 		card.Name, card.Color, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist,
 		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
-		card.Quantity, card.Condition, card.Notes, id,
+		card.Quantity, card.Condition, card.Notes, card.PriceUSD, id,
 	)
 	return err
 }
@@ -274,7 +276,7 @@ func (r *Repository) ListAll() ([]Card, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD,
 		)
 		if err != nil {
 			return nil, err
@@ -285,6 +287,53 @@ func (r *Repository) ListAll() ([]Card, error) {
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+// ── Atualização de preços ────────────────────────────────────────────────
+
+// CardForPriceRefresh contém os campos necessários para buscar e atualizar o preço via Scryfall.
+type CardForPriceRefresh struct {
+	ID               int
+	MTGID            string
+	SetCode          string
+	CollectionNumber string
+	Language         string
+	Artist           string
+	Foil             bool
+	Name             string
+}
+
+func (r *Repository) ListAllForPriceRefresh() ([]CardForPriceRefresh, error) {
+	rows, err := r.db.Query(`
+		SELECT id, COALESCE(mtg_id,''), COALESCE(set_code,''),
+		       COALESCE(collection_number,''), COALESCE(language,'EN'),
+		       COALESCE(artist,''), foil, name
+		FROM cards ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []CardForPriceRefresh
+	for rows.Next() {
+		var c CardForPriceRefresh
+		var foilInt int
+		if err := rows.Scan(&c.ID, &c.MTGID, &c.SetCode, &c.CollectionNumber, &c.Language, &c.Artist, &foilInt, &c.Name); err != nil {
+			return nil, err
+		}
+		c.Foil = foilInt == 1
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (r *Repository) UpdatePrice(id int, price float64) error {
+	_, err := r.db.Exec(`UPDATE cards SET price_usd = ? WHERE id = ?`, price, id)
+	return err
+}
+
+func (r *Repository) UpdatePriceAndMTGID(id int, mtgID string, price float64) error {
+	_, err := r.db.Exec(`UPDATE cards SET price_usd = ?, mtg_id = ? WHERE id = ?`, price, mtgID, id)
+	return err
 }
 
 // EvalCardInfo contém os campos mínimos necessários para gerar a avaliação IA de um deck.
@@ -303,6 +352,119 @@ type DeckBuilderCard struct {
 	Rarity   string
 	Colors   string
 	Quantity int
+}
+
+// ── Estatísticas da coleção ─────────────────────────────────────────────
+
+type CollectionStats struct {
+	TotalQuantity  int            `json:"total_quantity"`
+	UniqueCards    int            `json:"unique_cards"`
+	FoilCount      int            `json:"foil_count"`
+	FoilQuantity   int            `json:"foil_quantity"`
+	EstimatedValue float64        `json:"estimated_value_usd"`
+	PricedCards    int            `json:"priced_cards"`
+	ByRarity       []RarityCount  `json:"by_rarity"`
+	ByColor        []ColorCount   `json:"by_color"`
+	TopSets        []SetCount     `json:"top_sets"`
+}
+
+type RarityCount struct {
+	Rarity   string `json:"rarity"`
+	Count    int    `json:"count"`
+	Quantity int    `json:"quantity"`
+}
+
+type ColorCount struct {
+	Color    string `json:"color"`
+	Count    int    `json:"count"`
+}
+
+type SetCount struct {
+	SetCode  string `json:"set_code"`
+	Count    int    `json:"count"`
+	Quantity int    `json:"quantity"`
+}
+
+func (r *Repository) GetStats() (CollectionStats, error) {
+	var s CollectionStats
+
+	// Totais gerais
+	err := r.db.QueryRow(`
+		SELECT COUNT(*), COALESCE(SUM(quantity),0),
+		       COALESCE(SUM(CASE WHEN foil=1 THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN foil=1 THEN quantity ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN price_usd>0 THEN price_usd*quantity ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN price_usd>0 THEN 1 ELSE 0 END),0)
+		FROM cards`).Scan(
+		&s.UniqueCards, &s.TotalQuantity,
+		&s.FoilCount, &s.FoilQuantity,
+		&s.EstimatedValue, &s.PricedCards)
+	if err != nil {
+		return s, err
+	}
+
+	// Por raridade
+	rows, err := r.db.Query(`
+		SELECT COALESCE(NULLIF(rarity,''),'?') AS r, COUNT(*), COALESCE(SUM(quantity),0)
+		FROM cards GROUP BY r
+		ORDER BY FIELD(r,'M','R','U','C','L','T','?')`)
+	if err != nil {
+		return s, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rc RarityCount
+		if err := rows.Scan(&rc.Rarity, &rc.Count, &rc.Quantity); err != nil {
+			return s, err
+		}
+		s.ByRarity = append(s.ByRarity, rc)
+	}
+	rows.Close()
+
+	// Top 15 sets
+	setRows, err := r.db.Query(`
+		SELECT UPPER(COALESCE(NULLIF(set_code,''),'?')) AS sc, COUNT(*), COALESCE(SUM(quantity),0)
+		FROM cards GROUP BY sc ORDER BY COUNT(*) DESC LIMIT 15`)
+	if err != nil {
+		return s, err
+	}
+	defer setRows.Close()
+	for setRows.Next() {
+		var sc SetCount
+		if err := setRows.Scan(&sc.SetCode, &sc.Count, &sc.Quantity); err != nil {
+			return s, err
+		}
+		s.TopSets = append(s.TopSets, sc)
+	}
+	setRows.Close()
+
+	// Distribuição de cores: busca o campo JSON e processa em Go
+	colorRows, err := r.db.Query(`SELECT COALESCE(colors,'[]') FROM cards`)
+	if err != nil {
+		return s, err
+	}
+	defer colorRows.Close()
+	colorMap := map[string]int{}
+	for colorRows.Next() {
+		var colorsJSON string
+		colorRows.Scan(&colorsJSON)
+		var colors []string
+		json.Unmarshal([]byte(colorsJSON), &colors)
+		if len(colors) == 0 {
+			colorMap["C"]++
+		} else {
+			for _, c := range colors {
+				colorMap[c]++
+			}
+		}
+	}
+	for _, code := range []string{"W", "U", "B", "R", "G", "C"} {
+		if n, ok := colorMap[code]; ok {
+			s.ByColor = append(s.ByColor, ColorCount{Color: code, Count: n})
+		}
+	}
+
+	return s, nil
 }
 
 // ListForDeckBuilder retorna todas as cartas sem deck agrupadas por nome,

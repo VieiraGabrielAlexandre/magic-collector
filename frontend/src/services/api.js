@@ -140,6 +140,19 @@ export async function importPrecon(data) {
   return json;
 }
 
+export async function refreshPrices() {
+  const res = await fetch(`${BASE_URL}/cards/refresh-prices`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao atualizar preços");
+  return json;
+}
+
+export async function getCollectionStats() {
+  const res = await fetch(`${BASE_URL}/cards/stats`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function suggestDecks() {
   const res = await fetch(`${BASE_URL}/cards/suggest-decks`, { method: "POST" });
   const json = await res.json();

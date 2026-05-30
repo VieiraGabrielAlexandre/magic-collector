@@ -17,13 +17,14 @@ type Card struct {
 	Artist           string `json:"artist"`
 	Company          string `json:"company"`
 	Foil             bool   `json:"foil"`
-	PreRelease       bool   `json:"prerelease"`
-	Commander        bool   `json:"commander"`
-	PreconDeck       string `json:"precon_deck"`
-	DeckID           int    `json:"deck_id"`
-	Quantity         int    `json:"quantity"`
-	Condition        string `json:"condition"`
-	Notes            string `json:"notes"`
+	PreRelease       bool    `json:"prerelease"`
+	Commander        bool    `json:"commander"`
+	PreconDeck       string  `json:"precon_deck"`
+	DeckID           int     `json:"deck_id"`
+	Quantity         int     `json:"quantity"`
+	Condition        string  `json:"condition"`
+	Notes            string  `json:"notes"`
+	PriceUSD         float64 `json:"price_usd"`
 }
 
 type CreateCardInput struct {

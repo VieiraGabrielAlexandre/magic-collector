@@ -138,6 +138,24 @@ func (h *Handler) SetDeck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) RefreshPrices(c *gin.Context) {
+	result, err := h.service.RefreshPrices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) Stats(c *gin.Context) {
+	stats, err := h.service.GetStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao calcular estatísticas"})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 func (h *Handler) Export(c *gin.Context) {
 	cards, err := h.service.ExportAll()
 	if err != nil {

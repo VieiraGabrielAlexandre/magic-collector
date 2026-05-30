@@ -3,6 +3,7 @@ package importer
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,6 +11,23 @@ import (
 	"magic-collection-api/internal/decks"
 	"magic-collection-api/internal/mtgapi"
 )
+
+func parsePriceUSD(prices map[string]string, foil bool) float64 {
+	if prices == nil {
+		return 0
+	}
+	if foil {
+		if v, ok := prices["usd_foil"]; ok && v != "" {
+			f, _ := strconv.ParseFloat(v, 64)
+			return f
+		}
+	}
+	if v, ok := prices["usd"]; ok && v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		return f
+	}
+	return 0
+}
 
 type ImportPreconInput struct {
 	SetCode     string `json:"set_code" binding:"required"`
@@ -92,6 +110,7 @@ func (s *Service) ImportPrecon(input ImportPreconInput) (ImportResult, error) {
 			Quantity:         1,
 			Condition:        "Mint",
 			DeckID:           int(deckID),
+			PriceUSD:         parsePriceUSD(ext.Prices, false),
 		}
 
 		if _, err := s.cardRepo.Create(card); err != nil {
@@ -211,6 +230,7 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 			Quantity:         entry.Quantity,
 			Condition:        "Mint",
 			DeckID:           int(deckID),
+			PriceUSD:         parsePriceUSD(ext.Prices, false),
 		}
 
 		// database/sql já faz retry automático em ErrBadConn (broken pipe detectado antes do envio).

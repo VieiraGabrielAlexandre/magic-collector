@@ -80,6 +80,7 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE decks ADD COLUMN theme_color  VARCHAR(30)  NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN evaluation   LONGTEXT`)
 	db.Exec(`ALTER TABLE decks ADD COLUMN evaluated_at DATETIME NULL`)
+	db.Exec(`ALTER TABLE cards ADD COLUMN price_usd DECIMAL(10,2) NOT NULL DEFAULT 0`)
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS battles (
