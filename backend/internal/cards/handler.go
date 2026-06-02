@@ -139,7 +139,7 @@ func (h *Handler) SetDeck(c *gin.Context) {
 }
 
 func (h *Handler) Preview(c *gin.Context) {
-	var input CreateCardInput
+	var input PreviewCardInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
 		return

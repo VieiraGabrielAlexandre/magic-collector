@@ -103,27 +103,37 @@ function CardColorIcons({ card }) {
   );
 }
 
+// Converte um card (com colors JSON ou color PT) para string de códigos WUBRG separados por vírgula
+function colorToWUBRGCodes(card) {
+  if (card.colors && card.colors !== "[]" && card.colors !== "") {
+    try {
+      const arr = JSON.parse(card.colors);
+      if (Array.isArray(arr) && arr.length > 0) return arr.join(",");
+    } catch {}
+  }
+  const PT_TO_CODE = { branco: "W", azul: "U", preto: "B", preta: "B", vermelho: "R", vermelha: "R", verde: "G", incolor: "C" };
+  return (card.color || "").split(/[,/]+/).map(s => PT_TO_CODE[s.trim().toLowerCase()]).filter(Boolean).join(",");
+}
+
 function ManaColorPicker({ value, onChange }) {
-  const iconSet = colorStrToIconSet(value);
+  // value é uma string de códigos WUBRG separados por vírgula: "W,U,B"
+  const active = new Set((value || "").split(",").filter(Boolean));
   return (
     <div className="mana-color-picker">
       <span className="mana-color-picker-label">Cor</span>
       <div className="mana-color-picker-row">
-        {CARD_COLORS.map(({ icon, pt, code }) => {
-          const active = iconSet.has(icon);
-          return (
-            <button key={code} type="button" title={pt}
-              className={`mana-picker-btn${active ? " active" : ""}`}
-              onClick={() => {
-                const s = new Set(iconSet);
-                if (active) s.delete(icon); else s.add(icon);
-                onChange(iconSetToColorStr(s));
-              }}
-            >
-              <img src={`/mana-icons/${icon}.svg`} alt={pt} />
-            </button>
-          );
-        })}
+        {CARD_COLORS.map(({ icon, pt, code }) => (
+          <button key={code} type="button" title={pt}
+            className={`mana-picker-btn${active.has(code) ? " active" : ""}`}
+            onClick={() => {
+              const s = new Set(active);
+              if (s.has(code)) s.delete(code); else s.add(code);
+              onChange([...s].join(","));
+            }}
+          >
+            <img src={`/mana-icons/${icon}.svg`} alt={pt} />
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -303,6 +313,35 @@ function getDeckBadgeStyle(themeId) {
   return { background: t.bg, borderColor: t.border, color: t.text };
 }
 
+function DropdownMenu({ label, items, open, onToggle }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    function onOutside(e) { if (ref.current && !ref.current.contains(e.target)) onToggle(); }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open, onToggle]);
+  return (
+    <div className="toolbar-dropdown" ref={ref}>
+      <button type="button" className={`toolbar-menu-btn${open ? " open" : ""}`} onClick={onToggle}>{label}</button>
+      {open && (
+        <div className="toolbar-menu-items">
+          {items.map((item, i) =>
+            item.separator
+              ? <div key={i} className="toolbar-menu-sep" />
+              : <button key={i} type="button"
+                  className={`toolbar-menu-item${item.active ? " active" : ""}`}
+                  onClick={() => { item.onClick(); onToggle(); }}
+                  disabled={item.disabled}>
+                  {item.label}
+                </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DeckColorSelect({ value, onChange }) {
   const theme = getDeckTheme(value);
   return (
@@ -350,6 +389,10 @@ export default function App() {
   const [deckBuilderModal, setDeckBuilderModal] = useState(false);
   const [deckBuilderLoading, setDeckBuilderLoading] = useState(false);
   const [deckBuilderResult, setDeckBuilderResult] = useState(null);
+
+  const [quickAddModal, setQuickAddModal] = useState(false);
+  const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
+  const [openMenu, setOpenMenu] = useState(null);
 
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -478,7 +521,8 @@ export default function App() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const payload = { ...form, quantity: Number(form.quantity), year: Number(form.year) || 0 };
+    const colorArr = form.color.split(",").filter(Boolean);
+    const payload = { ...form, quantity: Number(form.quantity), year: Number(form.year) || 0, colors: JSON.stringify(colorArr) };
     setConfirmLoading(true);
     try {
       const preview = await previewCard(payload);
@@ -496,8 +540,27 @@ export default function App() {
     await createCard(confirmCard.formData);
     setConfirmCard(null);
     setForm(EMPTY_FORM);
+    setQuickAddForm({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
     setPage(1);
     loadCards({ page: 1 });
+  }
+
+  async function handleQuickAdd(e) {
+    e.preventDefault();
+    const payload = { ...quickAddForm, quantity: Number(quickAddForm.quantity) };
+    setQuickAddModal(false);
+    setConfirmLoading(true);
+    try {
+      const preview = await previewCard(payload);
+      const formData = preview.found && preview.card
+        ? { ...payload, name: preview.card.printed_name || preview.card.name || "", type: preview.card.type || "" }
+        : payload;
+      setConfirmCard({ found: preview.found, card: preview.card ?? null, formData });
+    } catch {
+      setConfirmCard({ found: false, card: null, formData: payload });
+    } finally {
+      setConfirmLoading(false);
+    }
   }
 
   async function handleDetails(id) {
@@ -520,7 +583,7 @@ export default function App() {
   function handleEditStart() {
     const c = selectedCard.local;
     setEditForm({
-      name: c.name, color: c.color, type: c.type, subtitle: c.subtitle,
+      name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist, company: c.company,
       foil: c.foil, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
@@ -529,7 +592,8 @@ export default function App() {
   }
 
   async function handleEditSave() {
-    await updateCard(selectedCard.local.id, { ...editForm, year: Number(editForm.year) || 0, quantity: Number(editForm.quantity) || 1, propagate });
+    const colorArr = editForm.color.split(",").filter(Boolean);
+    await updateCard(selectedCard.local.id, { ...editForm, year: Number(editForm.year) || 0, quantity: Number(editForm.quantity) || 1, propagate, colors: JSON.stringify(colorArr) });
     setEditMode(false);
     loadCards();
     handleDetails(selectedCard.local.id);
@@ -1163,6 +1227,63 @@ export default function App() {
         );
       })()}
 
+      {/* ── MODAL BUSCA RÁPIDA ── */}
+      {quickAddModal && (
+        <div className="modal-overlay" onClick={() => setQuickAddModal(false)}>
+          <div className="modal quick-add-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setQuickAddModal(false)}>✕</button>
+            <h2>⚡ Busca Rápida</h2>
+            <p className="quick-add-hint">Informe a sigla e o número da coleção para buscar a carta no Scryfall automaticamente.</p>
+            <form className="quick-add-form" onSubmit={handleQuickAdd}>
+              <div className="qa-row-2col">
+                <label>
+                  Sigla *
+                  <input required autoFocus placeholder="KLD, BRO…"
+                    value={quickAddForm.set_code}
+                    style={{ textTransform: "uppercase" }}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, set_code: e.target.value.toUpperCase().trim() })} />
+                </label>
+                <label>
+                  Número *
+                  <input required placeholder="017, 253a"
+                    value={quickAddForm.collection_number}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, collection_number: e.target.value.trim() })} />
+                </label>
+              </div>
+              <label>
+                Idioma
+                <select value={quickAddForm.language} onChange={(e) => setQuickAddForm({ ...quickAddForm, language: e.target.value })}>
+                  <option value="EN">Inglês</option>
+                  <option value="PT">Português</option>
+                  <option value="ES">Espanhol</option>
+                  <option value="JP">Japonês</option>
+                  <option value="FR">Francês</option>
+                  <option value="DE">Alemão</option>
+                </select>
+              </label>
+              <label>
+                Quantidade
+                <input type="number" min="1" value={quickAddForm.quantity}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, quantity: e.target.value })} />
+              </label>
+              <label>
+                Deck
+                <select value={quickAddForm.deck_id || 0} onChange={(e) => setQuickAddForm({ ...quickAddForm, deck_id: Number(e.target.value) })}>
+                  <option value={0}>— Nenhum —</option>
+                  {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </label>
+              <label className="checkbox-label">
+                <input type="checkbox" checked={quickAddForm.foil}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, foil: e.target.checked })} />
+                ✦ Foil
+              </label>
+              <button type="submit" className="quick-add-submit">Buscar e Confirmar →</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL CONFIRMAR CADASTRO ── */}
       {(confirmCard || confirmLoading) && (
         <div className="modal-overlay" onClick={() => !confirmLoading && setConfirmCard(null)}>
@@ -1467,7 +1588,10 @@ export default function App() {
       {activeTab === "collection" && <section className="grid">
         {/* ── FORMULÁRIO ── */}
         <form className="card form" onSubmit={handleSubmit}>
-          <h2>Cadastrar Carta</h2>
+          <div className="form-title-row">
+            <h2>Cadastrar Carta</h2>
+            <button type="button" className="quick-add-btn" onClick={(e) => { e.preventDefault(); setQuickAddModal(true); }}>⚡ Busca Rápida</button>
+          </div>
           {field("Nome *", "name", { placeholder: "Ex: Lightning Bolt", required: true })}
           <ManaColorPicker value={form.color} onChange={(v) => setForm({ ...form, color: v })} />
           {field("Tipo", "type", { placeholder: "Ex: Criatura, Instant" })}
@@ -1550,25 +1674,39 @@ export default function App() {
           <div className="list-header">
             <div className="list-header-top">
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
-              <div className="export-btns">
+              <div className="toolbar-group">
                 <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
-                  📊 {statsOpen ? "Fechar" : "Stats"}
+                  📊 Stats
                 </button>
-                <button type="button" className="price-refresh-btn" onClick={handleRefreshPrices} disabled={priceRefreshing} title="Atualizar todos os preços via Scryfall">
-                  {priceRefreshing ? "⏳…" : "💰 Preços"}
-                </button>
-                <button type="button" className="price-refresh-btn empty-price-btn" onClick={handleRefreshMissingPrices} disabled={priceRefreshing} title="Buscar preços das cartas sem valor (com fallback EN para cartas PT)">
-                  {priceRefreshing ? "⏳…" : "💰 Faltantes"}
-                </button>
-                <button type="button" className="price-refresh-btn img-refresh-btn" onClick={handleRefreshImages} disabled={priceRefreshing} title="Atualizar imagens via Scryfall">
-                  {priceRefreshing ? "⏳…" : "🖼 Imagens"}
-                </button>
-                <div className="view-toggle">
-                  <button type="button" className={`view-btn${viewMode === "list" ? " active" : ""}`} onClick={() => { setViewMode("list"); localStorage.setItem("card-view-mode","list"); }} title="Visualização em lista">☰</button>
-                  <button type="button" className={`view-btn${viewMode === "grid" ? " active" : ""}`} onClick={() => { setViewMode("grid"); localStorage.setItem("card-view-mode","grid"); }} title="Visualização em grid">⊞</button>
-                </div>
-                <button type="button" className="export-btn" onClick={handleExportCSV}>↓ CSV</button>
-                <button type="button" className="export-btn" onClick={handleExportXLSX}>↓ XLSX</button>
+                <DropdownMenu
+                  label={priceRefreshing ? "⏳…" : "🔄 Atualizar"}
+                  open={openMenu === "update"}
+                  onToggle={() => setOpenMenu(openMenu === "update" ? null : "update")}
+                  items={[
+                    { label: "💰 Todos os preços", onClick: handleRefreshPrices, disabled: priceRefreshing },
+                    { label: "💰 Só faltantes", onClick: handleRefreshMissingPrices, disabled: priceRefreshing },
+                    { separator: true },
+                    { label: "🖼 Imagens", onClick: handleRefreshImages, disabled: priceRefreshing },
+                  ]}
+                />
+                <DropdownMenu
+                  label={viewMode === "grid" ? "⊞ Exibição" : "☰ Exibição"}
+                  open={openMenu === "view"}
+                  onToggle={() => setOpenMenu(openMenu === "view" ? null : "view")}
+                  items={[
+                    { label: "☰ Lista", active: viewMode === "list", onClick: () => { setViewMode("list"); localStorage.setItem("card-view-mode", "list"); } },
+                    { label: "⊞ Grid", active: viewMode === "grid", onClick: () => { setViewMode("grid"); localStorage.setItem("card-view-mode", "grid"); } },
+                  ]}
+                />
+                <DropdownMenu
+                  label="↓ Exportar"
+                  open={openMenu === "export"}
+                  onToggle={() => setOpenMenu(openMenu === "export" ? null : "export")}
+                  items={[
+                    { label: "↓ CSV", onClick: handleExportCSV },
+                    { label: "↓ XLSX", onClick: handleExportXLSX },
+                  ]}
+                />
               </div>
             </div>
             {priceRefreshResult && (
@@ -1588,7 +1726,7 @@ export default function App() {
             <input
               className="search-input"
               type="search"
-              placeholder="Buscar por nome, coleção, cor, tipo..."
+              placeholder="Buscar por nome, coleção, nº, cor, tipo..."
               value={search}
               onChange={handleSearchChange}
             />
@@ -1830,10 +1968,10 @@ export default function App() {
               <form className="edit-form" onSubmit={(e) => { e.preventDefault(); handleEditSave(); }}>
                 <h2>Editar carta</h2>
                 <div className="edit-grid">
-                  <label>Nome *<input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+                  <label className="eg-full">Nome *<input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
                   <label>Tipo<input value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} /></label>
                   <label>Subtítulo<input value={editForm.subtitle} onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })} /></label>
-                  <label>Nº na coleção<input value={editForm.collection_number} onChange={(e) => setEditForm({ ...editForm, collection_number: e.target.value })} /></label>
+                  <label>Nº<input value={editForm.collection_number} onChange={(e) => setEditForm({ ...editForm, collection_number: e.target.value })} /></label>
                   <label>Raridade
                     <select value={editForm.rarity} onChange={(e) => setEditForm({ ...editForm, rarity: e.target.value })}>
                       <option value="">Selecione</option>
@@ -1845,7 +1983,7 @@ export default function App() {
                       <option value="T">Token (T)</option>
                     </select>
                   </label>
-                  <label>Sigla da coleção<input value={editForm.set_code} onChange={(e) => setEditForm({ ...editForm, set_code: e.target.value })} /></label>
+                  <label>Sigla<input value={editForm.set_code} onChange={(e) => setEditForm({ ...editForm, set_code: e.target.value })} /></label>
                   <label>Idioma
                     <select value={editForm.language} onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}>
                       <option value="PT">Português</option>
@@ -1867,16 +2005,16 @@ export default function App() {
                       <option value="damaged">Damaged</option>
                     </select>
                   </label>
-                  <label>Quantidade<input type="number" min="1" value={editForm.quantity} onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} /></label>
-                  <label className="checkbox-label"><input type="checkbox" checked={editForm.foil} onChange={(e) => setEditForm({ ...editForm, foil: e.target.checked })} />Foil</label>
-                  <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
-                  <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
+                  <label>Qtd<input type="number" min="1" value={editForm.quantity} onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} /></label>
                   <label>Deck
                     <select value={editForm.deck_id} onChange={(e) => setEditForm({ ...editForm, deck_id: Number(e.target.value) })}>
                       <option value={0}>— Nenhum —</option>
                       {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
+                  <label className="checkbox-label"><input type="checkbox" checked={editForm.foil} onChange={(e) => setEditForm({ ...editForm, foil: e.target.checked })} />Foil</label>
+                  <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
+                  <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
                 <label>Observações<textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>

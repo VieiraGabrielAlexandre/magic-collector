@@ -71,9 +71,9 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	var clauses []string
 	args := []any{}
 	if params.Search != "" {
-		clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ?)")
+		clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
 		like := "%" + params.Search + "%"
-		args = append(args, like, like, like, like, like)
+		args = append(args, like, like, like, like, like, like)
 	}
 	if params.DeckIDFilter != nil {
 		clauses = append(clauses, "deck_id = ?")
@@ -213,10 +213,10 @@ func (r *Repository) Update(id string, card Card) error {
 		commanderInt = 1
 	}
 	_, err := r.db.Exec(
-		"UPDATE cards SET name=?, color=?, `type`=?, subtitle=?, collection_number=?,"+
+		"UPDATE cards SET name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?,"+
 			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=? WHERE id=?",
-		card.Name, card.Color, card.Type, card.Subtitle, card.CollectionNumber,
+		card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist,
 		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
 		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, id,
@@ -236,10 +236,10 @@ func (r *Repository) UpdateSharedByIdentity(oldName, oldSetCode, oldCollNum, old
 		newFoilInt = 1
 	}
 	_, err := r.db.Exec(
-		"UPDATE cards SET name=?, color=?, `type`=?, subtitle=?, collection_number=?,"+
+		"UPDATE cards SET name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?, foil=?"+
 			" WHERE name=? AND set_code=? AND collection_number=? AND language=? AND foil=?",
-		card.Name, card.Color, card.Type, card.Subtitle, card.CollectionNumber,
+		card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist, card.Company, newFoilInt,
 		oldName, oldSetCode, oldCollNum, oldLang, oldFoilInt,
 	)

@@ -878,10 +878,16 @@ button.danger:hover:not(:disabled) {
 }
 .edit-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 }
 .edit-grid label, .edit-form > label { font-size: 13px; }
+/* Todos os campos ocupam 1 coluna (33%). Só Nome usa span 3 (100%). */
+.edit-grid .eg-full { grid-column: span 3; }
+.edit-grid label    { grid-column: span 1; min-width: 0; }
+/* Impede overflow lateral: inputs e selects respeitam a largura da célula */
+.edit-grid input,
+.edit-grid select   { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 
 .propagate-label {
   font-size: 13px;
@@ -895,6 +901,19 @@ button.danger:hover:not(:disabled) {
 .full-width { width: 100%; }
 
 /* ── Checkbox ──────────────────────────────────────────────────────────── */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  min-height: auto;
+  padding: 0;
+  width: auto;
+  border: revert;
+  background: revert;
+  border-radius: revert;
+  accent-color: var(--gold);
+}
+
 .checkbox-label {
   flex-direction: row;
   align-items: center;
@@ -1616,8 +1635,9 @@ button.danger:hover:not(:disabled) {
   .sort-btn { white-space: nowrap; flex-shrink: 0; }
 
   /* List header */
-  .list-header-top { flex-wrap: wrap; gap: 8px; }
-  .export-btns { flex-wrap: nowrap; }
+  .list-header-top { flex-direction: column; align-items: stretch; gap: 8px; }
+  .toolbar-group { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .toolbar-menu-items { right: auto; left: 0; min-width: 180px; }
 
   /* Deck inner tabs */
   .deck-inner-tabs { gap: 0; }
@@ -2696,4 +2716,172 @@ button.danger:hover:not(:disabled) {
   background: linear-gradient(135deg, #2a1a08, #4a3010);
   border-color: #8a5a20;
   box-shadow: 0 0 12px rgba(200,120,40,0.3);
+}
+
+/* ── Toolbar com dropdowns ─────────────────────────────────────────────── */
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbar-dropdown {
+  position: relative;
+}
+
+.toolbar-menu-btn {
+  background: var(--surface-3);
+  color: var(--gold);
+  border: 1px solid var(--border);
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 32px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  transition: all 0.15s;
+}
+.toolbar-menu-btn:hover:not(:disabled),
+.toolbar-menu-btn.open {
+  border-color: var(--gold-dim);
+  background: rgba(200,155,60,0.1);
+  color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(200,155,60,0.15);
+}
+
+.toolbar-menu-items {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 300;
+  min-width: 170px;
+  box-shadow:
+    0 12px 32px rgba(0,0,0,0.6),
+    0 0 0 1px rgba(200,155,60,0.08);
+  animation: menu-in 0.12s ease;
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.toolbar-menu-item {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 36px;
+  border-radius: 7px;
+  width: 100%;
+  letter-spacing: 0.02em;
+  transition: background 0.12s, color 0.12s;
+}
+.toolbar-menu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: none;
+  opacity: 1;
+}
+.toolbar-menu-item.active {
+  background: rgba(200,155,60,0.12);
+  color: var(--gold-light);
+}
+.toolbar-menu-item:disabled { opacity: 0.4; }
+
+.toolbar-menu-sep {
+  height: 1px;
+  background: var(--border-dim);
+  margin: 3px 4px;
+}
+
+/* ── Form header row ───────────────────────────────────────────────────── */
+.form-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.form-title-row h2 { margin: 0; }
+
+.quick-add-btn {
+  background: var(--surface-3);
+  color: var(--gold);
+  border: 1px solid var(--border);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 30px;
+  white-space: nowrap;
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.quick-add-btn:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+  background: rgba(200,155,60,0.1);
+  color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(200,155,60,0.15);
+}
+
+/* ── Modal Busca Rápida ────────────────────────────────────────────────── */
+.quick-add-modal {
+  max-width: 420px;
+}
+.quick-add-modal h2 {
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+.quick-add-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: -8px 0 0;
+  line-height: 1.4;
+}
+.quick-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Apenas Sigla + Número ficam lado a lado, colunas fixas e compactas */
+.qa-row-2col {
+  display: grid;
+  grid-template-columns: 120px 120px;
+  gap: 12px;
+}
+/* Todos os outros campos ocupam largura total, sem overflow */
+.quick-add-form > label,
+.quick-add-form > .checkbox-label {
+  width: 100%;
+}
+.quick-add-submit {
+  background: linear-gradient(160deg, var(--gold-dim), #5a3c10);
+  color: var(--gold-light);
+  border: 1px solid var(--gold-dim);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 16px;
+  border-radius: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.quick-add-submit:hover:not(:disabled) {
+  background: linear-gradient(160deg, #b08030, #7a5020);
+  box-shadow: 0 0 16px rgba(200,155,60,0.3);
 }

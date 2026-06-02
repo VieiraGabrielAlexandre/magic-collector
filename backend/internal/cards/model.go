@@ -28,9 +28,20 @@ type Card struct {
 	ImageURL         string  `json:"image_url"`
 }
 
+type PreviewCardInput struct {
+	Name             string `json:"name"`
+	SetCode          string `json:"set_code"`
+	CollectionNumber string `json:"collection_number"`
+	Language         string `json:"language"`
+	Artist           string `json:"artist"`
+	PreRelease       bool   `json:"prerelease"`
+	Foil             bool   `json:"foil"`
+}
+
 type CreateCardInput struct {
 	Name             string `json:"name" binding:"required"`
 	Color            string `json:"color"`
+	Colors           string `json:"colors"`
 	Type             string `json:"type"`
 	Subtitle         string `json:"subtitle"`
 	CollectionNumber string `json:"collection_number"`
@@ -53,6 +64,7 @@ type CreateCardInput struct {
 type UpdateCardInput struct {
 	Name             string `json:"name" binding:"required"`
 	Color            string `json:"color"`
+	Colors           string `json:"colors"`
 	Type             string `json:"type"`
 	Subtitle         string `json:"subtitle"`
 	CollectionNumber string `json:"collection_number"`

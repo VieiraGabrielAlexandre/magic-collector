@@ -9,6 +9,28 @@ import (
 	"magic-collection-api/internal/mtgapi"
 )
 
+var colorCodeToPT = map[string]string{
+	"W": "Branco", "U": "Azul", "B": "Preto",
+	"R": "Vermelho", "G": "Verde", "C": "Incolor",
+}
+
+func colorsJSONToDisplay(colorsJSON string) string {
+	if colorsJSON == "" || colorsJSON == "null" || colorsJSON == "[]" {
+		return ""
+	}
+	var codes []string
+	if err := json.Unmarshal([]byte(colorsJSON), &codes); err != nil {
+		return ""
+	}
+	parts := make([]string, 0, len(codes))
+	for _, c := range codes {
+		if pt, ok := colorCodeToPT[c]; ok {
+			parts = append(parts, pt)
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
 func parsePriceUSD(prices map[string]string, foil bool) float64 {
 	if prices == nil {
 		return 0
@@ -42,7 +64,8 @@ func NewService(repository *Repository, mtgClient *mtgapi.Client) *Service {
 func (s *Service) Create(input CreateCardInput) (int64, error) {
 	card := Card{
 		Name:             input.Name,
-		Color:            input.Color,
+		Colors:           input.Colors,
+		Color:            colorsJSONToDisplay(input.Colors),
 		Type:             input.Type,
 		Subtitle:         input.Subtitle,
 		CollectionNumber: input.CollectionNumber,
@@ -80,13 +103,14 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 	}
 
 	if ext, _ := fetchExt(); ext != nil {
-		colors, _ := json.Marshal(ext.Colors)
+		colorsJSON, _ := json.Marshal(ext.Colors)
 		card.MTGID = ext.ID
 		card.SetCode = ext.Set
 		card.Rarity = ext.Rarity
 		card.Type = ext.Type
 		card.ManaCost = ext.ManaCost
-		card.Colors = string(colors)
+		card.Colors = string(colorsJSON)
+		card.Color = colorsJSONToDisplay(card.Colors)
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
 	}
@@ -142,7 +166,8 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 
 	card := Card{
 		Name:             input.Name,
-		Color:            input.Color,
+		Colors:           input.Colors,
+		Color:            colorsJSONToDisplay(input.Colors),
 		Type:             input.Type,
 		Subtitle:         input.Subtitle,
 		CollectionNumber: input.CollectionNumber,
@@ -195,7 +220,7 @@ func (s *Service) GetStats() (CollectionStats, error) {
 }
 
 // Preview busca a carta na Scryfall sem salvar no banco — usado para confirmar antes de cadastrar.
-func (s *Service) Preview(input CreateCardInput) (*mtgapi.ExternalCard, error) {
+func (s *Service) Preview(input PreviewCardInput) (*mtgapi.ExternalCard, error) {
 	if input.PreRelease {
 		return s.mtgClient.SearchPreRelease(input.Name, input.Language, input.Artist)
 	}
