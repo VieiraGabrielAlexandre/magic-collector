@@ -79,6 +79,12 @@ resource "aws_instance" "app" {
 
   user_data = file("${path.module}/userdata.sh")
 
+  # user_data só é executado na criação; ami usa most_recent mas não queremos
+  # recriar uma instância em produção só porque saiu uma nova imagem Ubuntu.
+  lifecycle {
+    ignore_changes = [user_data, ami]
+  }
+
   tags = {
     Name    = var.app_name
     Project = var.app_name

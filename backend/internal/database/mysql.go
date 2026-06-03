@@ -3,9 +3,11 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Open(dsn string) (*sql.DB, error) {
@@ -104,5 +106,59 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id            INT          NOT NULL AUTO_INCREMENT,
+			username      VARCHAR(50)  NOT NULL UNIQUE,
+			display_name  VARCHAR(100) NOT NULL,
+			password_hash VARCHAR(255) NOT NULL,
+			created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS sessions (
+			token      VARCHAR(64)  NOT NULL,
+			user_id    INT          NOT NULL,
+			created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME     NOT NULL,
+			PRIMARY KEY (token),
+			INDEX idx_user_id (user_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	seedUsers(db)
+
 	return db, nil
+}
+
+// seedUsers insere os usuários iniciais se ainda não existirem.
+func seedUsers(db *sql.DB) {
+	initial := []struct{ username, displayName, password string }{
+		{"gabriel", "Gabriel", "gabriel123"},
+		{"juliana", "Juliana", "juliana123"},
+	}
+	for _, u := range initial {
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", u.username).Scan(&count)
+		if count == 0 {
+			hash, err := bcrypt.GenerateFromPassword([]byte(u.password), bcrypt.DefaultCost)
+			if err != nil {
+				log.Printf("seed: erro ao gerar hash para %s: %v", u.username, err)
+				continue
+			}
+			db.Exec(
+				"INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, ?)",
+				u.username, u.displayName, string(hash),
+			)
+			log.Printf("seed: usuário '%s' criado (senha: %s)", u.username, u.password)
+		}
+	}
 }

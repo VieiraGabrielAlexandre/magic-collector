@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"magic-collection-api/internal/ai"
+	"magic-collection-api/internal/auth"
 	"magic-collection-api/internal/battles"
 	"magic-collection-api/internal/cards"
 	"magic-collection-api/internal/database"
@@ -54,42 +55,53 @@ func main() {
 	battleRepo := battles.NewRepository(db)
 	battleHandler := battles.NewHandler(battleRepo)
 
+	authRepo := auth.NewRepository(db)
+	authSvc := auth.NewService(authRepo)
+	authHandler := auth.NewHandler(authSvc)
+
 	router := gin.Default()
 
+	// ── Rotas públicas ───────────────────────────────────────────────────
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+	router.POST("/auth/login", authHandler.Login)
+	router.POST("/auth/logout", authHandler.Logout)
+	router.GET("/auth/me", authHandler.Me)
 
-	router.GET("/cards", handler.List)
-	router.GET("/cards/colors", handler.ListColors)
-	router.POST("/cards/refresh-colors", handler.RefreshColors)
-	router.POST("/cards/normalize-rarities", handler.NormalizeRarities)
-	router.GET("/cards/stats", handler.Stats)
-	router.GET("/cards/export", handler.Export)
-	router.POST("/cards/preview", handler.Preview)
-	router.POST("/cards/refresh-prices", handler.RefreshPrices)
-	router.POST("/cards/refresh-images", handler.RefreshImages)
-	router.POST("/cards/suggest-decks", handler.SuggestDecks)
-	router.POST("/cards", handler.Create)
-	router.GET("/cards/:id", handler.GetByID)
-	router.PUT("/cards/:id", handler.Update)
-	router.PATCH("/cards/:id/quantity", handler.UpdateQuantity)
-	router.PATCH("/cards/:id/deck", handler.SetDeck)
-	router.DELETE("/cards/:id", handler.Delete)
+	// ── Rotas protegidas (requerem sessão válida) ────────────────────────
+	api := router.Group("/", authHandler.Middleware())
 
-	router.GET("/decks", deckHandler.List)
-	router.POST("/decks", deckHandler.Create)
-	router.PUT("/decks/:id", deckHandler.Update)
-	router.DELETE("/decks/:id", deckHandler.Delete)
-	router.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
-	router.POST("/decks/:id/evaluate", deckHandler.Evaluate)
-	router.POST("/decks/import-precon", importerHandler.ImportPrecon)
-	router.POST("/decks/import-list", importerHandler.ImportDeckList)
-	router.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
+	api.GET("/cards", handler.List)
+	api.GET("/cards/colors", handler.ListColors)
+	api.POST("/cards/refresh-colors", handler.RefreshColors)
+	api.POST("/cards/normalize-rarities", handler.NormalizeRarities)
+	api.GET("/cards/stats", handler.Stats)
+	api.GET("/cards/export", handler.Export)
+	api.POST("/cards/preview", handler.Preview)
+	api.POST("/cards/refresh-prices", handler.RefreshPrices)
+	api.POST("/cards/refresh-images", handler.RefreshImages)
+	api.POST("/cards/suggest-decks", handler.SuggestDecks)
+	api.POST("/cards", handler.Create)
+	api.GET("/cards/:id", handler.GetByID)
+	api.PUT("/cards/:id", handler.Update)
+	api.PATCH("/cards/:id/quantity", handler.UpdateQuantity)
+	api.PATCH("/cards/:id/deck", handler.SetDeck)
+	api.DELETE("/cards/:id", handler.Delete)
 
-	router.GET("/battles", battleHandler.List)
-	router.POST("/battles", battleHandler.Create)
-	router.DELETE("/battles/:id", battleHandler.Delete)
+	api.GET("/decks", deckHandler.List)
+	api.POST("/decks", deckHandler.Create)
+	api.PUT("/decks/:id", deckHandler.Update)
+	api.DELETE("/decks/:id", deckHandler.Delete)
+	api.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
+	api.POST("/decks/:id/evaluate", deckHandler.Evaluate)
+	api.POST("/decks/import-precon", importerHandler.ImportPrecon)
+	api.POST("/decks/import-list", importerHandler.ImportDeckList)
+	api.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
+
+	api.GET("/battles", battleHandler.List)
+	api.POST("/battles", battleHandler.Create)
+	api.DELETE("/battles/:id", battleHandler.Delete)
 
 	router.Run(":8080")
 }

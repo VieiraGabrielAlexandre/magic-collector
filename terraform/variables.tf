@@ -32,3 +32,9 @@ variable "volume_size_gb" {
   type        = number
   default     = 20
 }
+
+variable "domain_name" {
+  description = "Domínio registrado para a aplicação (ex: magic-collector.site)"
+  type        = string
+  default     = "magic-collector.site"
+}

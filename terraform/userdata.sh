@@ -2,6 +2,8 @@
 set -euxo pipefail
 exec > /var/log/userdata.log 2>&1
 
+DOMAIN="magic-collector.site"
+
 # ── Atualizar sistema ────────────────────────────────────────────────────
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -13,6 +15,8 @@ apt-get install -y \
   curl \
   gnupg \
   nginx \
+  certbot \
+  python3-certbot-nginx \
   git \
   unzip \
   awscli
@@ -53,11 +57,11 @@ fi
 mkdir -p /opt/magic-collector
 chown ubuntu:ubuntu /opt/magic-collector
 
-# ── Configurar Nginx como reverse proxy ─────────────────────────────────
-cat > /etc/nginx/sites-available/magic-collector <<'NGINXEOF'
+# ── Configurar Nginx como reverse proxy (HTTP — SSL via setup-ssl.sh) ───
+cat > /etc/nginx/sites-available/magic-collector <<NGINXEOF
 server {
-    listen 80 default_server;
-    server_name _;
+    listen 80;
+    server_name ${DOMAIN} www.${DOMAIN};
 
     client_max_body_size 10m;
 
@@ -65,10 +69,10 @@ server {
     location /api/ {
         proxy_pass         http://127.0.0.1:8080/;
         proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
         proxy_connect_timeout 60s;
         proxy_read_timeout    300s;
     }
@@ -77,10 +81,10 @@ server {
     location / {
         proxy_pass         http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
     }
 }
 NGINXEOF
@@ -90,4 +94,4 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl enable --now nginx
 
-echo "=== userdata.sh concluído ==="
+echo "=== userdata.sh concluído — execute setup-ssl.sh após DNS propagar ==="

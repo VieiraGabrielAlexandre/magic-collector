@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateCardQuantity, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, logout, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateCardQuantity, updateDeck } from "./services/api";
+import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -365,6 +366,52 @@ function DeckColorSelect({ value, onChange }) {
 }
 
 export default function App() {
+  // ── Auth ──────────────────────────────────────────────────────────────
+  const [authUser, setAuthUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [sessionCreatedAt, setSessionCreatedAt] = useState(null);
+  const [sessionElapsed, setSessionElapsed] = useState("");
+  const [showLanding, setShowLanding] = useState(false);
+
+  useEffect(() => {
+    getMe().then((data) => {
+      if (data?.user) {
+        setAuthUser(data.user);
+        setSessionCreatedAt(data.session_created_at);
+      }
+    }).finally(() => setAuthReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!sessionCreatedAt) return;
+    function tick() {
+      const diff = Math.floor((Date.now() - new Date(sessionCreatedAt).getTime()) / 1000);
+      if (diff < 60) setSessionElapsed(`${diff}s`);
+      else if (diff < 3600) setSessionElapsed(`${Math.floor(diff / 60)}min`);
+      else {
+        const h = Math.floor(diff / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+        setSessionElapsed(m > 0 ? `${h}h ${m}min` : `${h}h`);
+      }
+    }
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [sessionCreatedAt]);
+
+  function handleAuthEnter(user, createdAt) {
+    setAuthUser(user);
+    setSessionCreatedAt(createdAt);
+    setAuthReady(true);
+  }
+
+  async function handleLogout() {
+    await logout();
+    setAuthUser(null);
+    setSessionCreatedAt(null);
+    setSessionElapsed("");
+  }
+
   const [form, setForm] = useState(EMPTY_FORM);
 
   const [cards, setCards] = useState([]);
@@ -404,6 +451,7 @@ export default function App() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [detailFromDeck, setDetailFromDeck] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [propagate, setPropagate] = useState(true);
 
@@ -575,6 +623,19 @@ export default function App() {
   }
 
   async function handleDetails(id) {
+    setDetailFromDeck(false);
+    setLoadingDetail(true);
+    setSelectedCard(null);
+    try {
+      const data = await getCard(id);
+      setSelectedCard(data);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
+  async function handleDeckDetails(id) {
+    setDetailFromDeck(true);
     setLoadingDetail(true);
     setSelectedCard(null);
     try {
@@ -886,8 +947,43 @@ export default function App() {
 
   const deckTotalQuantity = deckCards.reduce((sum, c) => sum + (c.quantity || 1), 0);
 
+  // ── Guarda de autenticação (todos os hooks já foram chamados acima) ───
+  if (!authReady) return (
+    <div className="auth-loading">
+      <div className="eval-spinner">⚙</div>
+      <p>Carregando…</p>
+    </div>
+  );
+
+  if (!authUser || showLanding) return (
+    <LandingPage
+      onEnter={handleAuthEnter}
+      onBack={authUser ? () => setShowLanding(false) : null}
+    />
+  );
+
+  const userInitials = authUser.display_name
+    .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
   return (
     <main className="app">
+      {/* ── Session bar ── */}
+      <div className="session-bar">
+        <div className="session-bar-left">
+          <div className="session-avatar">{userInitials}</div>
+          <div className="session-info">
+            <span className="session-name">Olá, {authUser.display_name}</span>
+            {sessionElapsed && (
+              <span className="session-time">Logado há {sessionElapsed}</span>
+            )}
+          </div>
+        </div>
+        <div className="session-bar-actions">
+          <button className="session-home" onClick={() => setShowLanding(true)}>⚔ Início</button>
+          <button className="session-logout" onClick={handleLogout}>Sair</button>
+        </div>
+      </div>
+
       <section className="hero">
         <h1>Magic Collector</h1>
         <p>Cadastre, organize e consulte sua coleção de cartas Magic: The Gathering</p>
@@ -946,17 +1042,28 @@ export default function App() {
                   </div>
                   <div className="list">
                     {deckCards.map((card) => (
-                      <div className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                      <div className={`list-item deck-card-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                        {card.image_url && (
+                          <div className="deck-card-thumb">
+                            <img src={card.image_url} alt={card.name} loading="lazy" />
+                          </div>
+                        )}
                         <div className="list-item-info">
                           <div className="list-item-name">
                             <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
                             {card.foil && <span className="foil-text">✦</span>}
                             <CardColorIcons card={card} />
                             {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
+                            {card.mana_cost && <span className="deck-card-mana">{card.mana_cost}</span>}
                           </div>
-                          <small>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}</small>
+                          {card.type && <div className="deck-card-type">{card.type}</div>}
+                          <small>
+                            {card.set_code || "—"} · #{card.collection_number || "—"} · {card.language} · ×{card.quantity}
+                            {card.price_usd > 0 && <span className="deck-card-price"> · ${card.price_usd.toFixed(2)}</span>}
+                          </small>
                         </div>
                         <div className="actions">
+                          <button type="button" onClick={() => handleDeckDetails(card.id)}>Ver</button>
                           <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
                         </div>
                       </div>
@@ -1500,14 +1607,16 @@ export default function App() {
 
             {/* ── STEP: result ── */}
             {deckBuilderStep === "result" && deckBuilderResult && (
-              deckBuilderResult.error ? (
+              (deckBuilderResult.error || deckBuilderResult.error_ia) ? (
                 <>
                   <div className="eval-empty">
-                    <div className="eval-empty-icon">⚠️</div>
-                    <p>{deckBuilderResult.error}</p>
+                    <div className="eval-empty-icon">{deckBuilderResult.error_ia ? "🚫" : "⚠️"}</div>
+                    <p>{deckBuilderResult.error_ia
+                      ? `Não foi possível montar o deck: ${deckBuilderResult.error_ia}`
+                      : deckBuilderResult.error}</p>
                   </div>
                   <div className="db-actions">
-                    <button type="button" className="db-revaluate-btn" onClick={handleRevaluateDeck}>♻ Tentar novamente</button>
+                    <button type="button" className="db-revaluate-btn" onClick={handleRevaluateDeck}>♻ Tentar com outros parâmetros</button>
                     <button type="button" className="db-reject-btn" onClick={() => setDeckBuilderModal(false)}>✕ Fechar</button>
                   </div>
                 </>
@@ -2099,9 +2208,9 @@ export default function App() {
 
       {/* ── MODAL DETALHES ── */}
       {(selectedCard || loadingDetail) && (
-        <div className="modal-overlay" onClick={() => { setSelectedCard(null); setEditMode(false); }}>
+        <div className="modal-overlay" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => { setSelectedCard(null); setEditMode(false); }}>✕</button>
+            <button className="modal-close" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>✕</button>
 
             {loadingDetail && <p className="empty">Carregando...</p>}
 
@@ -2188,8 +2297,18 @@ export default function App() {
                 )}
 
                 <div className="modal-actions">
-                  <button type="button" className="edit-btn" onClick={handleEditStart}>Editar</button>
-                  <button className="danger" onClick={() => handleDelete(selectedCard.local.id)}>Remover carta</button>
+                  {detailFromDeck ? (
+                    <button className="danger" onClick={async () => {
+                      await handleUnassignCard(selectedCard.local.id);
+                      setSelectedCard(null);
+                      setDetailFromDeck(false);
+                    }}>Remover do deck</button>
+                  ) : (
+                    <>
+                      <button type="button" className="edit-btn" onClick={handleEditStart}>Editar</button>
+                      <button className="danger" onClick={() => handleDelete(selectedCard.local.id)}>Remover carta</button>
+                    </>
+                  )}
                 </div>
               </>
             )}
