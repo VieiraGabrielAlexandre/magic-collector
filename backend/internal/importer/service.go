@@ -94,6 +94,7 @@ func (s *Service) ImportPrecon(input ImportPreconInput) (ImportResult, error) {
 		}
 
 		colorsJSON, _ := json.Marshal(ext.Colors)
+		colorsStr := string(colorsJSON)
 
 		card := cards.Card{
 			MTGID:            ext.ID,
@@ -103,7 +104,8 @@ func (s *Service) ImportPrecon(input ImportPreconInput) (ImportResult, error) {
 			Rarity:           ext.Rarity,
 			SetCode:          ext.Set,
 			ManaCost:         ext.ManaCost,
-			Colors:           string(colorsJSON),
+			Colors:           colorsStr,
+			Color:            cards.ColorsJSONToDisplay(colorsStr),
 			Language:         lang,
 			Artist:           ext.Artist,
 			Company:          "Wizards of the Coast",
@@ -111,6 +113,7 @@ func (s *Service) ImportPrecon(input ImportPreconInput) (ImportResult, error) {
 			Condition:        "Mint",
 			DeckID:           int(deckID),
 			PriceUSD:         parsePriceUSD(ext.Prices, false),
+			ImageURL:         ext.ImageURL,
 		}
 
 		if _, err := s.cardRepo.Create(card); err != nil {
@@ -214,6 +217,7 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 			cardName = ext.Name
 		}
 		colorsJSON, _ := json.Marshal(ext.Colors)
+		colorsStr := string(colorsJSON)
 
 		card := cards.Card{
 			MTGID:            ext.ID,
@@ -223,7 +227,8 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 			Rarity:           ext.Rarity,
 			SetCode:          ext.Set,
 			ManaCost:         ext.ManaCost,
-			Colors:           string(colorsJSON),
+			Colors:           colorsStr,
+			Color:            cards.ColorsJSONToDisplay(colorsStr),
 			Language:         lang,
 			Artist:           ext.Artist,
 			Company:          "Wizards of the Coast",
@@ -231,6 +236,7 @@ func (s *Service) importEntries(entries []DeckListEntry, deckID int64, setCode, 
 			Condition:        "Mint",
 			DeckID:           int(deckID),
 			PriceUSD:         parsePriceUSD(ext.Prices, false),
+			ImageURL:         ext.ImageURL,
 		}
 
 		// database/sql já faz retry automático em ErrBadConn (broken pipe detectado antes do envio).

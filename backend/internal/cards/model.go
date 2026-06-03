@@ -1,5 +1,34 @@
 package cards
 
+import (
+	"encoding/json"
+	"strings"
+)
+
+var colorCodeToPT = map[string]string{
+	"W": "Branco", "U": "Azul", "B": "Preto",
+	"R": "Vermelho", "G": "Verde", "C": "Incolor",
+}
+
+// ColorsJSONToDisplay converte '["W","U"]' → "Branco/Azul".
+// Usada por todos os pacotes que criam ou atualizam cartas.
+func ColorsJSONToDisplay(colorsJSON string) string {
+	if colorsJSON == "" || colorsJSON == "null" || colorsJSON == "[]" {
+		return ""
+	}
+	var codes []string
+	if err := json.Unmarshal([]byte(colorsJSON), &codes); err != nil {
+		return ""
+	}
+	parts := make([]string, 0, len(codes))
+	for _, c := range codes {
+		if pt, ok := colorCodeToPT[c]; ok {
+			parts = append(parts, pt)
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
 type Card struct {
 	ID               int    `json:"id"`
 	MTGID            string `json:"mtg_id"`

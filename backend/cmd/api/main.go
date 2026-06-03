@@ -62,6 +62,8 @@ func main() {
 
 	router.GET("/cards", handler.List)
 	router.GET("/cards/colors", handler.ListColors)
+	router.POST("/cards/refresh-colors", handler.RefreshColors)
+	router.POST("/cards/normalize-rarities", handler.NormalizeRarities)
 	router.GET("/cards/stats", handler.Stats)
 	router.GET("/cards/export", handler.Export)
 	router.POST("/cards/preview", handler.Preview)

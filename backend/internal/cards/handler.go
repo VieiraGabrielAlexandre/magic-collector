@@ -140,6 +140,24 @@ func (h *Handler) SetDeck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) NormalizeRarities(c *gin.Context) {
+	result, err := h.service.NormalizeRarities()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) RefreshColors(c *gin.Context) {
+	result, err := h.service.RefreshColors()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *Handler) ListColors(c *gin.Context) {
 	combos, err := h.service.ListColorCombos()
 	if err != nil {

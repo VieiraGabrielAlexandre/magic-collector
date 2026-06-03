@@ -9,27 +9,6 @@ import (
 	"magic-collection-api/internal/mtgapi"
 )
 
-var colorCodeToPT = map[string]string{
-	"W": "Branco", "U": "Azul", "B": "Preto",
-	"R": "Vermelho", "G": "Verde", "C": "Incolor",
-}
-
-func colorsJSONToDisplay(colorsJSON string) string {
-	if colorsJSON == "" || colorsJSON == "null" || colorsJSON == "[]" {
-		return ""
-	}
-	var codes []string
-	if err := json.Unmarshal([]byte(colorsJSON), &codes); err != nil {
-		return ""
-	}
-	parts := make([]string, 0, len(codes))
-	for _, c := range codes {
-		if pt, ok := colorCodeToPT[c]; ok {
-			parts = append(parts, pt)
-		}
-	}
-	return strings.Join(parts, "/")
-}
 
 func parsePriceUSD(prices map[string]string, foil bool) float64 {
 	if prices == nil {
@@ -65,7 +44,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 	card := Card{
 		Name:             input.Name,
 		Colors:           input.Colors,
-		Color:            colorsJSONToDisplay(input.Colors),
+		Color:            ColorsJSONToDisplay(input.Colors),
 		Type:             input.Type,
 		Subtitle:         input.Subtitle,
 		CollectionNumber: input.CollectionNumber,
@@ -110,7 +89,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.Type = ext.Type
 		card.ManaCost = ext.ManaCost
 		card.Colors = string(colorsJSON)
-		card.Color = colorsJSONToDisplay(card.Colors)
+		card.Color = ColorsJSONToDisplay(card.Colors)
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
 	}
@@ -167,7 +146,7 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 	card := Card{
 		Name:             input.Name,
 		Colors:           input.Colors,
-		Color:            colorsJSONToDisplay(input.Colors),
+		Color:            ColorsJSONToDisplay(input.Colors),
 		Type:             input.Type,
 		Subtitle:         input.Subtitle,
 		CollectionNumber: input.CollectionNumber,
@@ -221,6 +200,64 @@ func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {
 
 func (s *Service) ListColorCombos() ([]ColorCombo, error) {
 	return s.repository.ListColorCombos()
+}
+
+func (s *Service) NormalizeRarities() (NormalizeRarityResult, error) {
+	return s.repository.NormalizeRarities()
+}
+
+// RefreshColorsResult resume o resultado da atualização em lote de cores.
+type RefreshColorsResult struct {
+	Updated int `json:"updated"`
+	Skipped int `json:"skipped"` // sem set_code+number nem mtg_id, ou Scryfall não retornou cores
+	Failed  int `json:"failed"`
+	Total   int `json:"total"`
+}
+
+// RefreshColors busca cores na Scryfall para todas as cartas sem `colors` definido.
+func (s *Service) RefreshColors() (RefreshColorsResult, error) {
+	cards, err := s.repository.ListCardsWithoutColors()
+	if err != nil {
+		return RefreshColorsResult{}, err
+	}
+
+	result := RefreshColorsResult{Total: len(cards)}
+
+	for _, c := range cards {
+		time.Sleep(80 * time.Millisecond)
+
+		var ext *mtgapi.ExternalCard
+		if c.MTGID != "" {
+			ext, _ = s.mtgClient.GetByMTGID(c.MTGID)
+		}
+		if ext == nil && c.SetCode != "" && c.CollectionNumber != "" {
+			ext, _ = s.mtgClient.Search(c.SetCode, c.CollectionNumber, c.Language, c.Artist)
+		}
+
+		if ext == nil {
+			result.Skipped++
+			continue
+		}
+
+		colorsJSON, _ := json.Marshal(ext.Colors)
+		colorsStr := string(colorsJSON)
+		colorDisplay := ColorsJSONToDisplay(colorsStr)
+
+		var updateErr error
+		if c.MTGID == "" && ext.ID != "" {
+			updateErr = s.repository.UpdateColorsAndMTGID(c.ID, ext.ID, colorsStr, colorDisplay)
+		} else {
+			updateErr = s.repository.UpdateColors(c.ID, colorsStr, colorDisplay)
+		}
+
+		if updateErr != nil {
+			result.Failed++
+		} else {
+			result.Updated++
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Service) GetStats() (CollectionStats, error) {

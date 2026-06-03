@@ -397,6 +397,99 @@ func (r *Repository) UpdateImageURLAndMTGID(id int, mtgID, imageURL string) erro
 	return err
 }
 
+// ListCardsWithoutColors retorna cartas que ainda não têm cores definidas
+// (colors NULL/''/null, mas NÃO '[]' que significa colorless já verificado)
+// e que têm set_code ou mtg_id para busca na Scryfall.
+func (r *Repository) ListCardsWithoutColors() ([]CardForPriceRefresh, error) {
+	q := `SELECT id, COALESCE(mtg_id,''), COALESCE(set_code,''),
+		       COALESCE(collection_number,''), COALESCE(language,'EN'),
+		       COALESCE(artist,''), foil, name
+		FROM cards
+		WHERE (colors IS NULL OR colors = '' OR colors = 'null')
+		  AND (mtg_id != '' OR (set_code != '' AND collection_number != ''))
+		ORDER BY id`
+
+	rows, err := r.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []CardForPriceRefresh
+	for rows.Next() {
+		var c CardForPriceRefresh
+		var foilInt int
+		if err := rows.Scan(&c.ID, &c.MTGID, &c.SetCode, &c.CollectionNumber, &c.Language, &c.Artist, &foilInt, &c.Name); err != nil {
+			return nil, err
+		}
+		c.Foil = foilInt == 1
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+// NormalizeRarityResult descreve o resultado da normalização em lote.
+type NormalizeRarityResult struct {
+	Updated int            `json:"updated"`
+	Skipped int            `json:"skipped"` // já estavam corretas
+	ByValue map[string]int `json:"by_value"` // quantas de cada valor antigo foram corrigidas
+}
+
+// NormalizeRarities converte todos os valores de raridade não-padrão para o código de 1 letra.
+func (r *Repository) NormalizeRarities() (NormalizeRarityResult, error) {
+	// mapeamento: valor antigo → novo
+	conversions := map[string]string{
+		"common":     "C",
+		"Common":     "C",
+		"COMMON":     "C",
+		"uncommon":   "U",
+		"Uncommon":   "U",
+		"UNCOMMON":   "U",
+		"rare":       "R",
+		"Rare":       "R",
+		"RARE":       "R",
+		"special":    "R",
+		"Special":    "R",
+		"bonus":      "R",
+		"timeshifted": "R",
+		"mythic":     "M",
+		"Mythic":     "M",
+		"MYTHIC":     "M",
+		"mythic rare": "M",
+		"Mythic Rare": "M",
+		"land":       "L",
+		"Land":       "L",
+		"basic land": "L",
+		"token":      "T",
+		"Token":      "T",
+	}
+
+	result := NormalizeRarityResult{ByValue: map[string]int{}}
+
+	for old, newVal := range conversions {
+		res, err := r.db.Exec(`UPDATE cards SET rarity = ? WHERE rarity = ?`, newVal, old)
+		if err != nil {
+			return result, err
+		}
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			result.Updated += int(n)
+			result.ByValue[old+" → "+newVal] = int(n)
+		}
+	}
+
+	return result, nil
+}
+
+func (r *Repository) UpdateColors(id int, colors, color string) error {
+	_, err := r.db.Exec(`UPDATE cards SET colors = ?, color = ? WHERE id = ?`, colors, color, id)
+	return err
+}
+
+func (r *Repository) UpdateColorsAndMTGID(id int, mtgID, colors, color string) error {
+	_, err := r.db.Exec(`UPDATE cards SET colors = ?, color = ?, mtg_id = ? WHERE id = ?`, colors, color, mtgID, id)
+	return err
+}
+
 // EvalCardInfo contém os campos mínimos necessários para gerar a avaliação IA de um deck.
 type EvalCardInfo struct {
 	Name     string

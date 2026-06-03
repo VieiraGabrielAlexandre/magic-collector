@@ -11,6 +11,31 @@ import (
 
 const apiBase = "https://api.scryfall.com/cards"
 
+// NormalizeRarity converte o valor de raridade (Scryfall lowercase ou variações)
+// para o código de uma letra usado no banco: C U R M L T.
+func NormalizeRarity(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "c", "common":
+		return "C"
+	case "u", "uncommon":
+		return "U"
+	case "r", "rare", "special", "bonus", "timeshifted":
+		return "R"
+	case "m", "mythic", "mythic rare":
+		return "M"
+	case "l", "land", "basic land":
+		return "L"
+	case "t", "token":
+		return "T"
+	default:
+		v := strings.ToUpper(strings.TrimSpace(s))
+		if v == "" {
+			return ""
+		}
+		return v
+	}
+}
+
 type Client struct {
 	http *http.Client
 }
@@ -105,7 +130,7 @@ func (s *scryfallCard) toExternal() *ExternalCard {
 		PrintedName: printedName,
 		Set:         strings.ToUpper(s.Set),
 		SetName:     s.SetName,
-		Rarity:      s.Rarity,
+		Rarity:      NormalizeRarity(s.Rarity),
 		Type:        s.TypeLine,
 		PrintedType: s.PrintedTypeLine,
 		ManaCost:    s.ManaCost,
