@@ -255,21 +255,38 @@ type deckSuggestion struct {
 }
 
 // parseDeckBuilderOutput extrai o bloco JSON da IA e separa a análise em markdown.
-func parseDeckBuilderOutput(raw string) (*deckSuggestion, string) {
+// Retorna (suggestion, analysis, errIA): errIA é preenchido quando a IA declara impossibilidade.
+func parseDeckBuilderOutput(raw string) (*deckSuggestion, string, string) {
+	// Verifica se a IA emitiu um bloco de erro (impossível montar deck)
+	const errStart = "<<<ERRO>>>"
+	const errEnd = "<<<FIM_ERRO>>>"
+	if es := strings.Index(raw, errStart); es != -1 {
+		if ee := strings.Index(raw, errEnd); ee > es {
+			jsonStr := strings.TrimSpace(raw[es+len(errStart) : ee])
+			var errObj struct {
+				Motivo string `json:"motivo"`
+			}
+			if json.Unmarshal([]byte(jsonStr), &errObj) == nil && errObj.Motivo != "" {
+				return nil, "", errObj.Motivo
+			}
+			return nil, "", strings.TrimSpace(raw[es+len(errStart) : ee])
+		}
+	}
+
 	const startTag = "<<<DECK>>>"
 	const endTag = "<<<FIM_DECK>>>"
 	start := strings.Index(raw, startTag)
 	end := strings.Index(raw, endTag)
 	if start == -1 || end == -1 || end <= start {
-		return nil, raw
+		return nil, raw, ""
 	}
 	jsonStr := strings.TrimSpace(raw[start+len(startTag) : end])
 	var s deckSuggestion
 	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
-		return nil, raw
+		return nil, raw, ""
 	}
 	analysis := strings.TrimSpace(raw[end+len(endTag):])
-	return &s, analysis
+	return &s, analysis, ""
 }
 
 func (h *Handler) SuggestDecks(c *gin.Context) {
@@ -299,9 +316,12 @@ func (h *Handler) SuggestDecks(c *gin.Context) {
 		return
 	}
 
-	suggestion, analysis := parseDeckBuilderOutput(raw)
+	suggestion, analysis, errIA := parseDeckBuilderOutput(raw)
 
 	resp := gin.H{"analysis": analysis, "card_count": len(cards)}
+	if errIA != "" {
+		resp["error_ia"] = errIA
+	}
 	if suggestion != nil {
 		resp["deck_name"] = suggestion.Nome
 		resp["deck_colors"] = suggestion.Cores
@@ -370,24 +390,26 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) st
 	var formatInstr string
 	switch input.Format {
 	case "commander":
-		formatInstr = "Monte UM deck **Commander de exatamente 100 cartas**.\n" +
+		formatInstr = "Monte UM deck **Commander de EXATAMENTE 100 cartas** (o Comandante é incluído nessa contagem).\n" +
 			"- Declare a carta Comandante na primeira linha da lista (ex: `Commander\\n1 [Nome]`)\n" +
 			"- Máximo 1 cópia de cada carta não-básica (singleton)\n" +
 			"- Inclua 37-40 terrenos (pode adicionar terrenos básicos não listados)\n" +
 			"- As cores do deck são definidas pela identidade de cor do Comandante\n" +
+			"- **ANTES DE GERAR:** conte mentalmente quantas cartas você escolherá; o total DEVE ser exatamente 100. Se for impossível atingir 100 com as cartas disponíveis, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`.\n" +
 			`- campo "commander": true no JSON`
 	case "casual60":
-		formatInstr = "Monte UM deck **de exatamente 60 cartas** (formato Casual / Standard / Modern).\n" +
+		formatInstr = "Monte UM deck **de EXATAMENTE 60 cartas** (Casual / Standard / Modern). Máximo tolerado: 62.\n" +
 			"- Até 4 cópias de cartas não-básicas\n" +
 			"- Inclua 20-24 terrenos básicos (pode adicionar básicos não listados)\n" +
 			"- Curva de mana: pico em 2-3 mana, poucas cartas com custo 5+\n" +
+			"- **ANTES DE GERAR:** conte mentalmente quantas cartas você escolherá; o total DEVE ser 60, 61 ou 62. Se for impossível atingir esse intervalo, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`.\n" +
 			`- campo "commander": false no JSON`
 	default: // auto
 		formatInstr = "Escolha o formato mais adequado para as cartas disponíveis:\n" +
 			"- Prefira **60 cartas** (Casual/Modern) se houver sinergias suficientes\n" +
 			"- Use **Commander (100 cartas)** apenas se as cartas claramente favorecem esse formato\n" +
 			"- Inclua terrenos básicos necessários mesmo que não estejam na lista\n" +
-			"- Seja preciso na contagem: 60 ou 100 cartas exatas"
+			"- **ANTES DE GERAR:** verifique a contagem: Commander = exatamente 100, Casual60 = 60 a 62. Se for impossível atingir esses valores, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`."
 	}
 
 	// ── Instruções de objetivo ────────────────────────────────────
@@ -430,9 +452,9 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) st
 4. **Sinergia obrigatória:** cada carta não-terreno deve contribuir diretamente para a estratégia central
 5. **Monte APENAS UM deck** — o melhor possível com os parâmetros dados
 
-## 📤 FORMATO DE SAÍDA — SIGA EXATAMENTE ESTA ESTRUTURA
+## 📤 FORMATO DE SAÍDA — DUAS OPÇÕES (emita APENAS UMA)
 
-Primeiro emita o bloco de dados (nada antes dele):
+**OPÇÃO A — Deck válido (contagem correta):**
 
 <<<DECK>>>
 {
@@ -449,8 +471,15 @@ Regras do campo "lista":
 - Cartas: "N Nome Exato da Carta" (ex: "4 Lightning Bolt", "1 Sol Ring")
 - Terrenos básicos no final; use os nomes exatos em inglês: Mountain, Island, Swamp, Plains, Forest
 - Sem comentários, sem preços, sem códigos de set dentro da lista
+- **A soma de todas as quantidades N da lista deve bater exatamente com o total exigido pelo formato**
 
-Depois do bloco, escreva a análise em markdown:
+**OPÇÃO B — Impossível montar deck válido:**
+
+<<<ERRO>>>
+{"motivo": "Explique em detalhes por que não é possível montar um deck com a contagem exigida usando as cartas disponíveis e os parâmetros fornecidos"}
+<<<FIM_ERRO>>>
+
+Depois do bloco (A ou B), escreva a análise em markdown:
 
 ## 📊 Análise
 Estratégia central do deck em 2-3 parágrafos.
