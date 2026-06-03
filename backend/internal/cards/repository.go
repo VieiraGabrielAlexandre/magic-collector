@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -21,9 +22,10 @@ type ListParams struct {
 	PageSize     int
 	Sort         string
 	Order        string
-	DeckIDFilter *int  // nil = all; 0 = without deck; >0 = specific deck
-	FoilOnly     bool  // true = somente foil
-	RarityFilter string // "" = todas; "L","C","U","R","M","T" = raridade específica
+	DeckIDFilter *int   // nil = all; 0 = without deck; >0 = specific deck
+	FoilOnly     bool   // true = somente foil
+	RarityFilter string // "" = todas; "L","C","U","R","M","T"
+	ColorsFilter string // "" = todas; "W" | "U,G" | "W,U,B" etc.
 }
 
 type ListResult struct {
@@ -43,6 +45,7 @@ var allowedSortFields = map[string]string{
 	"year":              "year",
 	"collection_number": "collection_number",
 	"price_usd":         "price_usd",
+	"quantity":          "quantity",
 }
 
 // selectCols lista as colunas na mesma ordem que os Scan abaixo.
@@ -71,9 +74,16 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	var clauses []string
 	args := []any{}
 	if params.Search != "" {
-		clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
-		like := "%" + params.Search + "%"
-		args = append(args, like, like, like, like, like, like)
+		if strings.HasPrefix(params.Search, "#") {
+			// Busca exata por número da carta quando o termo começa com '#'
+			num := params.Search[1:]
+			clauses = append(clauses, "collection_number = ?")
+			args = append(args, num)
+		} else {
+			clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
+			like := "%" + params.Search + "%"
+			args = append(args, like, like, like, like, like, like)
+		}
 	}
 	if params.DeckIDFilter != nil {
 		clauses = append(clauses, "deck_id = ?")
@@ -85,6 +95,28 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.RarityFilter != "" {
 		clauses = append(clauses, "rarity = ?")
 		args = append(args, params.RarityFilter)
+	}
+	if params.ColorsFilter != "" {
+		if params.ColorsFilter == "none" {
+			clauses = append(clauses, `(colors IS NULL OR colors = '' OR colors = '[]' OR colors = 'null')`)
+		} else {
+			codes := strings.Split(params.ColorsFilter, ",")
+			clean := make([]string, 0, len(codes))
+			for _, c := range codes {
+				if c = strings.TrimSpace(strings.ToUpper(c)); c != "" {
+					clean = append(clean, c)
+				}
+			}
+			if len(clean) > 0 {
+				clauses = append(clauses, `(colors IS NOT NULL AND colors != '' AND colors != '[]' AND colors != 'null')`)
+				for _, code := range clean {
+					clauses = append(clauses, `JSON_CONTAINS(colors, ?, '$') = 1`)
+					args = append(args, `"`+code+`"`)
+				}
+				clauses = append(clauses, `JSON_LENGTH(colors) = ?`)
+				args = append(args, len(clean))
+			}
+		}
 	}
 	where := ""
 	if len(clauses) > 0 {
@@ -256,6 +288,11 @@ func (r *Repository) Delete(id string) error {
 	return err
 }
 
+func (r *Repository) SetQuantity(id string, quantity int) error {
+	_, err := r.db.Exec(`UPDATE cards SET quantity = ? WHERE id = ?`, quantity, id)
+	return err
+}
+
 func (r *Repository) SetDeck(id string, deckID int) error {
 	_, err := r.db.Exec(`UPDATE cards SET deck_id = ? WHERE id = ?`, deckID, id)
 	return err
@@ -366,6 +403,76 @@ type EvalCardInfo struct {
 	Type     string
 	ManaCost string
 	Rarity   string
+}
+
+// ColorCombo representa uma combinação de cores disponível na coleção.
+type ColorCombo struct {
+	Codes string `json:"codes"` // ex: "W,U" — ordem WUBRG
+	Count int    `json:"count"`
+}
+
+var wubrgOrder = map[string]int{"W": 0, "U": 1, "B": 2, "R": 3, "G": 4, "C": 5}
+
+// ListColorCombos retorna as combinações de cores distintas presentes nas cartas.
+func (r *Repository) ListColorCombos() ([]ColorCombo, error) {
+	rows, err := r.db.Query(`
+		SELECT colors, COUNT(*) AS cnt
+		FROM cards
+		WHERE colors IS NOT NULL AND colors != '' AND colors != '[]' AND colors != 'null'
+		  AND JSON_LENGTH(colors) > 0
+		GROUP BY colors
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	totals := map[string]int{}
+	var ordered []string
+
+	for rows.Next() {
+		var colorsJSON string
+		var cnt int
+		if err := rows.Scan(&colorsJSON, &cnt); err != nil {
+			continue
+		}
+		var codes []string
+		if err := json.Unmarshal([]byte(colorsJSON), &codes); err != nil {
+			continue
+		}
+		sort.Slice(codes, func(i, j int) bool {
+			return wubrgOrder[codes[i]] < wubrgOrder[codes[j]]
+		})
+		key := strings.Join(codes, ",")
+		if _, exists := totals[key]; !exists {
+			ordered = append(ordered, key)
+		}
+		totals[key] += cnt
+	}
+
+	// Ordena: mono → duo → trio… e dentro de cada grupo por contagem desc
+	sort.Slice(ordered, func(i, j int) bool {
+		ni := strings.Count(ordered[i], ",")
+		nj := strings.Count(ordered[j], ",")
+		if ni != nj {
+			return ni < nj
+		}
+		return totals[ordered[i]] > totals[ordered[j]]
+	})
+
+	result := make([]ColorCombo, 0, len(ordered))
+	for _, key := range ordered {
+		result = append(result, ColorCombo{Codes: key, Count: totals[key]})
+	}
+
+	// Adiciona "sem cor" ao final — cartas sem cor identificável
+	var noColorCount int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM cards WHERE colors IS NULL OR colors = '' OR colors = '[]' OR colors = 'null'`).Scan(&noColorCount)
+	if noColorCount > 0 {
+		result = append(result, ColorCombo{Codes: "none", Count: noColorCount})
+	}
+
+	return result, nil
 }
 
 // DeckBuilderCard representa uma carta (agrupada por nome) para análise de deck-building.

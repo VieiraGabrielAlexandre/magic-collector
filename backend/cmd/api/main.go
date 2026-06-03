@@ -61,6 +61,7 @@ func main() {
 	})
 
 	router.GET("/cards", handler.List)
+	router.GET("/cards/colors", handler.ListColors)
 	router.GET("/cards/stats", handler.Stats)
 	router.GET("/cards/export", handler.Export)
 	router.POST("/cards/preview", handler.Preview)
@@ -70,6 +71,7 @@ func main() {
 	router.POST("/cards", handler.Create)
 	router.GET("/cards/:id", handler.GetByID)
 	router.PUT("/cards/:id", handler.Update)
+	router.PATCH("/cards/:id/quantity", handler.UpdateQuantity)
 	router.PATCH("/cards/:id/deck", handler.SetDeck)
 	router.DELETE("/cards/:id", handler.Delete)
 

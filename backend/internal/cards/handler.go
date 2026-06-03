@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -64,6 +65,7 @@ func (h *Handler) List(c *gin.Context) {
 		DeckIDFilter: deckIDFilter,
 		FoilOnly:     c.Query("foil") == "1",
 		RarityFilter: c.Query("rarity"),
+		ColorsFilter: c.Query("colors"),
 	}
 
 	result, err := h.service.List(params)
@@ -138,6 +140,30 @@ func (h *Handler) SetDeck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) ListColors(c *gin.Context) {
+	combos, err := h.service.ListColorCombos()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, combos)
+}
+
+func (h *Handler) UpdateQuantity(c *gin.Context) {
+	var body struct {
+		Quantity int `json:"quantity"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.Quantity < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Quantidade inválida"})
+		return
+	}
+	if err := h.service.SetQuantity(c.Param("id"), body.Quantity); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *Handler) Preview(c *gin.Context) {
 	var input PreviewCardInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -193,7 +219,51 @@ func (h *Handler) Export(c *gin.Context) {
 	c.JSON(http.StatusOK, cards)
 }
 
+// SuggestDecksInput parametriza a geração de deck pela IA.
+type SuggestDecksInput struct {
+	Format    string `json:"format"`    // "auto" | "casual60" | "commander"
+	Goal      string `json:"goal"`      // "fun" | "competitive"
+	Colors    string `json:"colors"`    // "W,U,B" ou ""
+	Revaluate bool   `json:"revaluate"` // true = sugerir cartas/estratégia diferentes
+}
+
+// deckSuggestion é o bloco estruturado que a IA devolve dentro dos delimitadores.
+type deckSuggestion struct {
+	Nome      string `json:"nome"`
+	Cores     string `json:"cores"`
+	Commander bool   `json:"commander"`
+	Descricao string `json:"descricao"`
+	Lista     string `json:"lista"`
+}
+
+// parseDeckBuilderOutput extrai o bloco JSON da IA e separa a análise em markdown.
+func parseDeckBuilderOutput(raw string) (*deckSuggestion, string) {
+	const startTag = "<<<DECK>>>"
+	const endTag = "<<<FIM_DECK>>>"
+	start := strings.Index(raw, startTag)
+	end := strings.Index(raw, endTag)
+	if start == -1 || end == -1 || end <= start {
+		return nil, raw
+	}
+	jsonStr := strings.TrimSpace(raw[start+len(startTag) : end])
+	var s deckSuggestion
+	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
+		return nil, raw
+	}
+	analysis := strings.TrimSpace(raw[end+len(endTag):])
+	return &s, analysis
+}
+
 func (h *Handler) SuggestDecks(c *gin.Context) {
+	var input SuggestDecksInput
+	_ = c.ShouldBindJSON(&input) // campos opcionais — ignora erro de bind vazio
+	if input.Format == "" {
+		input.Format = "auto"
+	}
+	if input.Goal == "" {
+		input.Goal = "fun"
+	}
+
 	cards, err := h.service.GetCardsForDeckBuilder()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar cartas: " + err.Error()})
@@ -204,17 +274,27 @@ func (h *Handler) SuggestDecks(c *gin.Context) {
 		return
 	}
 
-	prompt := buildDeckBuilderPrompt(cards)
-	analysis, err := h.aiClient.Complete(prompt)
+	prompt := buildDeckBuilderPrompt(cards, input)
+	raw, err := h.aiClient.Complete(prompt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro na API de IA: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"analysis": analysis, "card_count": len(cards)})
+	suggestion, analysis := parseDeckBuilderOutput(raw)
+
+	resp := gin.H{"analysis": analysis, "card_count": len(cards)}
+	if suggestion != nil {
+		resp["deck_name"] = suggestion.Nome
+		resp["deck_colors"] = suggestion.Cores
+		resp["deck_commander"] = suggestion.Commander
+		resp["deck_list"] = suggestion.Lista
+		resp["deck_description"] = suggestion.Descricao
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
-func buildDeckBuilderPrompt(cards []DeckBuilderCard) string {
+func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) string {
 	cats := map[string][]string{
 		"Criatura": {}, "Planeswalker": {}, "Feitiço": {},
 		"Mágica Imediata": {}, "Artefato": {}, "Encantamento": {},
@@ -247,7 +327,10 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard) string {
 		}
 		entry := fmt.Sprintf("%dx %s", c.Quantity, c.Name)
 		if c.ManaCost != "" {
-			entry += " " + c.ManaCost
+			entry += " (" + c.ManaCost + ")"
+		}
+		if c.Colors != "" && c.Colors != "[]" && c.Colors != "null" {
+			entry += " {" + c.Colors + "}"
 		}
 		if c.Rarity != "" {
 			entry += " [" + c.Rarity + "]"
@@ -258,54 +341,112 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard) string {
 	var cardList strings.Builder
 	for _, cat := range order {
 		if len(cats[cat]) > 0 {
-			cardList.WriteString(fmt.Sprintf("\n**%s (%d únicos):**\n", cat, len(cats[cat])))
+			cardList.WriteString(fmt.Sprintf("\n### %s (%d únicos)\n", cat, len(cats[cat])))
 			for _, entry := range cats[cat] {
 				cardList.WriteString("- " + entry + "\n")
 			}
 		}
 	}
 
-	return fmt.Sprintf(`Você é um especialista em Magic: The Gathering com profundo conhecimento de deck-building.
+	// ── Instruções de formato ─────────────────────────────────────
+	var formatInstr string
+	switch input.Format {
+	case "commander":
+		formatInstr = "Monte UM deck **Commander de exatamente 100 cartas**.\n" +
+			"- Declare a carta Comandante na primeira linha da lista (ex: `Commander\\n1 [Nome]`)\n" +
+			"- Máximo 1 cópia de cada carta não-básica (singleton)\n" +
+			"- Inclua 37-40 terrenos (pode adicionar terrenos básicos não listados)\n" +
+			"- As cores do deck são definidas pela identidade de cor do Comandante\n" +
+			`- campo "commander": true no JSON`
+	case "casual60":
+		formatInstr = "Monte UM deck **de exatamente 60 cartas** (formato Casual / Standard / Modern).\n" +
+			"- Até 4 cópias de cartas não-básicas\n" +
+			"- Inclua 20-24 terrenos básicos (pode adicionar básicos não listados)\n" +
+			"- Curva de mana: pico em 2-3 mana, poucas cartas com custo 5+\n" +
+			`- campo "commander": false no JSON`
+	default: // auto
+		formatInstr = "Escolha o formato mais adequado para as cartas disponíveis:\n" +
+			"- Prefira **60 cartas** (Casual/Modern) se houver sinergias suficientes\n" +
+			"- Use **Commander (100 cartas)** apenas se as cartas claramente favorecem esse formato\n" +
+			"- Inclua terrenos básicos necessários mesmo que não estejam na lista\n" +
+			"- Seja preciso na contagem: 60 ou 100 cartas exatas"
+	}
 
-O jogador possui %d cartas (%d únicas) SEM DECK atribuído. Analise-as e sugira como montar o(s) melhor(es) deck(s) possível(is).
+	// ── Instruções de objetivo ────────────────────────────────────
+	var goalInstr string
+	if input.Goal == "competitive" {
+		goalInstr = "**Objetivo: COMPETITIVO** — maximize consistência e eficiência. " +
+			"Priorize cartas com baixo custo de mana, remoções e geração de vantagem. " +
+			"O deck deve ser o mais forte possível com as cartas disponíveis."
+	} else {
+		goalInstr = "**Objetivo: DIVERSÃO** — priorize combos interessantes, sinergias temáticas e " +
+			"interações criativas. O deck não precisa ser o mais eficiente, mas deve ser divertido de jogar."
+	}
 
-**REGRA PRINCIPAL:** Priorize decks de 60 cartas (Casual, Standard, Pioneer, Modern ou Legacy). Só sugira Commander (100 cartas) se for claramente o melhor aproveitamento do que o jogador tem.
-**RESTRIÇÃO IMPORTANTE:** Use APENAS as cartas da lista abaixo, nas quantidades disponíveis.
+	// ── Preferência de cores ──────────────────────────────────────
+	var colorInstr string
+	if input.Colors != "" {
+		colorInstr = fmt.Sprintf("\n**Cores preferidas:** %s — monte o deck preferencialmente nessas cores. "+
+			"Ignore cartas de outras cores, exceto se forem essenciais para a estratégia.\n", input.Colors)
+	}
 
-**Cartas disponíveis:**
+	// ── Instrução de re-avaliação ─────────────────────────────────
+	var revaluateInstr string
+	if input.Revaluate {
+		revaluateInstr = "\n**⚠️ RE-AVALIAÇÃO:** Sugira uma estratégia DIFERENTE da avaliação anterior. " +
+			"Explore outras sinergias, outro archetype ou uma combinação de cores diferente.\n"
+	}
+
+	return fmt.Sprintf(`Você é um especialista em Magic: The Gathering com conhecimento profundo em deck-building.
+
+## 🃏 CARTAS DISPONÍVEIS (%d cópias totais, %d únicas sem deck)
 %s
 
-Forneça uma análise completa em markdown com as seguintes seções:
+## ⚙️ PARÂMETROS
+%s
+%s%s%s
+## 📐 REGRAS OBRIGATÓRIAS
+1. Use SOMENTE cartas da lista acima, respeitando as quantidades disponíveis
+2. **Terrenos básicos** (Mountain, Island, Swamp, Plains, Forest) podem ser adicionados livremente mesmo sem estarem na lista
+3. **Coerência de mana:** calcule a proporção de terrenos por cor baseado no custo de mana das cartas; não inclua terrenos de cores desnecessárias
+4. **Sinergia obrigatória:** cada carta não-terreno deve contribuir diretamente para a estratégia central
+5. **Monte APENAS UM deck** — o melhor possível com os parâmetros dados
 
-## 📊 Análise Geral
-Quantos decks de 60 cartas é possível montar? Avalie a viabilidade geral. Se não for possível montar decks completos, explique o que falta e por quê.
+## 📤 FORMATO DE SAÍDA — SIGA EXATAMENTE ESTA ESTRUTURA
 
----
-(Para cada deck sugerido, use o template abaixo:)
+Primeiro emita o bloco de dados (nada antes dele):
 
-## 🃏 Deck [número]: [Nome do Archetype]
-**Formato:** [formato ideal — ex: Casual 60, Modern, Standard, Commander]
-**Identidade de Cores:** [cores do deck]
-**Viabilidade:** [nota 1-10] — [frase justificando]
+<<<DECK>>>
+{
+  "nome": "Nome criativo e temático em português",
+  "cores": "X,Y",
+  "commander": false,
+  "descricao": "2-3 frases descrevendo estilo e estratégia do deck.",
+  "lista": "Commander\n1 Nome do Comandante\n\nCriaturas\n4 Carta Um\n3 Carta Dois\n\nFeitiços\n4 Carta Três\n\nTerrenos\n20 Forest\n4 Mountain"
+}
+<<<FIM_DECK>>>
 
-### 📋 Lista de Cartas
-(liste apenas cartas da lista disponível com as quantidades usadas, ex: 4x Lightning Bolt)
+Regras do campo "lista":
+- Linhas de seção sem número: "Commander", "Criaturas", "Feitiços", "Mágicas Imediatas", "Artefatos", "Encantamentos", "Terrenos"
+- Cartas: "N Nome Exato da Carta" (ex: "4 Lightning Bolt", "1 Sol Ring")
+- Terrenos básicos no final; use os nomes exatos em inglês: Mountain, Island, Swamp, Plains, Forest
+- Sem comentários, sem preços, sem códigos de set dentro da lista
 
-### 🎮 Como Jogar
-Passo a passo da estratégia: mulligan ideal, primeiros turnos, mid-game e como fechar o jogo.
+Depois do bloco, escreva a análise em markdown:
 
-### 🔗 Sinergias Principais
-Quais cartas combinam entre si e por quê.
+## 📊 Análise
+Estratégia central do deck em 2-3 parágrafos.
 
-### ✅ Vantagens
-Pontos fortes do deck.
+## 🔗 Sinergias Principais
+As 3-5 combinações de cartas mais importantes e por quê funcionam.
 
-### ❌ Desvantagens e Limitações
-O que falta, pontos fracos, o que comprar para completar.
+## 🎮 Como Jogar
+Turnos 1-3, mid-game e como fechar o jogo.
 
----
+## ✅ Pontos Fortes
 
-## 💡 Recomendações Finais
-O que o jogador deveria adquirir para completar ou melhorar os decks sugeridos.`,
-		totalQty, len(cards), cardList.String())
+## ❌ Limitações e o que comprar para completar`,
+		totalQty, len(cards),
+		cardList.String(),
+		formatInstr, goalInstr, colorInstr, revaluateInstr)
 }

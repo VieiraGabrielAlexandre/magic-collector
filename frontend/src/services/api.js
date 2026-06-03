@@ -1,10 +1,11 @@
 const BASE_URL = "/api";
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, rarity } = {}) {
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, rarity, colors } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
   if (foil) params.set("foil", "1");
   if (rarity) params.set("rarity", rarity);
+  if (colors) params.set("colors", colors);
   const res = await fetch(`${BASE_URL}/cards?${params}`);
   if (!res.ok) return { data: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 };
   return res.json();
@@ -172,11 +173,29 @@ export async function getCollectionStats() {
   return res.json();
 }
 
-export async function suggestDecks() {
-  const res = await fetch(`${BASE_URL}/cards/suggest-decks`, { method: "POST" });
+export async function suggestDecks(params = {}) {
+  const res = await fetch(`${BASE_URL}/cards/suggest-decks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Erro ao gerar sugestão");
   return json;
+}
+
+export async function listColorCombos() {
+  const res = await fetch(`${BASE_URL}/cards/colors`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function updateCardQuantity(id, quantity) {
+  await fetch(`${BASE_URL}/cards/${id}/quantity`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ quantity }),
+  });
 }
 
 export async function evaluateDeck(id) {

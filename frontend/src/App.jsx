@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listDecks, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateDeck } from "./services/api";
+import { assignCardToDeck, createBattle, createCard, createDeck, deleteCard, deleteBattle, deleteDeck, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateCardQuantity, updateDeck } from "./services/api";
 import "./App.css";
 
 const EMPTY_FORM = {
@@ -15,6 +15,7 @@ const SORT_OPTIONS = [
   { value: "set_code", label: "Coleção" },
   { value: "color", label: "Cor" },
   { value: "rarity", label: "Raridade" },
+  { value: "quantity", label: "Qtd" },
   { value: "price_usd", label: "💰 Preço" },
   { value: "year", label: "Ano" },
   { value: "collection_number", label: "Nº" },
@@ -378,6 +379,8 @@ export default function App() {
   const [filterFoil, setFilterFoil] = useState("");
   const [filterRarity, setFilterRarity] = useState("");
   const [filterDeck, setFilterDeck] = useState("");
+  const [filterColors, setFilterColors] = useState("");
+  const [availableColors, setAvailableColors] = useState([]);
   const [statsOpen, setStatsOpen] = useState(false);
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -389,6 +392,10 @@ export default function App() {
   const [deckBuilderModal, setDeckBuilderModal] = useState(false);
   const [deckBuilderLoading, setDeckBuilderLoading] = useState(false);
   const [deckBuilderResult, setDeckBuilderResult] = useState(null);
+  const EMPTY_DECK_CONFIG = { format: "auto", goal: "fun", colors: "" };
+  const [deckBuilderConfig, setDeckBuilderConfig] = useState(EMPTY_DECK_CONFIG);
+  const [deckBuilderStep, setDeckBuilderStep] = useState("config"); // "config" | "loading" | "result"
+  const [deckBuilderApproving, setDeckBuilderApproving] = useState(false);
 
   const [quickAddModal, setQuickAddModal] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
@@ -446,6 +453,7 @@ export default function App() {
       pageSize: 20,
       foil: opts.filterFoil ?? filterFoil,
       rarity: opts.filterRarity ?? filterRarity,
+      colors: opts.filterColors ?? filterColors,
       deckId,
     });
     setCards(result.data ?? []);
@@ -490,9 +498,12 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterRarity, filterDeck]);
+  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterRarity, filterDeck, filterColors]);
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
+  useEffect(() => {
+    listColorCombos().then(data => setAvailableColors(data ?? []));
+  }, []);
 
   function handleSearchChange(e) {
     const q = e.target.value;
@@ -578,6 +589,23 @@ export default function App() {
     await deleteCard(id);
     setSelectedCard(null);
     loadCards();
+  }
+
+  async function handleQuantityChange(cardId, delta) {
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+    const newQty = Math.max(1, (card.quantity || 1) + delta);
+    if (newQty === card.quantity) return;
+    // Atualização otimista
+    setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, quantity: newQty } : c));
+    setTotalQuantity((prev) => prev + (newQty - card.quantity));
+    try {
+      await updateCardQuantity(cardId, newQty);
+    } catch {
+      // Reverte em caso de erro
+      setCards((prev) => prev.map((c) => c.id === cardId ? { ...c, quantity: card.quantity } : c));
+      setTotalQuantity((prev) => prev - (newQty - card.quantity));
+    }
   }
 
   function handleEditStart() {
@@ -704,17 +732,66 @@ export default function App() {
     });
   }
 
-  async function handleSuggestDecks() {
+  function handleSuggestDecks() {
     setDeckBuilderModal(true);
+    setDeckBuilderStep("config");
+    setDeckBuilderResult(null);
+    setDeckBuilderConfig(EMPTY_DECK_CONFIG);
+  }
+
+  async function handleRunDeckBuilder() {
+    setDeckBuilderStep("loading");
     setDeckBuilderLoading(true);
     setDeckBuilderResult(null);
     try {
-      const result = await suggestDecks();
+      const result = await suggestDecks(deckBuilderConfig);
       setDeckBuilderResult(result);
+      setDeckBuilderStep("result");
     } catch (e) {
       setDeckBuilderResult({ error: e.message });
+      setDeckBuilderStep("result");
     } finally {
       setDeckBuilderLoading(false);
+    }
+  }
+
+  async function handleRevaluateDeck() {
+    setDeckBuilderStep("loading");
+    setDeckBuilderLoading(true);
+    setDeckBuilderResult(null);
+    try {
+      const result = await suggestDecks({ ...deckBuilderConfig, revaluate: true });
+      setDeckBuilderResult(result);
+      setDeckBuilderStep("result");
+    } catch (e) {
+      setDeckBuilderResult({ error: e.message });
+      setDeckBuilderStep("result");
+    } finally {
+      setDeckBuilderLoading(false);
+    }
+  }
+
+  async function handleApproveDeck() {
+    if (!deckBuilderResult?.deck_list) return;
+    setDeckBuilderApproving(true);
+    try {
+      await importDeckList({
+        deck_name: deckBuilderResult.deck_name || "Deck IA",
+        deck_list: deckBuilderResult.deck_list,
+        colors: deckBuilderResult.deck_colors || "",
+        commander: deckBuilderResult.deck_commander || false,
+        description: deckBuilderResult.deck_description || "",
+        language: "EN",
+        set_code: "",
+        theme_color: "",
+      });
+      setDeckBuilderModal(false);
+      setActiveTab("decks");
+      await loadDecks();
+    } catch (e) {
+      alert("Erro ao criar deck: " + e.message);
+    } finally {
+      setDeckBuilderApproving(false);
     }
   }
 
@@ -1347,33 +1424,142 @@ export default function App() {
 
       {/* ── MODAL DECK BUILDER IA ── */}
       {deckBuilderModal && (
-        <div className="modal-overlay" onClick={() => !deckBuilderLoading && setDeckBuilderModal(false)}>
+        <div className="modal-overlay" onClick={() => !deckBuilderLoading && !deckBuilderApproving && setDeckBuilderModal(false)}>
           <div className="modal deck-builder-modal" onClick={(e) => e.stopPropagation()}>
             <div className="deck-builder-modal-header">
               <h2>✨ Montar Deck com IA</h2>
-              {!deckBuilderLoading && (
+              {!deckBuilderLoading && !deckBuilderApproving && (
                 <button className="modal-close" onClick={() => setDeckBuilderModal(false)}>✕</button>
               )}
             </div>
-            {deckBuilderLoading ? (
+
+            {/* ── STEP: config ── */}
+            {deckBuilderStep === "config" && (
+              <div className="db-config">
+                <p className="deck-builder-meta">{total} carta{total !== 1 ? "s" : ""} sem deck serão analisadas</p>
+
+                <div className="db-config-section">
+                  <span className="db-config-label">Formato</span>
+                  <div className="db-option-row">
+                    {[
+                      { id: "auto",       icon: "🤖", label: "Auto",       desc: "IA decide o melhor" },
+                      { id: "casual60",   icon: "📄", label: "60 cartas",  desc: "Casual / Standard / Modern" },
+                      { id: "commander",  icon: "👑", label: "Commander",  desc: "100 cartas singleton" },
+                    ].map(f => (
+                      <button key={f.id} type="button"
+                        className={`db-option-btn${deckBuilderConfig.format === f.id ? " active" : ""}`}
+                        onClick={() => setDeckBuilderConfig({ ...deckBuilderConfig, format: f.id })}>
+                        <span className="db-option-icon">{f.icon}</span>
+                        <strong>{f.label}</strong>
+                        <small>{f.desc}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="db-config-section">
+                  <span className="db-config-label">Objetivo</span>
+                  <div className="db-option-row">
+                    {[
+                      { id: "fun",          icon: "🎉", label: "Diversão",    desc: "Sinergias e combos divertidos" },
+                      { id: "competitive",  icon: "⚔",  label: "Competitivo", desc: "Máxima eficiência" },
+                    ].map(g => (
+                      <button key={g.id} type="button"
+                        className={`db-option-btn${deckBuilderConfig.goal === g.id ? " active" : ""}`}
+                        onClick={() => setDeckBuilderConfig({ ...deckBuilderConfig, goal: g.id })}>
+                        <span className="db-option-icon">{g.icon}</span>
+                        <strong>{g.label}</strong>
+                        <small>{g.desc}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="db-config-section">
+                  <span className="db-config-label">Cores preferidas <em>(opcional — deixe vazio para a IA escolher)</em></span>
+                  <ManaColorPicker
+                    value={deckBuilderConfig.colors}
+                    onChange={(v) => setDeckBuilderConfig({ ...deckBuilderConfig, colors: v })}
+                  />
+                </div>
+
+                <button type="button" className="db-run-btn" onClick={handleRunDeckBuilder}>
+                  ✨ Analisar e Montar Deck →
+                </button>
+              </div>
+            )}
+
+            {/* ── STEP: loading ── */}
+            {deckBuilderStep === "loading" && (
               <div className="eval-loading">
                 <div className="eval-spinner">⚙</div>
-                <p className="eval-loading-text">Analisando suas cartas e montando sugestões de decks…</p>
-                <p className="eval-loading-sub">Isso pode levar alguns segundos.</p>
+                <p className="eval-loading-text">Montando o deck com IA…</p>
+                <p className="eval-loading-sub">Analisando sinergias, curva de mana e estratégia. Pode levar alguns segundos.</p>
               </div>
-            ) : deckBuilderResult?.error ? (
-              <div className="eval-empty">
-                <div className="eval-empty-icon">⚠️</div>
-                <p>{deckBuilderResult.error}</p>
-              </div>
-            ) : deckBuilderResult ? (
-              <>
-                <p className="deck-builder-meta">{deckBuilderResult.card_count} cartas únicas analisadas</p>
-                <div className="eval-content deck-builder-content">
-                  {renderEvalMarkdown(deckBuilderResult.analysis)}
-                </div>
-              </>
-            ) : null}
+            )}
+
+            {/* ── STEP: result ── */}
+            {deckBuilderStep === "result" && deckBuilderResult && (
+              deckBuilderResult.error ? (
+                <>
+                  <div className="eval-empty">
+                    <div className="eval-empty-icon">⚠️</div>
+                    <p>{deckBuilderResult.error}</p>
+                  </div>
+                  <div className="db-actions">
+                    <button type="button" className="db-revaluate-btn" onClick={handleRevaluateDeck}>♻ Tentar novamente</button>
+                    <button type="button" className="db-reject-btn" onClick={() => setDeckBuilderModal(false)}>✕ Fechar</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {deckBuilderResult.deck_name && (
+                    <div className="db-result-header">
+                      <div className="db-deck-name-block">
+                        <span className="db-deck-name-label">Deck sugerido</span>
+                        <strong className="db-deck-name-value">{deckBuilderResult.deck_name}</strong>
+                        {deckBuilderResult.deck_description && (
+                          <p className="db-deck-desc">{deckBuilderResult.deck_description}</p>
+                        )}
+                      </div>
+                      <div className="db-deck-meta">
+                        {deckBuilderResult.deck_colors && (
+                          <span className="db-deck-colors">
+                            {deckBuilderResult.deck_colors.split(",").filter(Boolean).map(c => (
+                              <img key={c} src={`/mana-icons/${({W:"white",U:"blue",B:"black",R:"red",G:"green",C:"incolour"}[c]||"incolour")}.svg`}
+                                className="mana-icon" alt={c} style={{width:18,height:18}} />
+                            ))}
+                          </span>
+                        )}
+                        {deckBuilderResult.deck_commander && <span className="commander-badge">CMD</span>}
+                        <span className="db-card-count">{deckBuilderResult.card_count} cartas analisadas</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="modal-divider" />
+
+                  <div className="eval-content deck-builder-content">
+                    {renderEvalMarkdown(deckBuilderResult.analysis)}
+                  </div>
+
+                  <div className="db-actions">
+                    {deckBuilderResult.deck_list && (
+                      <button type="button" className="db-approve-btn"
+                        onClick={handleApproveDeck} disabled={deckBuilderApproving}>
+                        {deckBuilderApproving ? "⏳ Criando deck…" : "✓ Aprovar e criar deck"}
+                      </button>
+                    )}
+                    <button type="button" className="db-revaluate-btn" onClick={handleRevaluateDeck} disabled={deckBuilderApproving}>
+                      ♻ Re-avaliar
+                    </button>
+                    <button type="button" className="db-reject-btn" onClick={() => setDeckBuilderModal(false)} disabled={deckBuilderApproving}>
+                      ✕ Recusar
+                    </button>
+                  </div>
+                </>
+              )
+            )}
           </div>
         </div>
       )}
@@ -1587,7 +1773,7 @@ export default function App() {
 
       {activeTab === "collection" && <section className="grid">
         {/* ── FORMULÁRIO ── */}
-        <form className="card form" onSubmit={handleSubmit}>
+        <form className="card form collection-form-panel" onSubmit={handleSubmit}>
           <div className="form-title-row">
             <h2>Cadastrar Carta</h2>
             <button type="button" className="quick-add-btn" onClick={(e) => { e.preventDefault(); setQuickAddModal(true); }}>⚡ Busca Rápida</button>
@@ -1749,6 +1935,40 @@ export default function App() {
                 <option value="T">Token (T)</option>
               </select>
             </div>
+            {availableColors.length > 0 && (
+              <div className="color-filter-bar">
+                <button
+                  type="button"
+                  className={`color-filter-chip${filterColors === "" ? " active" : ""}`}
+                  onClick={() => { setFilterColors(""); setPage(1); }}
+                >
+                  Todas
+                </button>
+                {availableColors.map((combo) => {
+                  const isActive = filterColors === combo.codes;
+                  const isNone = combo.codes === "none";
+                  const codes = isNone ? [] : combo.codes.split(",").filter(Boolean);
+                  return (
+                    <button
+                      key={combo.codes}
+                      type="button"
+                      className={`color-filter-chip${isActive ? " active" : ""}${isNone ? " no-color" : ""}`}
+                      title={`${isNone ? "Sem cor" : combo.codes} — ${combo.count} carta${combo.count !== 1 ? "s" : ""}`}
+                      onClick={() => { setFilterColors(isActive ? "" : combo.codes); setPage(1); }}
+                    >
+                      {isNone
+                        ? <span className="color-filter-none-icon">?</span>
+                        : codes.map((c) => (
+                            <img key={c} src={`/mana-icons/${MTG_CODE_TO_ICON[c] || "incolour"}.svg`}
+                              className="mana-icon" alt={c} />
+                          ))
+                      }
+                      <span className="color-filter-count">{combo.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {filterDeck === "0" && filterFoil === "" && filterRarity === "" && (
               <button type="button" className="deck-builder-btn" onClick={handleSuggestDecks}>
                 <span className="deck-builder-btn-shine" />
@@ -1796,6 +2016,11 @@ export default function App() {
                       {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}</span>}
                     </div>
                   </div>
+                  <div className="card-grid-qty" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
+                    <span className="qty-display">{card.quantity}</span>
+                    <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
+                  </div>
                 </div>
               ))}
               {cards.length === 0 && <p className="empty">Nenhuma carta encontrada.</p>}
@@ -1836,6 +2061,11 @@ export default function App() {
                       <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
                     </div>
                     <div className="actions">
+                      <div className="qty-ctrl">
+                        <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
+                        <span className="qty-display">{card.quantity}</span>
+                        <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
+                      </div>
                       <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
                       <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
                     </div>
@@ -2030,6 +2260,18 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+      {/* ── FAB MOBILE: Busca Rápida ── */}
+      {activeTab === "collection" && (
+        <button
+          type="button"
+          className="mobile-fab"
+          onClick={() => setQuickAddModal(true)}
+          aria-label="Adicionar carta"
+          title="Busca Rápida"
+        >
+          +
+        </button>
       )}
     </main>
   );

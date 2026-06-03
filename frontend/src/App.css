@@ -518,6 +518,170 @@ button.danger:hover:not(:disabled) {
   font-size: 13px;
 }
 
+/* ── Filtro de cores ───────────────────────────────────────────────────── */
+.color-filter-bar {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.color-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  white-space: nowrap;
+  min-height: unset;
+  letter-spacing: 0.02em;
+}
+.color-filter-chip:hover:not(.active) {
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: none;
+  opacity: 1;
+}
+.color-filter-chip.active {
+  border-color: var(--gold-dim);
+  background: rgba(200, 155, 60, 0.12);
+  color: var(--gold-light);
+  box-shadow: 0 0 6px rgba(200, 155, 60, 0.15);
+  opacity: 1;
+}
+.color-filter-chip:active:not(:disabled) { transform: none; }
+.color-filter-chip .mana-icon { width: 14px; height: 14px; }
+
+.color-filter-count {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 1px;
+}
+.color-filter-chip.active .color-filter-count { color: var(--gold-dim); }
+
+.color-filter-none-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 1px solid var(--border-dim);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.color-filter-chip.no-color { border-style: dashed; }
+.color-filter-chip.no-color.active { border-style: solid; }
+
+/* ── Grid: controle de quantidade ─────────────────────────────────────── */
+.card-grid-qty {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.15s;
+  backdrop-filter: blur(3px);
+}
+.card-grid-item:hover .card-grid-qty { opacity: 1; }
+.card-grid-qty .qty-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  color: #ccc;
+  padding: 0;
+  min-height: unset;
+  cursor: pointer;
+  letter-spacing: 0;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.card-grid-qty .qty-btn:hover:not(:disabled) {
+  background: rgba(200, 155, 60, 0.25);
+  color: var(--gold-light);
+  box-shadow: none;
+  opacity: 1;
+}
+.card-grid-qty .qty-btn:active:not(:disabled) { transform: none; }
+.card-grid-qty .qty-btn:disabled { opacity: 0.2; }
+.card-grid-qty .qty-display {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 18px;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  padding: 0 1px;
+  user-select: none;
+}
+
+@media (max-width: 680px) {
+  .card-grid-qty { opacity: 1; }
+}
+
+/* ── Controle de quantidade inline ─────────────────────────────────────── */
+.qty-ctrl {
+  display: flex;
+  align-items: center;
+  background: var(--surface-3);
+  border: 1px solid var(--border-dim);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.qty-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 26px;
+  height: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0;
+  min-height: unset;
+  letter-spacing: 0;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.qty-btn:hover:not(:disabled) {
+  background: var(--gold-glow);
+  color: var(--gold-light);
+  box-shadow: none;
+  opacity: 1;
+}
+.qty-btn:active:not(:disabled) { transform: none; background: rgba(200,155,60,0.2); }
+.qty-btn:disabled { opacity: 0.22; cursor: default; }
+
+.qty-display {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 20px;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  padding: 0 2px;
+  user-select: none;
+}
+
 .empty {
   color: var(--text-dim);
   text-align: center;
@@ -575,7 +739,7 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 500;
   padding: 20px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -1636,7 +1800,7 @@ input[type="radio"] {
 
   /* List header */
   .list-header-top { flex-direction: column; align-items: stretch; gap: 8px; }
-  .toolbar-group { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .toolbar-group { flex-wrap: wrap; }
   .toolbar-menu-items { right: auto; left: 0; min-width: 180px; }
 
   /* Deck inner tabs */
@@ -1756,6 +1920,12 @@ input[type="radio"] {
 
   /* Pagination */
   .pagination button { padding: 6px 10px; font-size: 12px; min-width: 32px; }
+
+  /* Esconde o formulário de cadastro no mobile — substituído pelo FAB */
+  .collection-form-panel { display: none; }
+
+  /* FAB visível no mobile */
+  .mobile-fab { display: flex; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2004,11 +2174,263 @@ input[type="radio"] {
   letter-spacing: 0.02em;
 }
 
+/* ── Deck Builder: Configuração ─────────────────────────────────── */
+.db-config {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.db-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.db-config-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.db-config-label em {
+  font-style: normal;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  margin-left: 6px;
+}
+
+.db-option-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.db-option-btn {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  min-height: unset;
+}
+.db-option-btn:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+  color: var(--text);
+  box-shadow: none;
+  opacity: 1;
+}
+.db-option-btn.active {
+  border-color: var(--gold-dim);
+  background: rgba(200, 155, 60, 0.12);
+  color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(200, 155, 60, 0.12);
+  opacity: 1;
+}
+.db-option-btn strong {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: block;
+}
+.db-option-btn small {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  display: block;
+}
+.db-option-btn.active small { color: var(--gold-dim); }
+.db-option-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.db-run-btn {
+  background: linear-gradient(135deg, #4a2a08, var(--gold-dim));
+  color: var(--gold-light);
+  border: 1px solid var(--gold-dim);
+  padding: 14px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+.db-run-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6a3a0a, #8a5a1a);
+  box-shadow: 0 0 20px var(--gold-glow);
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+/* ── Deck Builder: Resultado ────────────────────────────────────── */
+.db-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.db-deck-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.db-deck-name-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.db-deck-name-value {
+  font-family: 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.db-deck-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+.db-deck-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.db-deck-colors {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.db-card-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ── Deck Builder: Ações finais ─────────────────────────────────── */
+.db-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.db-approve-btn {
+  flex: 2;
+  min-width: 160px;
+  background: linear-gradient(135deg, #1a4028, #2a6040);
+  color: #9aeab0;
+  border: 1px solid #2a5c38;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 13px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: unset;
+  letter-spacing: 0.02em;
+}
+.db-approve-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2a5038, #3a7050);
+  box-shadow: 0 0 18px rgba(61, 158, 90, 0.35);
+  opacity: 1;
+}
+.db-approve-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.db-revaluate-btn {
+  flex: 1;
+  min-width: 110px;
+  background: var(--surface-3);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 13px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: unset;
+}
+.db-revaluate-btn:hover:not(:disabled) {
+  background: rgba(200, 155, 60, 0.1);
+  color: var(--gold-light);
+  opacity: 1;
+  box-shadow: none;
+}
+.db-revaluate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.db-reject-btn {
+  flex: 1;
+  min-width: 90px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 13px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: unset;
+}
+.db-reject-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+  opacity: 1;
+  box-shadow: none;
+}
+.db-reject-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .db-option-btn  { min-width: 90px; padding: 10px 8px; }
+  .db-option-icon { font-size: 18px; }
+  .db-option-btn strong { font-size: 12px; }
+  .db-option-btn small  { font-size: 10px; }
+  .db-deck-name-value   { font-size: 17px; }
+  .db-actions { flex-direction: column; }
+  .db-approve-btn, .db-revaluate-btn, .db-reject-btn { flex: none; width: 100%; }
+}
+
 /* ── Deck Builder Modal ──────────────────────────────────────────── */
 .deck-builder-modal {
-  max-width: 780px;
+  max-width: 720px;
   width: 96vw;
-  max-height: 88dvh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
 }
@@ -2051,6 +2473,51 @@ input[type="radio"] {
   border: none;
   border-top: 1px solid var(--border-dim);
   margin: 16px 0;
+}
+
+/* ── FAB — Botão flutuante de adicionar carta (mobile only) ─────── */
+.mobile-fab {
+  position: fixed;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 14px);
+  right: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0;
+  background: linear-gradient(135deg, #a07828, var(--gold-dim));
+  color: var(--gold-light);
+  border: 1px solid var(--gold);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.55),
+    0 0 16px rgba(200, 155, 60, 0.3);
+  z-index: 350;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.mobile-fab:hover:not(:disabled),
+.mobile-fab:active:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.6),
+    0 0 22px rgba(200, 155, 60, 0.45);
+  opacity: 1;
+}
+
+/* ── Edit-grid em 2 colunas para telas bem pequenas ─────────────── */
+@media (max-width: 480px) {
+  .edit-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .edit-grid .eg-full { grid-column: span 2; }
 }
 
 /* ── iOS / Safe area support ─────────────────────────────────────── */
@@ -2484,6 +2951,7 @@ input[type="radio"] {
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   margin-bottom: 4px;
 }

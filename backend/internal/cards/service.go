@@ -203,6 +203,10 @@ func (s *Service) Delete(id string) error {
 	return s.repository.Delete(id)
 }
 
+func (s *Service) SetQuantity(id string, quantity int) error {
+	return s.repository.SetQuantity(id, quantity)
+}
+
 func (s *Service) SetDeck(id string, deckID int) error {
 	return s.repository.SetDeck(id, deckID)
 }
@@ -213,6 +217,10 @@ func (s *Service) ExportAll() ([]Card, error) {
 
 func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {
 	return s.repository.ListForDeckBuilder()
+}
+
+func (s *Service) ListColorCombos() ([]ColorCombo, error) {
+	return s.repository.ListColorCombos()
 }
 
 func (s *Service) GetStats() (CollectionStats, error) {
