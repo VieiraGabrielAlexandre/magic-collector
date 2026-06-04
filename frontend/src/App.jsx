@@ -966,7 +966,7 @@ export default function App() {
     .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <main className="app">
+    <>
       {/* ── Session bar ── */}
       <div className="session-bar">
         <div className="session-bar-left">
@@ -984,6 +984,7 @@ export default function App() {
         </div>
       </div>
 
+      <main className="app">
       <section className="hero">
         <h1>Magic Collector</h1>
         <p>Cadastre, organize e consulte sua coleção de cartas Magic: The Gathering</p>
@@ -1995,6 +1996,9 @@ export default function App() {
             <div className="list-header-top">
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
               <div className="toolbar-group">
+                <button type="button" className="mobile-quick-add-btn" onClick={() => setQuickAddModal(true)}>
+                  ⚡ Busca Rápida
+                </button>
                 <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
                   📊 Stats
                 </button>
@@ -2417,6 +2421,7 @@ export default function App() {
           +
         </button>
       )}
-    </main>
+      </main>
+    </>
   );
 }
