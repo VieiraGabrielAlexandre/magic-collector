@@ -216,3 +216,11 @@ Definidas em `.env` (não versionado). Ver `.env.example`.
 - A Scryfall API não exige chave mas pede `User-Agent` no header — já está configurado como `magic-collector/1.0`.
 - `data/collection.db` no `.gitignore` é resquício do SQLite; o banco real é MySQL.
 - Ao importar pré-con em PT, cada carta gera 2 requests à Scryfall (EN + PT). Para um set de 100 cartas, leva ~30s.
+- 
+Para alterações visuais/responsivas, leia obrigatoriamente:
+
+- `docs/frontend-responsive-spec.md`
+- `docs/frontend-responsive-plan.md`
+
+A spec define o resultado esperado.
+O plan define a ordem de execução.

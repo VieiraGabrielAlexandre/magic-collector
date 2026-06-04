@@ -1652,6 +1652,31 @@ export default function App() {
                     {renderEvalMarkdown(deckBuilderResult.analysis)}
                   </div>
 
+                  {deckBuilderResult.card_roles && (
+                    <>
+                      <div className="modal-divider" />
+                      <div className="db-card-roles">
+                        <h3 className="db-card-roles-title">Cartas no Deck</h3>
+                        <div className="db-card-roles-list">
+                          {(deckBuilderResult.card_roles.nao_terrenos || []).map((card) => (
+                            <div key={card.nome} className="db-card-role-item">
+                              <span className="db-card-role-name">{card.nome}</span>
+                              <span className="db-card-role-papel">{card.papel}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {deckBuilderResult.card_roles.terrenos?.total > 0 && (
+                          <div className="db-terrenos-info">
+                            <span className="db-terrenos-label">
+                              Terrenos ({deckBuilderResult.card_roles.terrenos.total})
+                            </span>
+                            <span className="db-card-role-papel">{deckBuilderResult.card_roles.terrenos.motivo}</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                   <div className="db-actions">
                     {deckBuilderResult.deck_list && (
                       <button type="button" className="db-approve-btn"

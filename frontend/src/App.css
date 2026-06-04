@@ -2502,6 +2502,62 @@ input[type="radio"] {
   margin-top: 4px;
 }
 
+/* ── Papéis das cartas no deck builder ─────────────────────────────────── */
+.db-card-roles {
+  padding: 4px 0 8px;
+}
+
+.db-card-roles-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 10px;
+}
+
+.db-card-roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-card-role-item,
+.db-terrenos-info {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+.db-terrenos-info {
+  margin-top: 8px;
+  background: var(--surface-3);
+  border-left: 2px solid var(--r-l);
+}
+
+.db-card-role-name {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-terrenos-label {
+  font-weight: 600;
+  color: var(--r-l);
+}
+
+.db-card-role-papel {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 /* Separador horizontal dentro da análise */
 .deck-builder-content hr,
 .eval-content hr {

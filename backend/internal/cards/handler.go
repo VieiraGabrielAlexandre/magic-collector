@@ -254,9 +254,24 @@ type deckSuggestion struct {
 	Lista     string `json:"lista"`
 }
 
+type CardRole struct {
+	Nome  string `json:"nome"`
+	Papel string `json:"papel"`
+}
+
+type TerrenoInfo struct {
+	Total  int    `json:"total"`
+	Motivo string `json:"motivo"`
+}
+
+type CardRoles struct {
+	NaoTerrenos []CardRole  `json:"nao_terrenos"`
+	Terrenos    TerrenoInfo `json:"terrenos"`
+}
+
 // parseDeckBuilderOutput extrai o bloco JSON da IA e separa a análise em markdown.
-// Retorna (suggestion, analysis, errIA): errIA é preenchido quando a IA declara impossibilidade.
-func parseDeckBuilderOutput(raw string) (*deckSuggestion, string, string) {
+// Retorna (suggestion, analysis, errIA, roles): errIA é preenchido quando a IA declara impossibilidade.
+func parseDeckBuilderOutput(raw string) (*deckSuggestion, string, string, *CardRoles) {
 	// Verifica se a IA emitiu um bloco de erro (impossível montar deck)
 	const errStart = "<<<ERRO>>>"
 	const errEnd = "<<<FIM_ERRO>>>"
@@ -267,9 +282,9 @@ func parseDeckBuilderOutput(raw string) (*deckSuggestion, string, string) {
 				Motivo string `json:"motivo"`
 			}
 			if json.Unmarshal([]byte(jsonStr), &errObj) == nil && errObj.Motivo != "" {
-				return nil, "", errObj.Motivo
+				return nil, "", errObj.Motivo, nil
 			}
-			return nil, "", strings.TrimSpace(raw[es+len(errStart) : ee])
+			return nil, "", strings.TrimSpace(raw[es+len(errStart) : ee]), nil
 		}
 	}
 
@@ -278,15 +293,34 @@ func parseDeckBuilderOutput(raw string) (*deckSuggestion, string, string) {
 	start := strings.Index(raw, startTag)
 	end := strings.Index(raw, endTag)
 	if start == -1 || end == -1 || end <= start {
-		return nil, raw, ""
+		return nil, raw, "", nil
 	}
 	jsonStr := strings.TrimSpace(raw[start+len(startTag) : end])
 	var s deckSuggestion
 	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
-		return nil, raw, ""
+		return nil, raw, "", nil
 	}
-	analysis := strings.TrimSpace(raw[end+len(endTag):])
-	return &s, analysis, ""
+
+	afterDeck := raw[end+len(endTag):]
+
+	// Extrai o bloco de papéis das cartas, se presente
+	const cartasStart = "<<<CARTAS>>>"
+	const cartasEnd = "<<<FIM_CARTAS>>>"
+	var roles *CardRoles
+	if cs := strings.Index(afterDeck, cartasStart); cs != -1 {
+		if ce := strings.Index(afterDeck, cartasEnd); ce > cs {
+			cartasJSON := strings.TrimSpace(afterDeck[cs+len(cartasStart) : ce])
+			var r CardRoles
+			if json.Unmarshal([]byte(cartasJSON), &r) == nil {
+				roles = &r
+			}
+			// Remove o bloco CARTAS da análise
+			afterDeck = afterDeck[:cs] + afterDeck[ce+len(cartasEnd):]
+		}
+	}
+
+	analysis := strings.TrimSpace(afterDeck)
+	return &s, analysis, "", roles
 }
 
 func (h *Handler) SuggestDecks(c *gin.Context) {
@@ -316,7 +350,7 @@ func (h *Handler) SuggestDecks(c *gin.Context) {
 		return
 	}
 
-	suggestion, analysis, errIA := parseDeckBuilderOutput(raw)
+	suggestion, analysis, errIA, roles := parseDeckBuilderOutput(raw)
 
 	resp := gin.H{"analysis": analysis, "card_count": len(cards)}
 	if errIA != "" {
@@ -328,6 +362,9 @@ func (h *Handler) SuggestDecks(c *gin.Context) {
 		resp["deck_commander"] = suggestion.Commander
 		resp["deck_list"] = suggestion.Lista
 		resp["deck_description"] = suggestion.Descricao
+	}
+	if roles != nil {
+		resp["card_roles"] = roles
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -344,7 +381,8 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) st
 	for _, c := range cards {
 		totalQty += c.Quantity
 		t := strings.ToLower(c.Type)
-		var group string
+
+		group := "Outros"
 		switch {
 		case strings.Contains(t, "creature") || strings.Contains(t, "criatura"):
 			group = "Criatura"
@@ -360,9 +398,8 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) st
 			group = "Encantamento"
 		case strings.Contains(t, "land") || strings.Contains(t, "terreno"):
 			group = "Terreno"
-		default:
-			group = "Outros"
 		}
+
 		entry := fmt.Sprintf("%dx %s", c.Quantity, c.Name)
 		if c.ManaCost != "" {
 			entry += " (" + c.ManaCost + ")"
@@ -378,122 +415,219 @@ func buildDeckBuilderPrompt(cards []DeckBuilderCard, input SuggestDecksInput) st
 
 	var cardList strings.Builder
 	for _, cat := range order {
-		if len(cats[cat]) > 0 {
-			cardList.WriteString(fmt.Sprintf("\n### %s (%d únicos)\n", cat, len(cats[cat])))
-			for _, entry := range cats[cat] {
-				cardList.WriteString("- " + entry + "\n")
-			}
+		if len(cats[cat]) == 0 {
+			continue
+		}
+		cardList.WriteString(fmt.Sprintf("\n### %s (%d únicos)\n", cat, len(cats[cat])))
+		for _, entry := range cats[cat] {
+			cardList.WriteString("- " + entry + "\n")
 		}
 	}
 
-	// ── Instruções de formato ─────────────────────────────────────
 	var formatInstr string
+	var outputExample string
+
 	switch input.Format {
 	case "commander":
-		formatInstr = "Monte UM deck **Commander de EXATAMENTE 100 cartas** (o Comandante é incluído nessa contagem).\n" +
-			"- Declare a carta Comandante na primeira linha da lista (ex: `Commander\\n1 [Nome]`)\n" +
-			"- Máximo 1 cópia de cada carta não-básica (singleton)\n" +
-			"- Inclua 37-40 terrenos (pode adicionar terrenos básicos não listados)\n" +
-			"- As cores do deck são definidas pela identidade de cor do Comandante\n" +
-			"- **ANTES DE GERAR:** conte mentalmente quantas cartas você escolherá; o total DEVE ser exatamente 100. Se for impossível atingir 100 com as cartas disponíveis, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`.\n" +
-			`- campo "commander": true no JSON`
+		formatInstr = `Monte UM deck COMMANDER válido.
+
+REGRAS DURAS DO COMMANDER:
+- O deck deve ter EXATAMENTE 100 cartas no total, incluindo o comandante.
+- Deve existir uma seção "Commander" com EXATAMENTE 1 carta.
+- O comandante deve ser uma criatura lendária, ou uma carta que diga explicitamente que pode ser comandante.
+- Todas as cartas devem respeitar a IDENTIDADE DE COR do comandante.
+- A identidade de cor considera custo de mana, símbolos de mana no texto da carta e faces alternativas.
+- Nenhuma carta fora da identidade de cor do comandante pode entrar.
+- Cartas não-básicas são singleton: no máximo 1 cópia de cada nome.
+- Terrenos básicos podem repetir livremente.
+- Terrenos básicos devem respeitar as cores do comandante.
+- Não use terrenos básicos de cores que o comandante não tenha.
+- Use normalmente entre 35 e 40 terrenos.
+- O campo "commander" no JSON deve ser true.
+
+VALIDAÇÃO OBRIGATÓRIA:
+1. Escolha primeiro o comandante.
+2. Defina as cores exclusivamente pela identidade de cor dele.
+3. Remova qualquer carta fora dessas cores.
+4. Garanta singleton para todas as cartas não-básicas.
+5. Conte todas as cartas.
+6. O total deve ser exatamente 100.
+7. Se não conseguir montar Commander válido, emita <<<ERRO>>>.`
+
+		outputExample = `{
+  "nome": "Legião de Tartarugas",
+  "cores": "W,U,B,R,G",
+  "commander": true,
+  "descricao": "Deck Commander focado em sinergia tribal, valor incremental e finalizações em mesa cheia.",
+  "lista": "Commander\n1 Leonardo, the Balance\n\nCriaturas\n1 Donatello, the Brains\n1 Raphael, the Muscle\n1 Michelangelo, the Heart\n\nArtefatos\n1 Sol Ring\n1 Arcane Signet\n\nTerrenos\n8 Plains\n8 Island\n8 Swamp\n8 Mountain\n8 Forest"
+}`
+
 	case "casual60":
-		formatInstr = "Monte UM deck **de EXATAMENTE 60 cartas** (Casual / Standard / Modern). Máximo tolerado: 62.\n" +
-			"- Até 4 cópias de cartas não-básicas\n" +
-			"- Inclua 20-24 terrenos básicos (pode adicionar básicos não listados)\n" +
-			"- Curva de mana: pico em 2-3 mana, poucas cartas com custo 5+\n" +
-			"- **ANTES DE GERAR:** conte mentalmente quantas cartas você escolherá; o total DEVE ser 60, 61 ou 62. Se for impossível atingir esse intervalo, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`.\n" +
-			`- campo "commander": false no JSON`
-	default: // auto
-		formatInstr = "Escolha o formato mais adequado para as cartas disponíveis:\n" +
-			"- Prefira **60 cartas** (Casual/Modern) se houver sinergias suficientes\n" +
-			"- Use **Commander (100 cartas)** apenas se as cartas claramente favorecem esse formato\n" +
-			"- Inclua terrenos básicos necessários mesmo que não estejam na lista\n" +
-			"- **ANTES DE GERAR:** verifique a contagem: Commander = exatamente 100, Casual60 = 60 a 62. Se for impossível atingir esses valores, emita `<<<ERRO>>>` em vez de `<<<DECK>>>`."
+		formatInstr = `Monte UM deck CASUAL DE 60 CARTAS válido.
+
+REGRAS DURAS DO CASUAL 60:
+- O deck deve ter EXATAMENTE 60 cartas.
+- Não existe comandante.
+- Não crie seção "Commander".
+- O campo "commander" no JSON deve ser false.
+- Cartas não-básicas podem ter até 4 cópias.
+- Nunca use mais cópias de uma carta do que a quantidade disponível na coleção.
+- Terrenos básicos podem ser adicionados livremente.
+- Use normalmente entre 22 e 24 terrenos.
+- O deck deve ter uma estratégia clara.
+- A curva de mana deve ser jogável, com foco em custos 1, 2 e 3.
+- Use poucas cartas de custo 5 ou maior.
+
+VALIDAÇÃO OBRIGATÓRIA:
+1. Defina uma estratégia central.
+2. Escolha as cores de acordo com as melhores sinergias.
+3. Respeite até 4 cópias por carta não-básica.
+4. Respeite a quantidade disponível da coleção.
+5. Conte todas as cartas.
+6. O total deve ser exatamente 60.
+7. Se não conseguir montar 60 cartas coerentes, emita <<<ERRO>>>.`
+
+		outputExample = `{
+  "nome": "Ataque Rápido",
+  "cores": "R,G",
+  "commander": false,
+  "descricao": "Deck casual de 60 cartas focado em criaturas eficientes, pressão inicial e remoções simples.",
+  "lista": "Criaturas\n4 Carta Um\n4 Carta Dois\n\nFeitiços\n4 Carta Três\n\nMágicas Imediatas\n4 Carta Quatro\n\nTerrenos\n10 Mountain\n10 Forest"
+}`
+
+	default:
+		formatInstr = `Escolha automaticamente entre CASUAL 60 ou COMMANDER.
+
+CRITÉRIO DE ESCOLHA:
+- Escolha COMMANDER apenas se houver um comandante válido e cartas suficientes que respeitem sua identidade de cor.
+- Escolha CASUAL 60 se as cartas disponíveis formarem melhor um deck comum de 60 cartas.
+- Se escolher Commander, siga TODAS as regras de Commander.
+- Se escolher Casual 60, siga TODAS as regras de Casual 60.
+
+VALIDAÇÃO:
+- Commander = exatamente 100 cartas, com comandante, singleton e identidade de cor.
+- Casual 60 = exatamente 60 cartas, sem comandante, até 4 cópias por carta não-básica.
+- Se nenhum formato ficar válido, emita <<<ERRO>>>.`
+
+		outputExample = `{
+  "nome": "Ataque Rápido",
+  "cores": "R,G",
+  "commander": false,
+  "descricao": "Deck casual de 60 cartas focado em criaturas eficientes, pressão inicial e remoções simples.",
+  "lista": "Criaturas\n4 Carta Um\n4 Carta Dois\n\nFeitiços\n4 Carta Três\n\nMágicas Imediatas\n4 Carta Quatro\n\nTerrenos\n10 Mountain\n10 Forest"
+}`
 	}
 
-	// ── Instruções de objetivo ────────────────────────────────────
 	var goalInstr string
 	if input.Goal == "competitive" {
-		goalInstr = "**Objetivo: COMPETITIVO** — maximize consistência e eficiência. " +
-			"Priorize cartas com baixo custo de mana, remoções e geração de vantagem. " +
-			"O deck deve ser o mais forte possível com as cartas disponíveis."
+		goalInstr = `**Objetivo: COMPETITIVO** — maximize consistência, eficiência, curva de mana, remoções e vantagem de cartas.`
 	} else {
-		goalInstr = "**Objetivo: DIVERSÃO** — priorize combos interessantes, sinergias temáticas e " +
-			"interações criativas. O deck não precisa ser o mais eficiente, mas deve ser divertido de jogar."
+		goalInstr = `**Objetivo: DIVERSÃO** — priorize sinergias temáticas, combos interessantes e plano de jogo divertido, mantendo o deck funcional.`
 	}
 
-	// ── Preferência de cores ──────────────────────────────────────
 	var colorInstr string
 	if input.Colors != "" {
-		colorInstr = fmt.Sprintf("\n**Cores preferidas:** %s — monte o deck preferencialmente nessas cores. "+
-			"Ignore cartas de outras cores, exceto se forem essenciais para a estratégia.\n", input.Colors)
+		colorInstr = fmt.Sprintf(`
+**Cores preferidas:** %s.
+- Em Casual 60, tente respeitar essas cores se houver cartas suficientes.
+- Em Commander, essas cores só podem ser usadas se forem compatíveis com a identidade de cor do comandante.
+- Nunca viole identidade de cor em Commander por causa da preferência de cores.
+`, input.Colors)
 	}
 
-	// ── Instrução de re-avaliação ─────────────────────────────────
 	var revaluateInstr string
 	if input.Revaluate {
-		revaluateInstr = "\n**⚠️ RE-AVALIAÇÃO:** Sugira uma estratégia DIFERENTE da avaliação anterior. " +
-			"Explore outras sinergias, outro archetype ou uma combinação de cores diferente.\n"
+		revaluateInstr = `
+**RE-AVALIAÇÃO:** sugira uma estratégia diferente da anterior. Explore outro arquétipo, outra combinação de cores ou outro comandante, mas sem violar as regras do formato.`
 	}
 
-	return fmt.Sprintf(`Você é um especialista em Magic: The Gathering com conhecimento profundo em deck-building.
+	return fmt.Sprintf(`Você é um especialista em Magic: The Gathering e deck-building.
 
-## 🃏 CARTAS DISPONÍVEIS (%d cópias totais, %d únicas sem deck)
+## CARTAS DISPONÍVEIS (%d cópias totais, %d únicas sem deck)
 %s
 
-## ⚙️ PARÂMETROS
+## PARÂMETROS
 %s
-%s%s%s
-## 📐 REGRAS OBRIGATÓRIAS
-1. Use SOMENTE cartas da lista acima, respeitando as quantidades disponíveis
-2. **Terrenos básicos** (Mountain, Island, Swamp, Plains, Forest) podem ser adicionados livremente mesmo sem estarem na lista
-3. **Coerência de mana:** calcule a proporção de terrenos por cor baseado no custo de mana das cartas; não inclua terrenos de cores desnecessárias
-4. **Sinergia obrigatória:** cada carta não-terreno deve contribuir diretamente para a estratégia central
-5. **Monte APENAS UM deck** — o melhor possível com os parâmetros dados
 
-## 📤 FORMATO DE SAÍDA — DUAS OPÇÕES (emita APENAS UMA)
+%s
+%s
+%s
 
-**OPÇÃO A — Deck válido (contagem correta):**
+## REGRAS GERAIS OBRIGATÓRIAS
+1. Use somente cartas da lista acima, respeitando as quantidades disponíveis.
+2. Exceção: terrenos básicos podem ser adicionados livremente.
+3. Terrenos básicos válidos: Plains, Island, Swamp, Mountain, Forest.
+4. Em Commander, cartas não-básicas são limitadas a 1 cópia, mesmo se houver mais cópias disponíveis.
+5. Em Casual 60, cartas não-básicas podem usar até 4 cópias, mas nunca acima da quantidade disponível.
+6. Não invente cartas não-básicas.
+7. Não misture regras de Commander com Casual 60.
+8. Monte apenas UM deck.
+9. A lista final precisa bater exatamente com a contagem exigida pelo formato.
+10. Se não conseguir montar um deck válido, use o bloco <<<ERRO>>>.
+
+## FORMATO DE SAÍDA — EMITA APENAS UMA DAS OPÇÕES
+
+OPÇÃO A — Deck válido:
 
 <<<DECK>>>
-{
-  "nome": "Nome criativo e temático em português",
-  "cores": "X,Y",
-  "commander": false,
-  "descricao": "2-3 frases descrevendo estilo e estratégia do deck.",
-  "lista": "Commander\n1 Nome do Comandante\n\nCriaturas\n4 Carta Um\n3 Carta Dois\n\nFeitiços\n4 Carta Três\n\nTerrenos\n20 Forest\n4 Mountain"
-}
+%s
 <<<FIM_DECK>>>
 
 Regras do campo "lista":
-- Linhas de seção sem número: "Commander", "Criaturas", "Feitiços", "Mágicas Imediatas", "Artefatos", "Encantamentos", "Terrenos"
-- Cartas: "N Nome Exato da Carta" (ex: "4 Lightning Bolt", "1 Sol Ring")
-- Terrenos básicos no final; use os nomes exatos em inglês: Mountain, Island, Swamp, Plains, Forest
-- Sem comentários, sem preços, sem códigos de set dentro da lista
-- **A soma de todas as quantidades N da lista deve bater exatamente com o total exigido pelo formato**
+- Use seções sem número.
+- Seções permitidas: "Commander", "Criaturas", "Planeswalkers", "Feitiços", "Mágicas Imediatas", "Artefatos", "Encantamentos", "Terrenos".
+- Use a seção "Commander" somente quando o formato for Commander.
+- Cada carta deve seguir o formato: "N Nome Exato da Carta".
+- Não coloque comentários, preços ou códigos de set dentro da lista.
+- Terrenos básicos devem ficar no final.
+- A soma das quantidades deve bater exatamente com o formato escolhido.
 
-**OPÇÃO B — Impossível montar deck válido:**
+OPÇÃO B — Impossível montar deck válido:
 
 <<<ERRO>>>
-{"motivo": "Explique em detalhes por que não é possível montar um deck com a contagem exigida usando as cartas disponíveis e os parâmetros fornecidos"}
+{"motivo": "Explique em detalhes por que não foi possível montar um deck válido com as cartas e parâmetros fornecidos."}
 <<<FIM_ERRO>>>
 
-Depois do bloco (A ou B), escreva a análise em markdown:
+Depois do bloco escolhido, escreva a análise em markdown:
 
-## 📊 Análise
-Estratégia central do deck em 2-3 parágrafos.
+## Análise
+Explique a estratégia central do deck.
 
-## 🔗 Sinergias Principais
-As 3-5 combinações de cartas mais importantes e por quê funcionam.
+## Sinergias Principais
+Liste 3 a 5 sinergias importantes.
 
-## 🎮 Como Jogar
-Turnos 1-3, mid-game e como fechar o jogo.
+## Como Jogar
+Explique início, meio e fim de jogo.
 
-## ✅ Pontos Fortes
+## Pontos Fortes
 
-## ❌ Limitações e o que comprar para completar`,
-		totalQty, len(cards),
+## Limitações e o que comprar para completar
+
+Se emitiu OPÇÃO A, emita também:
+
+<<<CARTAS>>>
+{
+  "nao_terrenos": [
+    {"nome": "Nome Exato da Carta", "papel": "O que a carta faz e por que está neste deck."}
+  ],
+  "terrenos": {
+    "total": 0,
+    "motivo": "Explique a quantidade de terrenos e a distribuição por cor."
+  }
+}
+<<<FIM_CARTAS>>>
+
+Regras do bloco CARTAS:
+- Liste todas as cartas não-terreno do deck.
+- Use os nomes exatamente como aparecem na lista.
+- "terrenos.total" deve bater com a soma de terrenos da lista.`,
+		totalQty,
+		len(cards),
 		cardList.String(),
-		formatInstr, goalInstr, colorInstr, revaluateInstr)
+		formatInstr,
+		goalInstr,
+		colorInstr,
+		revaluateInstr,
+		outputExample,
+	)
 }
