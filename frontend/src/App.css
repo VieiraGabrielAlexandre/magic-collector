@@ -1,20 +1,25 @@
 /* ── Variáveis ─────────────────────────────────────────────────────────── */
 :root {
   --bg:          #080705;
-  --surface:     #110f0c;
-  --surface-2:   #1a1610;
-  --surface-3:   #231e16;
+  --surface:     #100e0b;
+  --surface-2:   #191511;
+  --surface-3:   #221d15;
   --border:      #3d3218;
   --border-dim:  #2a2210;
   --gold:        #c89b3c;
   --gold-light:  #e8c870;
+  --gold-vivid:  #d4a848;
   --gold-dim:    #7a5f20;
   --gold-glow:   rgba(200, 155, 60, 0.18);
+  --copper:      #b87840;
+  --card-shine:  rgba(255, 220, 100, 0.05);
   --text:        #ede0c8;
   --text-muted:  #9a8868;
   --text-dim:    #5a4830;
   --danger:      #8b1e1e;
   --danger-hover:#a02828;
+  --success:     #2d6e45;
+  --success-text:#6dd98c;
   --r-c:  #9a9a9a;
   --r-u:  #5ab4cc;
   --r-r:  #c89b3c;
@@ -25,6 +30,19 @@
 
 /* ── Reset / Base ──────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
+
+/* Foco visível para navegação por teclado — anel dourado em qualquer elemento focável */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+/* Inputs já têm ring customizado via box-shadow — não sobrepor com outline */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
 
 body {
   margin: 0;
@@ -85,20 +103,20 @@ img {
   font-size: 48px;
   font-weight: 700;
   margin: 0 0 10px;
-  letter-spacing: 0.06em;
-  background: linear-gradient(160deg, var(--gold-light) 0%, var(--gold) 50%, #a87828 100%);
+  letter-spacing: 0.07em;
+  background: linear-gradient(160deg, #f0d880 0%, var(--gold-vivid) 35%, var(--gold) 60%, #a07020 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: none;
-  filter: drop-shadow(0 0 32px rgba(200,155,60,0.2));
+  filter: drop-shadow(0 0 40px rgba(200,155,60,0.3));
 }
 
 .hero p {
   color: var(--text-muted);
   font-size: 14px;
   margin: 0;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
 }
 
 /* ── Grid de dois painéis ──────────────────────────────────────────────── */
@@ -111,14 +129,15 @@ img {
 
 /* ── Card Frame (painel) ───────────────────────────────────────────────── */
 .card {
-  background: var(--surface);
+  background: linear-gradient(170deg, #151210 0%, var(--surface) 45%, #0d0a07 100%);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 26px;
   box-shadow:
-    0 0 0 1px rgba(200, 155, 60, 0.06),
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.3);
+    0 0 0 1px rgba(200, 155, 60, 0.10),
+    0 10px 40px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 var(--card-shine);
   position: relative;
   transition: box-shadow 0.2s;
   min-width: 0;
@@ -127,9 +146,9 @@ img {
 .card::before {
   content: '';
   position: absolute;
-  inset: 5px;
-  border: 1px solid rgba(200, 155, 60, 0.08);
-  border-radius: 10px;
+  inset: 4px;
+  border: 1px solid rgba(200, 155, 60, 0.12);
+  border-radius: 11px;
   pointer-events: none;
 }
 
@@ -144,10 +163,11 @@ img {
   font-family: 'Cinzel', serif;
   font-size: 17px;
   font-weight: 600;
-  color: var(--gold);
+  color: var(--gold-vivid);
   letter-spacing: 0.08em;
   margin: 0 0 6px;
   text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(200, 155, 60, 0.25);
 }
 
 label {
@@ -182,8 +202,8 @@ select { appearance: auto; -webkit-appearance: auto; }
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--gold-dim);
-  box-shadow: 0 0 0 3px rgba(200, 155, 60, 0.12);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-dim), 0 0 0 4px rgba(200, 155, 60, 0.14);
 }
 
 select option { background: var(--surface-3); }
@@ -191,7 +211,7 @@ select option { background: var(--surface-3); }
 textarea { min-height: 76px; resize: vertical; }
 
 button {
-  background: linear-gradient(160deg, #a07828, var(--gold-dim));
+  background: linear-gradient(160deg, #b08830 0%, var(--gold-dim) 55%, #5a3e14 100%);
   color: var(--gold-light);
   border: 1px solid var(--gold-dim);
   padding: 10px 16px;
@@ -202,28 +222,30 @@ button {
   font-family: inherit;
   letter-spacing: 0.04em;
   min-height: 40px;
-  transition: opacity 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: background 0.15s, box-shadow 0.18s, transform 0.1s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
 button:hover:not(:disabled) {
-  opacity: 0.88;
-  box-shadow: 0 0 14px rgba(200, 155, 60, 0.3);
+  background: linear-gradient(160deg, #c09840 0%, #8a6a28 55%, #6a4820 100%);
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(200, 155, 60, 0.35), 0 2px 8px rgba(0,0,0,0.3);
 }
-button:active:not(:disabled) { transform: scale(0.98); }
+button:active:not(:disabled) { transform: scale(0.97); }
 
 button:disabled { opacity: 0.35; cursor: default; }
 
 button.danger {
-  background: var(--danger);
-  color: #e88;
+  background: linear-gradient(160deg, #7a1a1a 0%, var(--danger) 55%, #3e0e0e 100%);
+  color: #e89090;
   border-color: #6b1818;
 }
 
 button.danger:hover:not(:disabled) {
-  background: var(--danger-hover);
-  box-shadow: 0 0 10px rgba(180, 40, 40, 0.3);
+  background: linear-gradient(160deg, #962222 0%, var(--danger-hover) 55%, #581414 100%);
+  border-color: #9e3030;
+  box-shadow: 0 0 14px rgba(180, 40, 40, 0.4);
 }
 
 /* ── Lista ─────────────────────────────────────────────────────────────── */
@@ -245,9 +267,10 @@ button.danger:hover:not(:disabled) {
   font-family: 'Cinzel', serif;
   font-size: 17px;
   font-weight: 600;
-  color: var(--gold);
+  color: var(--gold-vivid);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(200, 155, 60, 0.2);
   margin: 0;
   display: flex;
   align-items: center;
@@ -378,8 +401,8 @@ button.danger:hover:not(:disabled) {
 .list-item:hover {
   border-color: var(--border);
   border-left-color: var(--gold-dim);
-  background: var(--surface-3);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  background: linear-gradient(90deg, rgba(200,155,60,0.05) 0%, var(--surface-3) 20%);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(200,155,60,0.04);
 }
 
 .list-item-info { flex: 1; min-width: 0; }
@@ -734,10 +757,14 @@ button.danger:hover:not(:disabled) {
 }
 
 .empty {
-  color: var(--text-dim);
+  color: var(--text-muted);
   text-align: center;
-  padding: 32px 0;
-  font-size: 14px;
+  padding: 40px 20px;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  border: 1px dashed var(--border-dim);
+  border-radius: 10px;
+  background: rgba(200, 155, 60, 0.02);
 }
 
 /* ── Paginação ─────────────────────────────────────────────────────────── */
@@ -996,10 +1023,11 @@ button.danger:hover:not(:disabled) {
   min-height: 44px;
   transition: color 0.15s, border-color 0.15s;
 }
-.tab:hover { color: var(--text); }
+.tab:hover { color: var(--text); background: rgba(200,155,60,0.04); }
 .tab.active {
-  color: var(--gold);
-  border-bottom-color: var(--gold);
+  color: var(--gold-vivid);
+  border-bottom-color: var(--gold-vivid);
+  background: rgba(200, 155, 60, 0.06);
 }
 
 /* Tab icon/label responsive */
@@ -1404,7 +1432,8 @@ input[type="radio"] {
 .deck-list-item:hover {
   border-color: var(--border);
   border-left-color: var(--gold-dim);
-  background: var(--surface-3);
+  background: linear-gradient(90deg, rgba(200,155,60,0.05) 0%, var(--surface-3) 20%);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 .deck-list-icon {
   display: flex;
@@ -3634,10 +3663,11 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border-dim);
+  background: linear-gradient(180deg, #1e1a13 0%, #15120d 100%);
+  border-bottom: 1px solid var(--border);
   padding: 8px max(28px, calc((100vw - 1240px) / 2 + 28px));
   gap: 12px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
 }
 .session-bar-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .session-avatar {

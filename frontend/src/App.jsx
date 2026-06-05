@@ -125,7 +125,7 @@ function ManaColorPicker({ value, onChange }) {
       <span className="mana-color-picker-label">Cor</span>
       <div className="mana-color-picker-row">
         {CARD_COLORS.map(({ icon, pt, code }) => (
-          <button key={code} type="button" title={pt}
+          <button key={code} type="button" title={pt} aria-label={pt}
             className={`mana-picker-btn${active.has(code) ? " active" : ""}`}
             onClick={() => {
               const s = new Set(active);
@@ -990,15 +990,15 @@ export default function App() {
         <p>Cadastre, organize e consulte sua coleção de cartas Magic: The Gathering</p>
       </section>
 
-      <nav className="tabs">
-        <button type="button" className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>
-          <span className="tab-icon">🃏</span><span className="tab-label">Coleção</span>
+      <nav className="tabs" role="tablist" aria-label="Navegação principal">
+        <button role="tab" type="button" aria-selected={activeTab === "collection"} className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>
+          <span className="tab-icon" aria-hidden="true">🃏</span><span className="tab-label">Coleção</span>
         </button>
-        <button type="button" className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>
-          <span className="tab-icon">🗂</span><span className="tab-label">Decks</span>
+        <button role="tab" type="button" aria-selected={activeTab === "decks"} className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>
+          <span className="tab-icon" aria-hidden="true">🗂</span><span className="tab-label">Decks</span>
         </button>
-        <button type="button" className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>
-          <span className="tab-icon">⚔</span><span className="tab-label">Batalhas</span>
+        <button role="tab" type="button" aria-selected={activeTab === "battles"} className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>
+          <span className="tab-icon" aria-hidden="true">⚔</span><span className="tab-label">Batalhas</span>
         </button>
       </nav>
 
@@ -1230,7 +1230,7 @@ export default function App() {
                     <div className="actions">
                       <button type="button" onClick={() => handleManageDeck(deck)}>Cartas</button>
                       <button type="button" onClick={() => setEditDeckModal({ ...deck })}>Editar</button>
-                      <button type="button" className="danger" onClick={() => handleDeckDelete(deck.id)}>✕</button>
+                      <button type="button" className="danger" aria-label="Remover deck" onClick={() => handleDeckDelete(deck.id)}>✕</button>
                     </div>
                   </div>
                 ))}
@@ -1402,7 +1402,7 @@ export default function App() {
                           </div>
                           {b.notes && <div className="battle-notes">{b.notes}</div>}
                         </div>
-                        <button type="button" className="danger battle-del" onClick={() => handleBattleDelete(b.id)}>✕</button>
+                        <button type="button" className="danger battle-del" aria-label="Remover batalha" onClick={() => handleBattleDelete(b.id)}>✕</button>
                       </div>
                     );
                   })}
@@ -1418,7 +1418,7 @@ export default function App() {
       {quickAddModal && (
         <div className="modal-overlay" onClick={() => setQuickAddModal(false)}>
           <div className="modal quick-add-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setQuickAddModal(false)}>✕</button>
+            <button className="modal-close" aria-label="Fechar" onClick={() => setQuickAddModal(false)}>✕</button>
             <h2>⚡ Busca Rápida</h2>
             <p className="quick-add-hint">Informe a sigla e o número da coleção para buscar a carta no Scryfall automaticamente.</p>
             <form className="quick-add-form" onSubmit={handleQuickAdd}>
@@ -1482,7 +1482,7 @@ export default function App() {
               </div>
             ) : (
               <>
-                <button className="modal-close" onClick={() => setConfirmCard(null)}>✕</button>
+                <button className="modal-close" aria-label="Fechar" onClick={() => setConfirmCard(null)}>✕</button>
                 {confirmCard?.found && confirmCard.card ? (
                   <>
                     <div className="confirm-card-top">
@@ -1539,7 +1539,7 @@ export default function App() {
             <div className="deck-builder-modal-header">
               <h2>✨ Montar Deck com IA</h2>
               {!deckBuilderLoading && !deckBuilderApproving && (
-                <button className="modal-close" onClick={() => setDeckBuilderModal(false)}>✕</button>
+                <button className="modal-close" aria-label="Fechar" onClick={() => setDeckBuilderModal(false)}>✕</button>
               )}
             </div>
 
@@ -1705,7 +1705,7 @@ export default function App() {
       {editDeckModal && (
         <div className="modal-overlay" onClick={() => setEditDeckModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setEditDeckModal(null)}>✕</button>
+            <button className="modal-close" aria-label="Fechar" onClick={() => setEditDeckModal(null)}>✕</button>
             <form className="edit-form" onSubmit={handleDeckUpdate}>
               <h2>Editar Deck</h2>
               <div className="edit-grid">
@@ -1747,7 +1747,7 @@ export default function App() {
       {listModal && (
         <div className="modal-overlay" onClick={() => { if (!listLoading) setListModal(false); }}>
           <div className="modal modal-import" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => { if (!listLoading) setListModal(false); }}>✕</button>
+            <button className="modal-close" aria-label="Fechar" onClick={() => { if (!listLoading) setListModal(false); }}>✕</button>
             <h2>Importar Lista de Cartas</h2>
 
             {listResult ? (
@@ -1833,7 +1833,7 @@ export default function App() {
       {importModal && (
         <div className="modal-overlay" onClick={() => { if (!importLoading) setImportModal(false); }}>
           <div className="modal modal-import" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => { if (!importLoading) setImportModal(false); }}>✕</button>
+            <button className="modal-close" aria-label="Fechar" onClick={() => { if (!importLoading) setImportModal(false); }}>✕</button>
             <h2>Importar Pré-con</h2>
 
             {importResult ? (
@@ -2045,7 +2045,7 @@ export default function App() {
                     ? `✓ ${priceRefreshResult.updated} preços faltantes preenchidos · ${priceRefreshResult.skipped} sem dados na Scryfall · total: ${priceRefreshResult.total}`
                     : `✓ ${priceRefreshResult.updated} preços atualizados · ${priceRefreshResult.skipped} sem dados · total: ${priceRefreshResult.total}`
                 }
-                <button type="button" className="banner-close" onClick={() => setPriceRefreshResult(null)}>✕</button>
+                <button type="button" className="banner-close" aria-label="Fechar aviso" onClick={() => setPriceRefreshResult(null)}>✕</button>
               </div>
             )}
             {statsOpen && <StatsPanel stats={stats} loading={statsLoading} />}
@@ -2094,6 +2094,8 @@ export default function App() {
                       type="button"
                       className={`color-filter-chip${isActive ? " active" : ""}${isNone ? " no-color" : ""}`}
                       title={`${isNone ? "Sem cor" : combo.codes} — ${combo.count} carta${combo.count !== 1 ? "s" : ""}`}
+                      aria-label={`${isNone ? "Sem cor" : `Cor ${combo.codes}`} — ${combo.count} carta${combo.count !== 1 ? "s" : ""}`}
+                      aria-pressed={isActive}
                       onClick={() => { setFilterColors(isActive ? "" : combo.codes); setPage(1); }}
                     >
                       {isNone
@@ -2157,9 +2159,9 @@ export default function App() {
                     </div>
                   </div>
                   <div className="card-grid-qty" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
+                    <button type="button" className="qty-btn" aria-label="Reduzir quantidade" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
                     <span className="qty-display">{card.quantity}</span>
-                    <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
+                    <button type="button" className="qty-btn" aria-label="Aumentar quantidade" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
                   </div>
                 </div>
               ))}
@@ -2202,12 +2204,12 @@ export default function App() {
                     </div>
                     <div className="actions">
                       <div className="qty-ctrl">
-                        <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
+                        <button type="button" className="qty-btn" aria-label="Reduzir quantidade" onClick={() => handleQuantityChange(card.id, -1)} disabled={card.quantity <= 1}>−</button>
                         <span className="qty-display">{card.quantity}</span>
-                        <button type="button" className="qty-btn" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
+                        <button type="button" className="qty-btn" aria-label="Aumentar quantidade" onClick={() => handleQuantityChange(card.id, +1)}>+</button>
                       </div>
                       <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
-                      <button type="button" className="danger" onClick={() => handleDelete(card.id)}>✕</button>
+                      <button type="button" className="danger" aria-label="Remover carta" onClick={() => handleDelete(card.id)}>✕</button>
                     </div>
                   </div>
                 );
@@ -2241,7 +2243,7 @@ export default function App() {
       {(selectedCard || loadingDetail) && (
         <div className="modal-overlay" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>✕</button>
+            <button className="modal-close" aria-label="Fechar" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>✕</button>
 
             {loadingDetail && <p className="empty">Carregando...</p>}
 
