@@ -303,3 +303,85 @@ export async function acquireWishlistItem(id, data) {
   if (!res.ok) throw new Error(json.error || "Erro ao adquirir carta");
   return json;
 }
+
+// ── Game Sessions ─────────────────────────────────────────────────────────────
+
+export async function listGameSessions() {
+  const res = await authFetch(`${BASE_URL}/game-sessions`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createGameSession(data) {
+  const res = await authFetch(`${BASE_URL}/game-sessions`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao criar sessão");
+  return json;
+}
+
+export async function getGameSession(id) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${id}`);
+  if (!res.ok) throw new Error("Sessão não encontrada");
+  return res.json();
+}
+
+export async function deleteGameSession(id) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover sessão");
+  return res.json();
+}
+
+export async function addGameSessionPlayer(sessionId, data) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/players`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao adicionar jogador");
+  return json;
+}
+
+export async function updateGameSessionPlayer(sessionId, playerId, data) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/players/${playerId}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao atualizar jogador");
+  return json;
+}
+
+export async function deleteGameSessionPlayer(sessionId, playerId) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/players/${playerId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Erro ao remover jogador");
+  return res.json();
+}
+
+export async function resetGameSession(id) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${id}/reset`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao resetar sessão");
+  return json;
+}
+
+export async function finishGameSession(id) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${id}/finish`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao encerrar sessão");
+  return json;
+}
+
+export async function restoreGameSession(id) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${id}/restore`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao restaurar sessão");
+  return json;
+}

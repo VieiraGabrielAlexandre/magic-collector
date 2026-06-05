@@ -161,6 +161,44 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS game_sessions (
+			id            BIGINT       NOT NULL AUTO_INCREMENT,
+			name          VARCHAR(255) NOT NULL,
+			format        VARCHAR(50)  NOT NULL DEFAULT 'Commander',
+			status        VARCHAR(20)  NOT NULL DEFAULT 'active',
+			starting_life INT          NOT NULL DEFAULT 40,
+			created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			ended_at      DATETIME     NULL,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS game_session_players (
+			id                        BIGINT       NOT NULL AUTO_INCREMENT,
+			session_id                BIGINT       NOT NULL,
+			name                      VARCHAR(255) NOT NULL,
+			short_code                VARCHAR(3)   NOT NULL,
+			life                      INT          NOT NULL DEFAULT 40,
+			poison                    INT          NOT NULL DEFAULT 0,
+			commander_damage_received INT          NOT NULL DEFAULT 0,
+			is_eliminated             TINYINT(1)   NOT NULL DEFAULT 0,
+			eliminated_reason         VARCHAR(50)  NULL,
+			created_at                DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at                DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			INDEX idx_gsp_session_id (session_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
 	seedUsers(db)
 
 	return db, nil

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, assignCardToDeck, createBattle, createCard, createDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, getCard, getCollectionStats, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listWishlist, logout, previewCard, refreshImages, refreshPrices, suggestDecks, updateCard, updateCardQuantity, updateDeck } from "./services/api";
+import { acquireWishlistItem, addGameSessionPlayer, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listWishlist, logout, previewCard, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
@@ -493,6 +493,19 @@ export default function App() {
   const [wishlistAcquireForm, setWishlistAcquireForm] = useState(EMPTY_ACQUIRE_FORM);
   const [wishlistAcquiring, setWishlistAcquiring] = useState(false);
 
+  // ── Pontuação / Life Counter ─────────────────────────────────────────────────
+  const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
+  const EMPTY_PLAYER_ROW = { name: "", short_code: "" };
+  const [gameSessions, setGameSessions] = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+  const [sessionView, setSessionView] = useState("list");
+  const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
+  const [sessionPlayers, setSessionPlayers] = useState([{ ...EMPTY_PLAYER_ROW }, { ...EMPTY_PLAYER_ROW }]);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [addPlayerForm, setAddPlayerForm] = useState(EMPTY_PLAYER_ROW);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+
   const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "PT", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
   const [listForm, setListForm] = useState(EMPTY_LIST_FORM);
@@ -589,6 +602,132 @@ export default function App() {
     }
   }
 
+  // ── Game Session handlers ─────────────────────────────────────────────────
+  async function loadGameSessions() {
+    const data = await listGameSessions();
+    setGameSessions(data ?? []);
+  }
+
+  async function handleCreateSession(e) {
+    e.preventDefault();
+    setSessionLoading(true);
+    setSessionError("");
+    try {
+      const validPlayers = sessionPlayers.filter(p => p.name.trim() && p.short_code.trim());
+      const session = await createGameSession({
+        ...sessionForm,
+        starting_life: Number(sessionForm.starting_life),
+        players: validPlayers,
+      });
+      setGameSessions(prev => [session, ...prev]);
+      setActiveSession(session);
+      setSessionView("play");
+      setSessionForm(EMPTY_SESSION_FORM);
+      setSessionPlayers([{ ...EMPTY_PLAYER_ROW }, { ...EMPTY_PLAYER_ROW }]);
+    } catch (err) {
+      setSessionError(err.message);
+    } finally {
+      setSessionLoading(false);
+    }
+  }
+
+  async function handleOpenSession(id) {
+    const session = await getGameSession(id);
+    setActiveSession(session);
+    setSessionView("play");
+  }
+
+  async function handleUpdatePlayer(playerId, field, delta) {
+    if (!activeSession || activeSession.status === "finished") return;
+    const player = activeSession.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const newLife = field === "life" ? player.life + delta : player.life;
+    const newPoison = field === "poison" ? Math.max(0, player.poison + delta) : player.poison;
+    const newCmdDmg = field === "commander_damage_received" ? Math.max(0, player.commander_damage_received + delta) : player.commander_damage_received;
+
+    // Optimistic update
+    setActiveSession(prev => prev ? ({
+      ...prev,
+      players: prev.players.map(p => p.id === playerId
+        ? { ...p, life: newLife, poison: newPoison, commander_damage_received: newCmdDmg }
+        : p),
+    }) : prev);
+
+    try {
+      const updated = await updateGameSessionPlayer(activeSession.id, playerId, {
+        life: newLife, poison: newPoison, commander_damage_received: newCmdDmg,
+      });
+      setActiveSession(prev => prev ? ({
+        ...prev,
+        players: prev.players.map(p => p.id === playerId ? updated : p),
+      }) : prev);
+    } catch {
+      const session = await getGameSession(activeSession.id);
+      setActiveSession(session);
+    }
+  }
+
+  async function handleAddSessionPlayer(e) {
+    e.preventDefault();
+    if (!activeSession) return;
+    setSessionError("");
+    try {
+      const player = await addGameSessionPlayer(activeSession.id, addPlayerForm);
+      setActiveSession(prev => prev ? ({ ...prev, players: [...prev.players, player] }) : prev);
+      setAddPlayerForm({ ...EMPTY_PLAYER_ROW });
+      setShowAddPlayer(false);
+      await loadGameSessions();
+    } catch (err) {
+      setSessionError(err.message);
+    }
+  }
+
+  async function handleRemoveSessionPlayer(playerId) {
+    if (!activeSession) return;
+    try {
+      await deleteGameSessionPlayer(activeSession.id, playerId);
+      setActiveSession(prev => prev ? ({
+        ...prev,
+        players: prev.players.filter(p => p.id !== playerId),
+      }) : prev);
+      await loadGameSessions();
+    } catch (err) {
+      setSessionError(err.message);
+    }
+  }
+
+  async function handleResetSession() {
+    if (!activeSession) return;
+    const session = await resetGameSession(activeSession.id);
+    setActiveSession(session);
+    await loadGameSessions();
+  }
+
+  async function handleFinishSession() {
+    if (!activeSession) return;
+    const session = await finishGameSession(activeSession.id);
+    setActiveSession(session);
+    await loadGameSessions();
+  }
+
+  async function handleRestoreSession(sessionId) {
+    const session = await restoreGameSession(sessionId);
+    setActiveSession(session);
+    setSessionView("play");
+    await loadGameSessions();
+  }
+
+  async function handleDeleteSession(sessionId) {
+    if (!confirm("Excluir esta sessão?")) return;
+    await deleteGameSession(sessionId);
+    if (activeSession?.id === sessionId) {
+      setActiveSession(null);
+      setSessionView("list");
+    }
+    await loadGameSessions();
+  }
+
   async function loadDeckCards(deckId) {
     const dc = await listCards({ deckId, pageSize: 500 });
     setDeckCards(dc.data ?? []);
@@ -606,6 +745,7 @@ export default function App() {
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
+  useEffect(() => { loadGameSessions(); }, []);
   useEffect(() => {
     listColorCombos().then(data => setAvailableColors(data ?? []));
   }, []);
@@ -1059,6 +1199,9 @@ export default function App() {
         </button>
         <button role="tab" type="button" aria-selected={activeTab === "wishlist"} className={`tab tab-wishlist${activeTab === "wishlist" ? " active" : ""}`} onClick={() => setActiveTab("wishlist")}>
           <span className="tab-icon" aria-hidden="true">⭐</span><span className="tab-label">Wishlist</span>
+        </button>
+        <button role="tab" type="button" aria-selected={activeTab === "score"} className={`tab tab-score${activeTab === "score" ? " active" : ""}`} onClick={() => setActiveTab("score")}>
+          <span className="tab-icon" aria-hidden="true">🎮</span><span className="tab-label">Pontuação</span>
         </button>
       </nav>
 
@@ -1751,6 +1894,305 @@ export default function App() {
                   </div>
                 </form>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ABA PONTUAÇÃO ── */}
+      {activeTab === "score" && (
+        <div className="score-page">
+
+          {/* Vista: Lista de sessões */}
+          {sessionView === "list" && (
+            <div className="score-list-page">
+              <div className="score-list-header">
+                <h2>Sessões de Jogo</h2>
+                <button type="button" className="score-btn-primary" onClick={() => { setSessionError(""); setSessionView("create"); }}>
+                  + Nova Sessão
+                </button>
+              </div>
+              {gameSessions.length === 0 ? (
+                <div className="score-empty">
+                  <p>Nenhuma sessão ainda.</p>
+                  <button type="button" className="score-btn-primary" onClick={() => { setSessionError(""); setSessionView("create"); }}>
+                    Criar primeira sessão
+                  </button>
+                </div>
+              ) : (
+                <div className="score-session-cards">
+                  {gameSessions.map(s => (
+                    <div key={s.id} className={`score-session-card${s.status === "finished" ? " finished" : ""}`}>
+                      <div className="score-session-card-header">
+                        <span className={`score-badge ${s.status}`}>
+                          {s.status === "active" ? "Ativo" : "Encerrado"}
+                        </span>
+                        <span className="score-format-tag">{s.format}</span>
+                        <span className="score-life-tag">♥ {s.starting_life}</span>
+                      </div>
+                      <h3 className="score-session-name">{s.name}</h3>
+                      <div className="score-players-summary">
+                        {(s.players || []).map(p => (
+                          <span key={p.id} className={`score-player-chip${p.is_eliminated ? " elim" : ""}`}>
+                            {p.short_code}{p.is_eliminated ? " ☠" : ""}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="score-session-date">
+                        {new Date(s.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                        {s.ended_at && ` — Encerrada ${new Date(s.ended_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
+                      </p>
+                      <div className="score-session-actions">
+                        <button type="button" className="score-btn-primary" onClick={() => handleOpenSession(s.id)}>
+                          {s.status === "active" ? "▶ Jogar" : "👁 Ver"}
+                        </button>
+                        {s.status === "finished" && (
+                          <button type="button" className="score-btn-secondary" onClick={() => handleRestoreSession(s.id)}>↩ Restaurar</button>
+                        )}
+                        <button type="button" className="score-btn-danger" onClick={() => handleDeleteSession(s.id)}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Vista: Criar sessão */}
+          {sessionView === "create" && (
+            <div className="score-create-page">
+              <button type="button" className="score-back-btn" onClick={() => setSessionView("list")}>← Voltar</button>
+              <h2>Nova Sessão de Jogo</h2>
+              <form className="score-form" onSubmit={handleCreateSession}>
+                <label>
+                  Nome da sessão *
+                  <input
+                    required
+                    placeholder="Commander sexta-feira"
+                    value={sessionForm.name}
+                    onChange={e => setSessionForm({ ...sessionForm, name: e.target.value })}
+                  />
+                </label>
+                <div className="score-form-row">
+                  <label>
+                    Formato
+                    <select
+                      value={sessionForm.format}
+                      onChange={e => {
+                        const fmt = e.target.value;
+                        const life = fmt === "Casual" ? 20 : 40;
+                        setSessionForm({ ...sessionForm, format: fmt, starting_life: life });
+                      }}
+                    >
+                      <option>Commander</option>
+                      <option>Casual</option>
+                      <option>Standard</option>
+                      <option>Modern</option>
+                      <option>Pioneer</option>
+                      <option>Legacy</option>
+                    </select>
+                  </label>
+                  <label>
+                    Vida inicial
+                    <input
+                      type="number"
+                      min={1}
+                      value={sessionForm.starting_life}
+                      onChange={e => setSessionForm({ ...sessionForm, starting_life: Number(e.target.value) })}
+                    />
+                  </label>
+                </div>
+
+                <div className="score-players-header">
+                  <h3>Jogadores <span className="score-player-count">({sessionPlayers.length}/8)</span></h3>
+                  {sessionPlayers.length < 8 && (
+                    <button
+                      type="button"
+                      className="score-btn-secondary"
+                      onClick={() => setSessionPlayers([...sessionPlayers, { ...EMPTY_PLAYER_ROW }])}
+                    >
+                      + Jogador
+                    </button>
+                  )}
+                </div>
+
+                {sessionPlayers.map((p, i) => (
+                  <div key={i} className="score-player-row">
+                    <input
+                      placeholder="Nome do jogador"
+                      value={p.name}
+                      required
+                      onChange={e => {
+                        const ps = [...sessionPlayers];
+                        ps[i] = { ...ps[i], name: e.target.value };
+                        setSessionPlayers(ps);
+                      }}
+                    />
+                    <input
+                      className="score-short-input"
+                      placeholder="Sigla"
+                      maxLength={3}
+                      value={p.short_code}
+                      required
+                      onChange={e => {
+                        const ps = [...sessionPlayers];
+                        ps[i] = { ...ps[i], short_code: e.target.value.toUpperCase() };
+                        setSessionPlayers(ps);
+                      }}
+                    />
+                    {sessionPlayers.length > 2 && (
+                      <button
+                        type="button"
+                        className="score-remove-row"
+                        onClick={() => setSessionPlayers(sessionPlayers.filter((_, j) => j !== i))}
+                      >✕</button>
+                    )}
+                  </div>
+                ))}
+
+                {sessionError && <p className="score-error">{sessionError}</p>}
+                <div className="score-form-actions">
+                  <button type="button" className="score-btn-secondary" onClick={() => setSessionView("list")}>Cancelar</button>
+                  <button type="submit" className="score-btn-primary" disabled={sessionLoading}>
+                    {sessionLoading ? "Criando…" : "✓ Criar Sessão"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Vista: Jogar */}
+          {sessionView === "play" && activeSession && (
+            <div className="score-play-page">
+              <div className="score-play-header">
+                <button type="button" className="score-back-btn" onClick={() => { setSessionView("list"); setActiveSession(null); }}>
+                  ← Sessões
+                </button>
+                <div className="score-play-meta">
+                  <span className="score-play-name">{activeSession.name}</span>
+                  <span className="score-format-tag">{activeSession.format}</span>
+                  <span className={`score-badge ${activeSession.status}`}>
+                    {activeSession.status === "active" ? "Ativo" : "Encerrado"}
+                  </span>
+                </div>
+                <div className="score-play-actions">
+                  {activeSession.status === "active" && (
+                    <>
+                      <button type="button" className="score-btn-secondary" onClick={handleResetSession}>↺ Reset</button>
+                      <button type="button" className="score-btn-danger" onClick={handleFinishSession}>■ Encerrar</button>
+                    </>
+                  )}
+                  {activeSession.status === "finished" && (
+                    <button type="button" className="score-btn-secondary" onClick={() => handleRestoreSession(activeSession.id)}>↩ Restaurar</button>
+                  )}
+                </div>
+              </div>
+
+              {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
+
+              <div className={`score-players-grid score-grid-${Math.min(activeSession.players.length, 4)}`}>
+                {activeSession.players.map(player => (
+                  <div key={player.id} className={`score-player-card${player.is_eliminated ? " elim" : ""}`}>
+                    {player.is_eliminated && <div className="score-skull">☠</div>}
+
+                    <div className="score-player-top">
+                      <span className="score-player-code">{player.short_code}</span>
+                      <span className="score-player-name">{player.name}</span>
+                      {player.is_eliminated && (
+                        <span className="score-elim-reason">
+                          {player.eliminated_reason === "life" && "Sem vida"}
+                          {player.eliminated_reason === "commander_damage" && "Cmd damage"}
+                          {player.eliminated_reason === "poison" && "Tóxico"}
+                        </span>
+                      )}
+                      {activeSession.status === "active" && activeSession.players.length > 2 && (
+                        <button
+                          type="button"
+                          className="score-remove-player"
+                          title="Remover jogador"
+                          onClick={() => handleRemoveSessionPlayer(player.id)}
+                        >✕</button>
+                      )}
+                    </div>
+
+                    {/* Vida */}
+                    <div className="score-stat">
+                      <span className="score-stat-label">Vida</span>
+                      <span className={`score-stat-val${player.life <= 0 ? " score-val-dead" : player.life <= 5 ? " score-val-low" : ""}`}>
+                        {player.life}
+                      </span>
+                      <div className="score-ctrl">
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
+                      </div>
+                    </div>
+
+                    {/* Dano de comandante */}
+                    <div className="score-stat">
+                      <span className="score-stat-label">
+                        Comandante <span className="score-stat-limit">/ 21</span>
+                      </span>
+                      <span className={`score-stat-val score-stat-val-md${player.commander_damage_received >= 21 ? " score-val-dead" : player.commander_damage_received >= 15 ? " score-val-low" : ""}`}>
+                        {player.commander_damage_received}
+                      </span>
+                      <div className="score-ctrl">
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
+                      </div>
+                    </div>
+
+                    {/* Tóxico */}
+                    <div className="score-stat score-stat-poison">
+                      <span className="score-stat-label">
+                        Tóxico <span className="score-stat-limit">/ 10</span>
+                      </span>
+                      <span className={`score-stat-val score-stat-val-sm${player.poison >= 10 ? " score-val-dead" : player.poison >= 7 ? " score-val-low" : ""}`}>
+                        {player.poison}
+                      </span>
+                      <div className="score-ctrl score-ctrl-sm">
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "poison", -1)}>−1</button>
+                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "poison", +1)}>+1</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Adicionar jogador */}
+              {activeSession.status === "active" && (
+                <div className="score-add-player-area">
+                  {showAddPlayer ? (
+                    <form className="score-add-player-form" onSubmit={handleAddSessionPlayer}>
+                      <input
+                        placeholder="Nome"
+                        value={addPlayerForm.name}
+                        required
+                        onChange={e => setAddPlayerForm({ ...addPlayerForm, name: e.target.value })}
+                      />
+                      <input
+                        className="score-short-input"
+                        placeholder="Sigla"
+                        maxLength={3}
+                        value={addPlayerForm.short_code}
+                        required
+                        onChange={e => setAddPlayerForm({ ...addPlayerForm, short_code: e.target.value.toUpperCase() })}
+                      />
+                      <button type="submit" className="score-btn-primary">Adicionar</button>
+                      <button type="button" className="score-btn-secondary" onClick={() => setShowAddPlayer(false)}>Cancelar</button>
+                    </form>
+                  ) : (
+                    activeSession.players.length < 8 && (
+                      <button type="button" className="score-btn-secondary" onClick={() => setShowAddPlayer(true)}>
+                        + Adicionar Jogador
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -11,6 +11,7 @@ import (
 	"magic-collection-api/internal/cards"
 	"magic-collection-api/internal/database"
 	"magic-collection-api/internal/decks"
+	game_sessions "magic-collection-api/internal/game_sessions"
 	"magic-collection-api/internal/importer"
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/wishlist"
@@ -59,6 +60,10 @@ func main() {
 	wishlistRepo := wishlist.NewRepository(db)
 	wishlistSvc := wishlist.NewService(wishlistRepo, mtgClient)
 	wishlistHandler := wishlist.NewHandler(wishlistSvc)
+
+	gameSessionRepo := game_sessions.NewRepository(db)
+	gameSessionSvc := game_sessions.NewService(gameSessionRepo)
+	gameSessionHandler := game_sessions.NewHandler(gameSessionSvc)
 
 	authRepo := auth.NewRepository(db)
 	authSvc := auth.NewService(authRepo)
@@ -114,6 +119,17 @@ func main() {
 	api.PUT("/wishlist/:id", wishlistHandler.Update)
 	api.DELETE("/wishlist/:id", wishlistHandler.Delete)
 	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
+
+	api.GET("/game-sessions", gameSessionHandler.List)
+	api.POST("/game-sessions", gameSessionHandler.Create)
+	api.GET("/game-sessions/:id", gameSessionHandler.GetByID)
+	api.DELETE("/game-sessions/:id", gameSessionHandler.Delete)
+	api.POST("/game-sessions/:id/players", gameSessionHandler.AddPlayer)
+	api.PATCH("/game-sessions/:id/players/:player_id", gameSessionHandler.UpdatePlayer)
+	api.DELETE("/game-sessions/:id/players/:player_id", gameSessionHandler.DeletePlayer)
+	api.POST("/game-sessions/:id/reset", gameSessionHandler.Reset)
+	api.POST("/game-sessions/:id/finish", gameSessionHandler.Finish)
+	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
 
 	router.Run(":8080")
 }
