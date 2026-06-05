@@ -134,6 +134,33 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS wishlist_cards (
+			id                BIGINT        NOT NULL AUTO_INCREMENT,
+			mtg_id            VARCHAR(64)   NOT NULL DEFAULT '',
+			set_code          VARCHAR(10)   NOT NULL,
+			collection_number VARCHAR(20)   NOT NULL,
+			name              VARCHAR(255)  NOT NULL DEFAULT '',
+			printed_name      VARCHAR(255)  NOT NULL DEFAULT '',
+			image_uri         TEXT,
+			artist            VARCHAR(255)  NOT NULL DEFAULT '',
+			rarity            VARCHAR(10)   NOT NULL DEFAULT '',
+			colors            TEXT,
+			color             VARCHAR(100)  NOT NULL DEFAULT '',
+			price_usd         DECIMAL(10,2) NULL,
+			price_usd_foil    DECIMAL(10,2) NULL,
+			foil              TINYINT(1)    NOT NULL DEFAULT 0,
+			reason            TEXT,
+			acquired          TINYINT(1)    NOT NULL DEFAULT 0,
+			created_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
 	seedUsers(db)
 
 	return db, nil

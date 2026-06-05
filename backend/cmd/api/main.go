@@ -13,6 +13,7 @@ import (
 	"magic-collection-api/internal/decks"
 	"magic-collection-api/internal/importer"
 	"magic-collection-api/internal/mtgapi"
+	"magic-collection-api/internal/wishlist"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,6 +55,10 @@ func main() {
 
 	battleRepo := battles.NewRepository(db)
 	battleHandler := battles.NewHandler(battleRepo)
+
+	wishlistRepo := wishlist.NewRepository(db)
+	wishlistSvc := wishlist.NewService(wishlistRepo, mtgClient)
+	wishlistHandler := wishlist.NewHandler(wishlistSvc)
 
 	authRepo := auth.NewRepository(db)
 	authSvc := auth.NewService(authRepo)
@@ -102,6 +107,13 @@ func main() {
 	api.GET("/battles", battleHandler.List)
 	api.POST("/battles", battleHandler.Create)
 	api.DELETE("/battles/:id", battleHandler.Delete)
+
+	api.GET("/wishlist", wishlistHandler.List)
+	api.POST("/wishlist", wishlistHandler.Create)
+	api.GET("/wishlist/:id", wishlistHandler.GetByID)
+	api.PUT("/wishlist/:id", wishlistHandler.Update)
+	api.DELETE("/wishlist/:id", wishlistHandler.Delete)
+	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
 
 	router.Run(":8080")
 }

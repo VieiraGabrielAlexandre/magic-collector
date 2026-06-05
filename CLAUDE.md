@@ -224,3 +224,9 @@ Para alterações visuais/responsivas, leia obrigatoriamente:
 
 A spec define o resultado esperado.
 O plan define a ordem de execução.
+
+Para implementar Wishlist, leia `docs/wishlist-feature-spec.md`.
+
+Para implementar Life Counter/Pontuação, leia `docs/life-counter-feature-spec.md`.
+
+Implemente uma feature por vez. Antes de codificar, faça diagnóstico e plano de arquivos impactados. Não misture Wishlist com Pontuação na mesma execução.

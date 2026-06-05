@@ -251,3 +251,55 @@ export async function deleteBattle(id) {
   if (!res.ok) throw new Error("Erro ao remover batalha");
   return res.json();
 }
+
+// ── Wishlist ──────────────────────────────────────────────────────────────────
+
+export async function listWishlist() {
+  const res = await authFetch(`${BASE_URL}/wishlist`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createWishlistItem(data) {
+  const res = await authFetch(`${BASE_URL}/wishlist`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao adicionar à wishlist");
+  return json;
+}
+
+export async function getWishlistItem(id) {
+  const res = await authFetch(`${BASE_URL}/wishlist/${id}`);
+  if (!res.ok) throw new Error("Item não encontrado");
+  return res.json();
+}
+
+export async function updateWishlistItem(id, data) {
+  const res = await authFetch(`${BASE_URL}/wishlist/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Erro ao atualizar item");
+  return res.json();
+}
+
+export async function deleteWishlistItem(id) {
+  const res = await authFetch(`${BASE_URL}/wishlist/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover item");
+  return res.json();
+}
+
+export async function acquireWishlistItem(id, data) {
+  const res = await authFetch(`${BASE_URL}/wishlist/${id}/acquire`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao adquirir carta");
+  return json;
+}
