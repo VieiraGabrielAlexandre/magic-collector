@@ -1191,8 +1191,10 @@ export default function App() {
               <div className="list-header">
                 <div className="list-header-top">
                   <h2>Meus Decks <span className="total-badge">{decks.length}</span></h2>
-                  <button type="button" className="import-precon-btn" onClick={() => { setImportModal(true); setImportResult(null); setImportError(""); setImportForm(EMPTY_IMPORT_FORM); }}>Importar Pré-con</button>
-                  <button type="button" className="import-precon-btn" onClick={() => { setListModal(true); setListResult(null); setListError(""); setListForm(EMPTY_LIST_FORM); }}>Importar Lista</button>
+                  <div className="deck-import-btns">
+                    <button type="button" className="import-precon-btn" onClick={() => { setImportModal(true); setImportResult(null); setImportError(""); setImportForm(EMPTY_IMPORT_FORM); }}>Importar Pré-con</button>
+                    <button type="button" className="import-precon-btn" onClick={() => { setListModal(true); setListResult(null); setListError(""); setListForm(EMPTY_LIST_FORM); }}>Importar Lista</button>
+                  </div>
                 </div>
               </div>
               <div className="list deck-list">

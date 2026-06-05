@@ -826,16 +826,17 @@ button.danger:hover:not(:disabled) {
 
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 10px;
+  right: 10px;
   background: transparent;
   border: 1px solid var(--border-dim);
   color: var(--text-muted);
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 44px;
+  height: 44px;
+  min-height: unset;
+  border-radius: 8px;
   padding: 0;
-  font-size: 13px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1766,6 +1767,21 @@ input[type="radio"] {
   background: var(--gold-glow);
   border-color: var(--gold);
 }
+
+/* Wrapper dos dois botões de importar deck */
+.deck-import-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.deck-import-btns .import-precon-btn {
+  flex: 1 1 130px;
+  text-align: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .modal-import {
   max-width: 520px;
 }
@@ -1834,12 +1850,14 @@ input[type="radio"] {
   .tab  { padding: 10px 16px; min-height: 44px; font-size: 12px; white-space: nowrap; }
 
   /* Card detail modal */
-  .modal-top img  { width: 130px; }
+  .modal-top img  { width: 160px; }
   .modal-grid     { grid-template-columns: repeat(2, 1fr); }
 
   /* Deck manage */
   .deck-manage-grid    { grid-template-columns: 1fr; }
   .deck-manage-header  { gap: 12px; }
+  .deck-import-btns    { width: 100%; }
+  .deck-import-btns .import-precon-btn { flex: 1; }
 
   /* Battles */
   .battles-grid   { grid-template-columns: 1fr; }
@@ -1973,12 +1991,43 @@ input[type="radio"] {
   /* Deck list on card items */
   .list-item-info .deck-badge { max-width: 120px; }
 
-  /* Battle */
+  /* Fase 5 — Deck list items: wrap no mobile */
+  .deck-list-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px 14px;
+  }
+  .deck-list-icon { align-self: center; }
+  .deck-list-body { flex: 1; min-width: 0; }
+  .deck-list-item .actions {
+    flex: 0 0 100%;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .deck-list-item .actions > button {
+    flex: 1;
+    min-height: 40px;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  .deck-list-item .actions > button.danger { flex: 0 0 44px; }
+  /* deck-desc sem max-width fixo no mobile */
+  .deck-desc { max-width: 100%; white-space: normal; }
+
+  /* Fase 5 — Deck card item (manage): mantém thumbnail + info na mesma linha */
+  .deck-card-item .list-item-info { flex: 1 1 0%; }
+
+  /* Fase 6 — Battle */
   .bstat     { padding: 12px 10px; }
   .bstat-num { font-size: 28px; }
   .battle-item { padding: 10px 10px; gap: 10px; }
-  .battle-date { display: none; }
+  /* Mostrar data de forma compacta em vez de ocultar */
+  .battle-date { font-size: 10px; margin-left: 0; }
   .battle-del  { padding: 5px 8px; }
+
+  /* Fase 7 — Modal actions: empilha botões se necessário */
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions button { min-height: 44px; }
 
   /* Eval panel */
   .eval-panel { padding: 16px; }
@@ -2065,9 +2114,7 @@ input[type="radio"] {
   }
   .sort-btn { flex-shrink: 0; scroll-snap-align: start; }
 
-  /* Deck list — empilha ações em mobile estreito */
-  .deck-list-item { flex-wrap: wrap; gap: 8px; }
-  .deck-list-item .actions { margin-left: auto; }
+  /* Deck list — ações já tratadas no bloco ≤680px */
 }
 
 /* ═══════════════════════════════════════════════════════════════════
