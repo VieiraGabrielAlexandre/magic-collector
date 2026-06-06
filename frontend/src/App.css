@@ -52,6 +52,7 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  scrollbar-gutter: stable;
 }
 
 #root {
@@ -1000,7 +1001,8 @@ button.danger:hover:not(:disabled) {
 
 /* ── Tabs de navegação ─────────────────────────────────────────────────── */
 .tabs {
-  display: flex;
+  display: inline-flex;
+  justify-content: center;
   gap: 4px;
   margin-bottom: 28px;
   border-bottom: 1px solid var(--border);
@@ -4031,11 +4033,17 @@ input[type="radio"] {
   min-width: 0;
 }
 
-/* Grid de cards */
+/* Force wishlist panel to occupy full available column like other list-sections */
+.wishlist-list-panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Use stacked list layout to match Decks/Battles list behavior */
 .wishlist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
 }
 
 /* Card individual */
@@ -4047,6 +4055,7 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   transition: box-shadow 0.2s, border-color 0.2s;
+  min-height: 320px;
 }
 
 .wishlist-card:hover {
@@ -4362,9 +4371,7 @@ input[type="radio"] {
 }
 
 @media (max-width: 640px) {
-  .wishlist-grid {
-    grid-template-columns: 1fr;
-  }
+  .wishlist-grid { grid-template-columns: 1fr; gap: 8px; }
 
   .wishlist-card {
     flex-direction: row;
@@ -4393,15 +4400,18 @@ input[type="radio"] {
 }
 
 @media (min-width: 641px) and (max-width: 899px) {
-  .wishlist-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .wishlist-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (min-width: 1280px) {
-  .wishlist-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  }
+  .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+}
+@media (max-width: 420px) {
+  .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -4414,6 +4424,44 @@ input[type="radio"] {
 .score-page {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ── List view panels ── */
+.score-form-panel h2 { color: var(--gold); }
+.score-form-intro { font-size: 0.88rem; color: var(--text-muted); margin: 0; }
+.score-form-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+.score-form-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 10px 4px;
+}
+.score-form-stat-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
+.score-form-stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.score-list-panel { min-width: 0; }
+.score-empty-inline {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 2rem 0;
+  text-align: center;
 }
 
 /* ── Shared buttons ── */
@@ -4596,11 +4644,10 @@ input[type="radio"] {
 
 /* ── Create page ── */
 .score-create-page {
-  padding: 1rem;
   max-width: 560px;
   margin: 0 auto;
 }
-.score-create-page h2 { margin: 0.75rem 0 1rem; }
+.score-create-page .card.form { margin-top: 0.75rem; }
 
 .score-form {
   display: flex;

@@ -1619,12 +1619,11 @@ export default function App() {
 
       {/* ── ABA WISHLIST ── */}
       {activeTab === "wishlist" && (
-        <div className="wishlist-page">
-          <div className="wishlist-layout">
+        <>
+          <section className="grid">
 
             {/* Formulário */}
-            <section className="card wishlist-form-panel">
-              <form className="form" onSubmit={handleWishlistCreate}>
+            <form className="card form wishlist-form-panel" onSubmit={handleWishlistCreate}>
                 <h2>Adicionar à Wishlist</h2>
                 <div className="qa-row-2col">
                   <label>
@@ -1667,11 +1666,10 @@ export default function App() {
                 <button type="submit" className="wishlist-submit-btn" disabled={wishlistSubmitting}>
                   {wishlistSubmitting ? "Buscando na Scryfall…" : "＋ Adicionar à Wishlist"}
                 </button>
-              </form>
-            </section>
+            </form>
 
             {/* Lista */}
-            <section className="wishlist-list-panel">
+            <section className="card list-section">
               <div className="list-header">
                 <h2>
                   Cartas Desejadas
@@ -1767,7 +1765,7 @@ export default function App() {
                 </div>
               )}
             </section>
-          </div>
+          </section>
 
           {/* Modal de Detalhes */}
           {wishlistDetail && (
@@ -1896,30 +1894,47 @@ export default function App() {
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* ── ABA PONTUAÇÃO ── */}
       {activeTab === "score" && (
-        <div className="score-page">
+        <>
 
           {/* Vista: Lista de sessões */}
           {sessionView === "list" && (
-            <div className="score-list-page">
-              <div className="score-list-header">
-                <h2>Sessões de Jogo</h2>
-                <button type="button" className="score-btn-primary" onClick={() => { setSessionError(""); setSessionView("create"); }}>
+            <section className="grid">
+              <section className="card form score-form-panel">
+                <h2>Pontuação</h2>
+                <p className="score-form-intro">Gerencie sessões de jogo e controle de vida.</p>
+                <div className="score-form-stats">
+                  <div className="score-form-stat">
+                    <span className="score-form-stat-num">{gameSessions.length}</span>
+                    <span className="score-form-stat-label">Sessões</span>
+                  </div>
+                  <div className="score-form-stat">
+                    <span className="score-form-stat-num">{gameSessions.filter(s => s.status === "active").length}</span>
+                    <span className="score-form-stat-label">Ativas</span>
+                  </div>
+                  <div className="score-form-stat">
+                    <span className="score-form-stat-num">{gameSessions.filter(s => s.status === "finished").length}</span>
+                    <span className="score-form-stat-label">Encerradas</span>
+                  </div>
+                </div>
+                {sessionError && <p className="form-error">{sessionError}</p>}
+                <button type="button" onClick={() => { setSessionError(""); setSessionView("create"); }}>
                   + Nova Sessão
                 </button>
-              </div>
-              {gameSessions.length === 0 ? (
-                <div className="score-empty">
-                  <p>Nenhuma sessão ainda.</p>
-                  <button type="button" className="score-btn-primary" onClick={() => { setSessionError(""); setSessionView("create"); }}>
-                    Criar primeira sessão
-                  </button>
+              </section>
+              <section className="card list-section score-list-panel">
+                <div className="list-header">
+                  <div className="list-header-top">
+                    <h2>Sessões de Jogo <span className="total-badge">{gameSessions.length}</span></h2>
+                  </div>
                 </div>
-              ) : (
+                {gameSessions.length === 0 ? (
+                  <p className="score-empty-inline">Nenhuma sessão ainda.</p>
+                ) : (
                 <div className="score-session-cards">
                   {gameSessions.map(s => (
                     <div key={s.id} className={`score-session-card${s.status === "finished" ? " finished" : ""}`}>
@@ -1954,16 +1969,17 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+                )}
+              </section>
+            </section>
           )}
 
           {/* Vista: Criar sessão */}
           {sessionView === "create" && (
             <div className="score-create-page">
               <button type="button" className="score-back-btn" onClick={() => setSessionView("list")}>← Voltar</button>
-              <h2>Nova Sessão de Jogo</h2>
-              <form className="score-form" onSubmit={handleCreateSession}>
+              <form className="card form" onSubmit={handleCreateSession}>
+                <h2>Nova Sessão de Jogo</h2>
                 <label>
                   Nome da sessão *
                   <input
@@ -2195,7 +2211,7 @@ export default function App() {
               )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* ── MODAL BUSCA RÁPIDA ── */}
