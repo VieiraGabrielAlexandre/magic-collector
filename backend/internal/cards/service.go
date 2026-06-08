@@ -92,6 +92,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.Color = ColorsJSONToDisplay(card.Colors)
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
+		card.FullArt = ext.FullArt
 	}
 
 	return s.repository.Create(card)

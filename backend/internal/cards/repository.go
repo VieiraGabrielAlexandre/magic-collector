@@ -24,6 +24,7 @@ type ListParams struct {
 	Order        string
 	DeckIDFilter *int   // nil = all; 0 = without deck; >0 = specific deck
 	FoilOnly     bool   // true = somente foil
+	FullArtOnly  bool   // true = somente full art
 	RarityFilter string // "" = todas; "L","C","U","R","M","T"
 	ColorsFilter string // "" = todas; "W" | "U,G" | "W,U,B" etc.
 }
@@ -52,7 +53,7 @@ var allowedSortFields = map[string]string{
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url`
+	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -91,6 +92,9 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	}
 	if params.FoilOnly {
 		clauses = append(clauses, "foil = 1")
+	}
+	if params.FullArtOnly {
+		clauses = append(clauses, "full_art = 1")
 	}
 	if params.RarityFilter != "" {
 		clauses = append(clauses, "rarity = ?")
@@ -142,12 +146,12 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	var result []Card
 	for rows.Next() {
 		var c Card
-		var foilInt, prereleaseInt, commanderInt int
+		var foilInt, prereleaseInt, commanderInt, fullArtInt int
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 		)
 		if err != nil {
 			return ListResult{}, err
@@ -155,6 +159,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 		c.Foil = foilInt == 1
 		c.PreRelease = prereleaseInt == 1
 		c.Commander = commanderInt == 1
+		c.FullArt = fullArtInt == 1
 		result = append(result, c)
 	}
 
@@ -177,8 +182,8 @@ func (r *Repository) Create(card Card) (int64, error) {
 	stmt, err := r.db.Prepare("INSERT INTO cards " +
 		"(mtg_id, name, color, `type`, subtitle, collection_number," +
 		" rarity, set_code, mana_cost, colors, language, year," +
-		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url)" +
-		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
@@ -196,12 +201,16 @@ func (r *Repository) Create(card Card) (int64, error) {
 	if card.Commander {
 		commanderInt = 1
 	}
+	fullArtInt := 0
+	if card.FullArt {
+		fullArtInt = 1
+	}
 
 	result, err := stmt.Exec(
 		card.MTGID, card.Name, card.Color, card.Type, card.Subtitle,
 		card.CollectionNumber, card.Rarity, card.SetCode, card.ManaCost,
 		card.Colors, card.Language, card.Year, card.Artist, card.Company,
-		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL,
+		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL, fullArtInt,
 	)
 	if err != nil {
 		return 0, err
@@ -215,12 +224,12 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 		"SELECT "+selectCols+" FROM cards WHERE id = ?", id)
 
 	var c Card
-	var foilInt, prereleaseInt, commanderInt int
+	var foilInt, prereleaseInt, commanderInt, fullArtInt int
 	err := row.Scan(
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 		&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
+		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 	)
 	if err != nil {
 		return nil, err
@@ -228,6 +237,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 	c.Foil = foilInt == 1
 	c.PreRelease = prereleaseInt == 1
 	c.Commander = commanderInt == 1
+	c.FullArt = fullArtInt == 1
 	return &c, nil
 }
 
@@ -244,14 +254,18 @@ func (r *Repository) Update(id string, card Card) error {
 	if card.Commander {
 		commanderInt = 1
 	}
+	fullArtIntU := 0
+	if card.FullArt {
+		fullArtIntU = 1
+	}
 	_, err := r.db.Exec(
 		"UPDATE cards SET name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?,"+
-			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=? WHERE id=?",
+			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=?, full_art=? WHERE id=?",
 		card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist,
 		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
-		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, id,
+		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, fullArtIntU, id,
 	)
 	return err
 }
@@ -308,12 +322,12 @@ func (r *Repository) ListAll() ([]Card, error) {
 	var result []Card
 	for rows.Next() {
 		var c Card
-		var foilInt, prereleaseInt, commanderInt int
+		var foilInt, prereleaseInt, commanderInt, fullArtInt int
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 		)
 		if err != nil {
 			return nil, err
@@ -321,6 +335,7 @@ func (r *Repository) ListAll() ([]Card, error) {
 		c.Foil = foilInt == 1
 		c.PreRelease = prereleaseInt == 1
 		c.Commander = commanderInt == 1
+		c.FullArt = fullArtInt == 1
 		result = append(result, c)
 	}
 	return result, nil

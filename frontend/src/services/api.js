@@ -43,10 +43,11 @@ export async function getMe() {
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, rarity, colors } = {}) {
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
   if (foil) params.set("foil", "1");
+  if (full_art) params.set("full_art", "1");
   if (rarity) params.set("rarity", rarity);
   if (colors) params.set("colors", colors);
   const res = await authFetch(`${BASE_URL}/cards?${params}`);

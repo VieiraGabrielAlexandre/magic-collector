@@ -7,7 +7,7 @@ import "./App.css";
 const EMPTY_FORM = {
   name: "", color: "", type: "", subtitle: "", collection_number: "",
   rarity: "", set_code: "", language: "PT", year: "", artist: "",
-  company: "Wizards of the Coast", foil: false, prerelease: false, commander: false, deck_id: 0, quantity: 1,
+  company: "Wizards of the Coast", foil: false, full_art: false, prerelease: false, commander: false, deck_id: 0, quantity: 1,
   condition: "played", notes: "",
 };
 
@@ -424,6 +424,7 @@ export default function App() {
   const [sort, setSort] = useState("name");
   const [order, setOrder] = useState("asc");
   const [filterFoil, setFilterFoil] = useState("");
+  const [filterFullArt, setFilterFullArt] = useState(false);
   const [filterRarity, setFilterRarity] = useState("");
   const [filterDeck, setFilterDeck] = useState("");
   const [filterColors, setFilterColors] = useState("");
@@ -505,6 +506,8 @@ export default function App() {
   const [sessionError, setSessionError] = useState("");
   const [addPlayerForm, setAddPlayerForm] = useState(EMPTY_PLAYER_ROW);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const playerTimers = useRef({});
+  const playerPending = useRef({});
 
   const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "PT", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
@@ -525,6 +528,7 @@ export default function App() {
       order: opts.order ?? order,
       pageSize: 20,
       foil: opts.filterFoil ?? filterFoil,
+      full_art: opts.filterFullArt ?? filterFullArt,
       rarity: opts.filterRarity ?? filterRarity,
       colors: opts.filterColors ?? filterColors,
       deckId,
@@ -637,16 +641,25 @@ export default function App() {
     setSessionView("play");
   }
 
-  async function handleUpdatePlayer(playerId, field, delta) {
+  function handleUpdatePlayer(playerId, field, delta) {
     if (!activeSession || activeSession.status === "finished") return;
-    const player = activeSession.players.find(p => p.id === playerId);
-    if (!player) return;
+    const currentPlayer = activeSession.players.find(p => p.id === playerId);
+    if (!currentPlayer) return;
 
-    const newLife = field === "life" ? player.life + delta : player.life;
-    const newPoison = field === "poison" ? Math.max(0, player.poison + delta) : player.poison;
-    const newCmdDmg = field === "commander_damage_received" ? Math.max(0, player.commander_damage_received + delta) : player.commander_damage_received;
+    // Acumula no ref para não depender do closure stale do React state
+    const pending = playerPending.current[playerId] ?? {
+      life: currentPlayer.life,
+      poison: currentPlayer.poison,
+      commander_damage_received: currentPlayer.commander_damage_received,
+    };
 
-    // Optimistic update
+    const newLife = field === "life" ? pending.life + delta : pending.life;
+    const newPoison = field === "poison" ? Math.max(0, pending.poison + delta) : pending.poison;
+    const newCmdDmg = field === "commander_damage_received" ? Math.max(0, pending.commander_damage_received + delta) : pending.commander_damage_received;
+
+    playerPending.current[playerId] = { life: newLife, poison: newPoison, commander_damage_received: newCmdDmg };
+
+    // Atualiza UI imediatamente
     setActiveSession(prev => prev ? ({
       ...prev,
       players: prev.players.map(p => p.id === playerId
@@ -654,18 +667,23 @@ export default function App() {
         : p),
     }) : prev);
 
-    try {
-      const updated = await updateGameSessionPlayer(activeSession.id, playerId, {
-        life: newLife, poison: newPoison, commander_damage_received: newCmdDmg,
-      });
-      setActiveSession(prev => prev ? ({
-        ...prev,
-        players: prev.players.map(p => p.id === playerId ? updated : p),
-      }) : prev);
-    } catch {
-      const session = await getGameSession(activeSession.id);
-      setActiveSession(session);
-    }
+    // Cancela flush anterior e agenda novo
+    clearTimeout(playerTimers.current[playerId]);
+    const sessionId = activeSession.id;
+    playerTimers.current[playerId] = setTimeout(async () => {
+      const values = playerPending.current[playerId];
+      delete playerPending.current[playerId];
+      try {
+        const updated = await updateGameSessionPlayer(sessionId, playerId, values);
+        setActiveSession(prev => prev ? ({
+          ...prev,
+          players: prev.players.map(p => p.id === playerId ? updated : p),
+        }) : prev);
+      } catch {
+        const session = await getGameSession(sessionId);
+        setActiveSession(session);
+      }
+    }, 800);
   }
 
   async function handleAddSessionPlayer(e) {
@@ -741,7 +759,7 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterRarity, filterDeck, filterColors]);
+  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors]);
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
@@ -872,7 +890,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist, company: c.company,
-      foil: c.foil, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
     });
     setEditMode(true);
   }
@@ -2106,9 +2124,14 @@ export default function App() {
 
               {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
 
+              {(() => {
+                const alivePlayers = activeSession.players.filter(p => !p.is_eliminated);
+                const winnerId = activeSession.status === "active" && activeSession.players.length > 1 && alivePlayers.length === 1
+                  ? alivePlayers[0].id : null;
+                return (
               <div className={`score-players-grid score-grid-${Math.min(activeSession.players.length, 4)}`}>
                 {activeSession.players.map(player => (
-                  <div key={player.id} className={`score-player-card${player.is_eliminated ? " elim" : ""}`}>
+                  <div key={player.id} className={`score-player-card${player.is_eliminated ? " elim" : ""}${player.id === winnerId ? " winner" : ""}`}>
                     {player.is_eliminated && <div className="score-skull">☠</div>}
 
                     <div className="score-player-top">
@@ -2177,6 +2200,8 @@ export default function App() {
                   </div>
                 ))}
               </div>
+                );
+              })()}
 
               {/* Adicionar jogador */}
               {activeSession.status === "active" && (
@@ -2767,6 +2792,11 @@ export default function App() {
             Foil
           </label>
           <label className="checkbox-label">
+            <input type="checkbox" checked={form.full_art}
+              onChange={(e) => setForm({ ...form, full_art: e.target.checked })} />
+            Full Art
+          </label>
+          <label className="checkbox-label">
             <input type="checkbox" checked={form.prerelease}
               onChange={(e) => setForm({ ...form, prerelease: e.target.checked })} />
             Pré-release
@@ -2865,6 +2895,13 @@ export default function App() {
                 <option value="">Todas as cartas</option>
                 <option value="1">✦ Somente Foil</option>
               </select>
+              <button
+                type="button"
+                className={`filter-select filter-fullart-btn${filterFullArt ? " active" : ""}`}
+                onClick={() => { setFilterFullArt(v => !v); setPage(1); }}
+              >
+                ◈ Full Art
+              </button>
               <select className="filter-select" value={filterRarity} onChange={(e) => { setFilterRarity(e.target.value); setPage(1); }}>
                 <option value="">Todas as raridades</option>
                 <option value="L">Land (L)</option>
@@ -2937,7 +2974,7 @@ export default function App() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}`}
                   onClick={() => handleDetails(card.id)}
                   title={card.name}
                 >
@@ -2973,7 +3010,7 @@ export default function App() {
                 const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
                 return (
                   <div
-                    className={`list-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
                     key={card.id}
                   >
                     <div className="list-item-info">
@@ -2982,6 +3019,7 @@ export default function App() {
                           {card.name}
                         </strong>
                         {card.foil && <span className="foil-text">✦</span>}
+                        {card.full_art && <span className="full-art-badge">◈ Full Art</span>}
                         <CardColorIcons card={card} />
                         {card.rarity && (
                           <span className={`rarity r-${card.rarity.toLowerCase()}`}>
@@ -3091,6 +3129,7 @@ export default function App() {
                   <div><span>Quantidade</span>{selectedCard.local.quantity}</div>
                   <div><span>Condição</span>{selectedCard.local.condition || "—"}</div>
                   <div><span>Foil</span>{selectedCard.local.foil ? "Sim" : "Não"}</div>
+                  <div><span>Full Art</span>{selectedCard.local.full_art ? <span className="full-art-badge">◈ Sim</span> : "Não"}</div>
                   {selectedCard.local.deck_id > 0 && (() => {
                     const d = decks.find(dd => dd.id === selectedCard.local.deck_id);
                     return d ? (
@@ -3195,6 +3234,7 @@ export default function App() {
                     </select>
                   </label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.foil} onChange={(e) => setEditForm({ ...editForm, foil: e.target.checked })} />Foil</label>
+                  <label className="checkbox-label"><input type="checkbox" checked={editForm.full_art || false} onChange={(e) => setEditForm({ ...editForm, full_art: e.target.checked })} />Full Art</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
                 </div>

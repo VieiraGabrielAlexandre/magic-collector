@@ -61,6 +61,7 @@ type ExternalCard struct {
 	Toughness   string            `json:"toughness"`
 	Prices      map[string]string `json:"prices"`
 	ScryfallURI string            `json:"scryfall_uri"`
+	FullArt     bool              `json:"full_art"`
 }
 
 type scryfallList struct {
@@ -100,6 +101,7 @@ type scryfallCard struct {
 	Prices          map[string]string  `json:"prices"`
 	ScryfallURI     string             `json:"scryfall_uri"`
 	Layout          string             `json:"layout"`
+	FullArt         bool               `json:"full_art"`
 }
 
 func (s *scryfallCard) toExternal() *ExternalCard {
@@ -145,6 +147,7 @@ func (s *scryfallCard) toExternal() *ExternalCard {
 		Toughness:   s.Toughness,
 		Prices:      s.Prices,
 		ScryfallURI: s.ScryfallURI,
+		FullArt:     s.FullArt,
 	}
 }
 

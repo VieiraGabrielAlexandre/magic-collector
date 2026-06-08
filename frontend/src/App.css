@@ -580,6 +580,50 @@ button.danger:hover:not(:disabled) {
   animation: foil-border 3s linear infinite;
 }
 
+/* ── Full Art ──────────────────────────────────────────────────────────── */
+@keyframes fullart-glow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(232,200,112,0.0), 0 0 8px rgba(232,200,112,0.10); }
+  50%       { box-shadow: inset 0 0 0 1px rgba(232,200,112,0.18), 0 0 18px rgba(232,200,112,0.22); }
+}
+
+.list-item.is-full-art {
+  border-left-color: var(--gold);
+  background: linear-gradient(90deg, rgba(200,155,60,0.07), transparent 32px) var(--surface-2);
+  animation: fullart-glow 4s ease-in-out infinite;
+}
+
+.card-grid-item.is-full-art {
+  border-color: rgba(200,155,60,0.40);
+  animation: fullart-glow 4s ease-in-out infinite;
+}
+
+.full-art-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  border: 1px solid rgba(200,155,60,0.45);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.filter-fullart-btn {
+  cursor: pointer;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 0 12px;
+}
+
+.filter-fullart-btn.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(200,155,60,0.10);
+}
+
 /* ── Ações ─────────────────────────────────────────────────────────────── */
 .actions {
   display: flex;
@@ -4212,7 +4256,6 @@ input[type="radio"] {
   border-color: var(--border-dim) !important;
   font-size: 12px;
   padding: 7px 10px;
-  min-height: 44px;
   flex: 1;
 }
 .wishlist-btn-detail:hover:not(:disabled) {
@@ -4228,7 +4271,6 @@ input[type="radio"] {
   border-color: var(--wishlist-border) !important;
   font-size: 12px;
   padding: 7px 10px;
-  min-height: 44px;
   flex: 1;
 }
 .wishlist-btn-acquire:hover:not(:disabled) {
@@ -4241,8 +4283,6 @@ input[type="radio"] {
 .wishlist-btn-remove {
   font-size: 12px;
   padding: 7px 10px;
-  min-height: 44px;
-  min-width: 44px;
   flex-shrink: 0;
 }
 
@@ -4368,70 +4408,54 @@ input[type="radio"] {
 }
 
 /* ── Responsivo Wishlist ────────────────────────────────────────────────── */
-
-/* Mobile: 1 coluna, layout horizontal (imagem à esquerda) */
-@media (max-width: 639px) {
-  .wishlist-grid {
+@media (max-width: 900px) {
+  .wishlist-layout {
     grid-template-columns: 1fr;
-    gap: 8px;
   }
+}
+
+@media (max-width: 640px) {
+  .wishlist-grid { grid-template-columns: 1fr; gap: 8px; }
 
   .wishlist-card {
     flex-direction: row;
     align-items: flex-start;
-    min-height: 0;
   }
 
   .wishlist-card-img-wrap,
   .wishlist-card-img-placeholder {
-    width: 88px;
-    min-width: 88px;
+    width: 100px;
     flex-shrink: 0;
     aspect-ratio: 5 / 7;
-    align-self: stretch;
   }
 
   .wishlist-card-img {
     height: 100%;
-    width: 100%;
-    aspect-ratio: unset;
-    object-fit: cover;
   }
 
   .wishlist-card-body {
     flex: 1;
     min-width: 0;
-    padding: 10px 10px 10px 8px;
-    overflow: hidden;
-  }
-
-  .wishlist-card-name-text {
-    font-size: 12px;
-  }
-
-  .wishlist-card-artist {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-  }
-
-  .wishlist-card-actions {
-    gap: 4px;
   }
 
   .wishlist-modal-img {
-    max-width: 160px;
+    max-width: 180px;
   }
 }
 
-/* Tablet: 2 colunas, layout vertical */
-@media (min-width: 640px) and (max-width: 899px) {
+@media (min-width: 641px) and (max-width: 899px) {
   .wishlist-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Desktop: grid fluido */
 @media (min-width: 1280px) {
   .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+}
+@media (max-width: 420px) {
+  .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -4496,10 +4520,6 @@ input[type="radio"] {
   cursor: pointer;
   transition: opacity 0.15s;
   white-space: nowrap;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 .score-btn-primary:hover { opacity: 0.85; }
 .score-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -4514,10 +4534,6 @@ input[type="radio"] {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 .score-btn-secondary:hover { background: #30363d; }
 
@@ -4531,10 +4547,6 @@ input[type="radio"] {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 .score-btn-danger:hover { background: rgba(248, 81, 73, 0.3); }
 
@@ -4544,13 +4556,10 @@ input[type="radio"] {
   color: #8b949e;
   font-size: 0.9rem;
   cursor: pointer;
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 4px;
   white-space: nowrap;
   transition: color 0.15s;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
 }
 .score-back-btn:hover { color: #c9d1d9; }
 
@@ -4603,7 +4612,7 @@ input[type="radio"] {
 
 .score-session-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 1rem;
 }
 
@@ -4761,7 +4770,6 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  overflow-x: hidden;
 }
 
 .score-play-header {
@@ -4827,6 +4835,27 @@ input[type="radio"] {
 .score-player-card.elim {
   border-color: #f8514955;
   opacity: 0.65;
+}
+@keyframes winner-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(63,185,80,0.25), inset 0 0 0 1px rgba(63,185,80,0.15); }
+  50%       { box-shadow: 0 0 22px rgba(63,185,80,0.45), inset 0 0 0 1px rgba(63,185,80,0.30); }
+}
+.score-player-card.winner {
+  border-color: #3fb950;
+  background: linear-gradient(160deg, #0d1f12 0%, #161b22 100%);
+  animation: winner-pulse 2s ease-in-out infinite;
+}
+.score-player-card.winner .score-player-name {
+  color: #3fb950;
+  font-weight: 700;
+}
+.score-player-card.winner::before {
+  content: "🏆";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  font-size: 1.1rem;
+  opacity: 0.85;
 }
 
 .score-skull {
@@ -4996,52 +5025,13 @@ input[type="radio"] {
 
 /* ── Responsive tweaks ── */
 @media (max-width: 480px) {
-  /* Play header: empilha verticalmente em telas estreitas */
-  .score-play-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
-  }
-  .score-play-meta {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  .score-play-name {
-    font-size: 0.95rem;
-    white-space: normal;
-    word-break: break-word;
-  }
-  .score-play-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  /* Controles de vida: botões maiores */
+  .score-play-header { gap: 0.4rem; }
+  .score-play-name { font-size: 0.95rem; }
   .score-stat-val { font-size: 2.4rem; }
   .score-stat-val-md { font-size: 1.6rem; }
-  .score-ctrl button { padding: 10px 1px; min-height: 44px; }
+  .score-ctrl button { padding: 10px 1px; min-height: 40px; }
   .score-skull { font-size: 4rem; }
-
-  /* Formulário de criação */
   .score-form-row { grid-template-columns: 1fr; }
-  .score-form-actions {
-    flex-direction: column-reverse;
-    gap: 0.5rem;
-  }
-  .score-form-actions button { width: 100%; justify-content: center; }
-
-  /* Sessões na lista */
-  .score-session-actions { gap: 0.35rem; }
-  .score-session-actions .score-btn-primary,
-  .score-session-actions .score-btn-secondary { flex: 1; justify-content: center; }
-
-  /* Área de adicionar jogador */
-  .score-add-player-form { flex-direction: column; }
-  .score-add-player-form input { width: 100%; min-width: unset; }
-  .score-add-player-form .score-short-input { width: 100%; flex: unset; }
-  .score-add-player-form .score-btn-primary,
-  .score-add-player-form .score-btn-secondary { width: 100%; }
 }
 
 @media (min-width: 600px) and (max-width: 959px) {

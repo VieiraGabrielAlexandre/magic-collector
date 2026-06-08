@@ -64,6 +64,7 @@ func (h *Handler) List(c *gin.Context) {
 		Order:        c.DefaultQuery("order", "asc"),
 		DeckIDFilter: deckIDFilter,
 		FoilOnly:     c.Query("foil") == "1",
+		FullArtOnly:  c.Query("full_art") == "1",
 		RarityFilter: c.Query("rarity"),
 		ColorsFilter: c.Query("colors"),
 	}
