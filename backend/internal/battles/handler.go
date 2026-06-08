@@ -7,7 +7,7 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
+	repo battleRepo
 }
 
 func NewHandler(repo *Repository) *Handler {

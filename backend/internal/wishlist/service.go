@@ -9,8 +9,8 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
-	mtgClient *mtgapi.Client
+	repo      wishlistRepository
+	mtgClient wishlistMtgClient
 }
 
 func NewService(repo *Repository, mtgClient *mtgapi.Client) *Service {

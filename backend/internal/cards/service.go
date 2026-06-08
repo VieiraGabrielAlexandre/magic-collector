@@ -9,7 +9,6 @@ import (
 	"magic-collection-api/internal/mtgapi"
 )
 
-
 func parsePriceUSD(prices map[string]string, foil bool) float64 {
 	if prices == nil {
 		return 0
@@ -29,8 +28,8 @@ func parsePriceUSD(prices map[string]string, foil bool) float64 {
 }
 
 type Service struct {
-	repository *Repository
-	mtgClient  *mtgapi.Client
+	repository cardRepository
+	mtgClient  mtgAPIClient
 }
 
 func NewService(repository *Repository, mtgClient *mtgapi.Client) *Service {

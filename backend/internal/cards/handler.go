@@ -13,8 +13,8 @@ import (
 )
 
 type Handler struct {
-	service  *Service
-	aiClient *ai.Client
+	service  cardService
+	aiClient aiCompleter
 }
 
 func NewHandler(service *Service, aiClient *ai.Client) *Handler {

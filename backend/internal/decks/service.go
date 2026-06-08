@@ -12,10 +12,10 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
-	mtgClient *mtgapi.Client
-	cardRepo  *cards.Repository
-	aiClient  *ai.Client
+	repo      deckRepository
+	mtgClient deckMtgClient
+	cardRepo  deckCardRepo
+	aiClient  deckAiClient
 }
 
 func NewService(repo *Repository, mtgClient *mtgapi.Client, cardRepo *cards.Repository, aiClient *ai.Client) *Service {

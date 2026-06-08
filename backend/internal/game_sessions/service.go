@@ -6,7 +6,7 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo gsRepository
 }
 
 func NewService(repo *Repository) *Service {

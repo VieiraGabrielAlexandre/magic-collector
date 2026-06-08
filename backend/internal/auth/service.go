@@ -9,7 +9,7 @@ import (
 )
 
 type Service struct {
-	repository *Repository
+	repository authRepository
 }
 
 func NewService(repo *Repository) *Service {

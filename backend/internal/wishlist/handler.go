@@ -7,7 +7,7 @@ import (
 )
 
 type Handler struct {
-	svc *Service
+	svc wishlistService
 }
 
 func NewHandler(svc *Service) *Handler {
