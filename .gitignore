@@ -55,3 +55,4 @@ terraform/*.tfstate.backup
 
 # ── Documentação externa clonada (não faz parte do projeto) ─────────────────────
 doc-api-magictgr/
+backend/coverage.out
