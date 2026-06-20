@@ -43,13 +43,14 @@ export async function getMe() {
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors } = {}) {
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors, typeFilter } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
   if (foil) params.set("foil", "1");
   if (full_art) params.set("full_art", "1");
   if (rarity) params.set("rarity", rarity);
   if (colors) params.set("colors", colors);
+  if (typeFilter) params.set("type_filter", typeFilter);
   const res = await authFetch(`${BASE_URL}/cards?${params}`);
   if (!res.ok) return { data: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 };
   return res.json();

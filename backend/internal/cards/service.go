@@ -52,7 +52,6 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		Language:         input.Language,
 		Year:             input.Year,
 		Artist:           input.Artist,
-		Company:          input.Company,
 		Foil:             input.Foil,
 		PreRelease:       input.PreRelease,
 		Commander:        input.Commander,
@@ -92,6 +91,12 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
 		card.FullArt = ext.FullArt
+		if ext.Year > 0 {
+			card.Year = ext.Year
+		}
+		if ext.Artist != "" && card.Artist == "" {
+			card.Artist = ext.Artist
+		}
 	}
 
 	return s.repository.Create(card)
@@ -152,7 +157,6 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		Language:         input.Language,
 		Year:             input.Year,
 		Artist:           input.Artist,
-		Company:          input.Company,
 		Foil:             input.Foil,
 		PreRelease:       input.PreRelease,
 		Commander:        input.Commander,
@@ -196,6 +200,12 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
 		card.FullArt = ext.FullArt
+		if ext.Year > 0 {
+			card.Year = ext.Year
+		}
+		if ext.Artist != "" && card.Artist == "" {
+			card.Artist = ext.Artist
+		}
 	}
 
 	if input.Propagate {

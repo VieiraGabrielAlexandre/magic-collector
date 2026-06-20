@@ -85,6 +85,7 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE decks ADD COLUMN evaluated_at DATETIME NULL`)
 	db.Exec(`ALTER TABLE cards ADD COLUMN price_usd  DECIMAL(10,2)  NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE cards ADD COLUMN image_url  VARCHAR(500)   NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE cards DROP COLUMN IF EXISTS company`)
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS battles (

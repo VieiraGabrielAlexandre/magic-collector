@@ -27,6 +27,7 @@ type ListParams struct {
 	FullArtOnly  bool   // true = somente full art
 	RarityFilter string // "" = todas; "L","C","U","R","M","T"
 	ColorsFilter string // "" = todas; "W" | "U,G" | "W,U,B" etc.
+	TypeFilter   string // "" = todos; busca parcial no type_line
 }
 
 type ListResult struct {
@@ -47,13 +48,14 @@ var allowedSortFields = map[string]string{
 	"collection_number": "collection_number",
 	"price_usd":         "price_usd",
 	"quantity":          "quantity",
+	"created_at":        "created_at",
 }
 
 // selectCols lista as colunas na mesma ordem que os Scan abaixo.
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, company, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art`
+	       artist, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -63,13 +65,13 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 		params.PageSize = 20
 	}
 
-	sortCol := "name"
+	sortCol := "created_at"
 	if col, ok := allowedSortFields[params.Sort]; ok {
 		sortCol = col
 	}
-	order := "ASC"
-	if strings.ToUpper(params.Order) == "DESC" {
-		order = "DESC"
+	order := "DESC"
+	if strings.ToUpper(params.Order) == "ASC" {
+		order = "ASC"
 	}
 
 	var clauses []string
@@ -99,6 +101,10 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.RarityFilter != "" {
 		clauses = append(clauses, "rarity = ?")
 		args = append(args, params.RarityFilter)
+	}
+	if params.TypeFilter != "" {
+		clauses = append(clauses, "`type` LIKE ?")
+		args = append(args, "%"+params.TypeFilter+"%")
 	}
 	if params.ColorsFilter != "" {
 		if params.ColorsFilter == "none" {
@@ -150,7 +156,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
-			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
+			&c.Colors, &c.Language, &c.Year, &c.Artist,
 			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 		)
 		if err != nil {
@@ -182,8 +188,8 @@ func (r *Repository) Create(card Card) (int64, error) {
 	stmt, err := r.db.Prepare("INSERT INTO cards " +
 		"(mtg_id, name, color, `type`, subtitle, collection_number," +
 		" rarity, set_code, mana_cost, colors, language, year," +
-		" artist, company, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art)" +
-		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		" artist, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
@@ -209,7 +215,7 @@ func (r *Repository) Create(card Card) (int64, error) {
 	result, err := stmt.Exec(
 		card.MTGID, card.Name, card.Color, card.Type, card.Subtitle,
 		card.CollectionNumber, card.Rarity, card.SetCode, card.ManaCost,
-		card.Colors, card.Language, card.Year, card.Artist, card.Company,
+		card.Colors, card.Language, card.Year, card.Artist,
 		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL, fullArtInt,
 	)
 	if err != nil {
@@ -228,7 +234,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 	err := row.Scan(
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
-		&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
+		&c.Colors, &c.Language, &c.Year, &c.Artist,
 		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 	)
 	if err != nil {
@@ -260,11 +266,11 @@ func (r *Repository) Update(id string, card Card) error {
 	}
 	_, err := r.db.Exec(
 		"UPDATE cards SET mtg_id=?, name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
-			" rarity=?, set_code=?, mana_cost=?, language=?, year=?, artist=?, company=?,"+
+			" rarity=?, set_code=?, mana_cost=?, language=?, year=?, artist=?,"+
 			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=?, full_art=? WHERE id=?",
 		card.MTGID, card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.ManaCost, card.Language, card.Year, card.Artist,
-		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
+		foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
 		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, fullArtIntU, id,
 	)
 	return err
@@ -283,10 +289,10 @@ func (r *Repository) UpdateSharedByIdentity(oldName, oldSetCode, oldCollNum, old
 	}
 	_, err := r.db.Exec(
 		"UPDATE cards SET name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
-			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?, foil=?"+
+			" rarity=?, set_code=?, language=?, year=?, artist=?, foil=?"+
 			" WHERE name=? AND set_code=? AND collection_number=? AND language=? AND foil=?",
 		card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
-		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist, card.Company, newFoilInt,
+		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist, newFoilInt,
 		oldName, oldSetCode, oldCollNum, oldLang, oldFoilInt,
 	)
 	return err
@@ -326,7 +332,7 @@ func (r *Repository) ListAll() ([]Card, error) {
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
-			&c.Colors, &c.Language, &c.Year, &c.Artist, &c.Company,
+			&c.Colors, &c.Language, &c.Year, &c.Artist,
 			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt,
 		)
 		if err != nil {

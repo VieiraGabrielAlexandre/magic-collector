@@ -62,6 +62,7 @@ type ExternalCard struct {
 	Prices      map[string]string `json:"prices"`
 	ScryfallURI string            `json:"scryfall_uri"`
 	FullArt     bool              `json:"full_art"`
+	Year        int               `json:"year"`
 }
 
 type scryfallList struct {
@@ -102,6 +103,21 @@ type scryfallCard struct {
 	ScryfallURI     string             `json:"scryfall_uri"`
 	Layout          string             `json:"layout"`
 	FullArt         bool               `json:"full_art"`
+	ReleasedAt      string             `json:"released_at"`
+}
+
+func yearFromReleasedAt(releasedAt string) int {
+	if len(releasedAt) >= 4 {
+		y := 0
+		for _, ch := range releasedAt[:4] {
+			if ch < '0' || ch > '9' {
+				return 0
+			}
+			y = y*10 + int(ch-'0')
+		}
+		return y
+	}
+	return 0
 }
 
 func (s *scryfallCard) toExternal() *ExternalCard {
@@ -148,6 +164,7 @@ func (s *scryfallCard) toExternal() *ExternalCard {
 		Prices:      s.Prices,
 		ScryfallURI: s.ScryfallURI,
 		FullArt:     s.FullArt,
+		Year:        yearFromReleasedAt(s.ReleasedAt),
 	}
 }
 

@@ -67,6 +67,7 @@ func (h *Handler) List(c *gin.Context) {
 		FullArtOnly:  c.Query("full_art") == "1",
 		RarityFilter: c.Query("rarity"),
 		ColorsFilter: c.Query("colors"),
+		TypeFilter:   c.Query("type_filter"),
 	}
 
 	result, err := h.service.List(params)

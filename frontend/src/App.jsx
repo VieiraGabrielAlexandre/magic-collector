@@ -7,7 +7,7 @@ import "./App.css";
 const EMPTY_FORM = {
   name: "", color: "", type: "", subtitle: "", collection_number: "",
   rarity: "", set_code: "", language: "PT", year: "", artist: "",
-  company: "Wizards of the Coast", foil: false, full_art: false, prerelease: false, commander: false, deck_id: 0, quantity: 1,
+  foil: false, full_art: false, prerelease: false, commander: false, deck_id: 0, quantity: 1,
   condition: "played", notes: "",
 };
 
@@ -421,8 +421,9 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("name");
-  const [order, setOrder] = useState("asc");
+  const [sort, setSort] = useState("created_at");
+  const [order, setOrder] = useState("desc");
+  const [filterType, setFilterType] = useState("");
   const [filterFoil, setFilterFoil] = useState("");
   const [filterFullArt, setFilterFullArt] = useState(false);
   const [filterRarity, setFilterRarity] = useState("");
@@ -531,6 +532,7 @@ export default function App() {
       full_art: opts.filterFullArt ?? filterFullArt,
       rarity: opts.filterRarity ?? filterRarity,
       colors: opts.filterColors ?? filterColors,
+      typeFilter: opts.filterType ?? filterType,
       deckId,
     });
     setCards(result.data ?? []);
@@ -763,7 +765,7 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors]);
+  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType]);
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
@@ -893,7 +895,7 @@ export default function App() {
     setEditForm({
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
-      language: c.language, year: c.year, artist: c.artist, company: c.company,
+      language: c.language, year: c.year, artist: c.artist,
       foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
     });
     setEditMode(true);
@@ -907,12 +909,12 @@ export default function App() {
     handleDetails(selectedCard.local.id);
   }
 
-  const EXPORT_HEADERS = ["name","color","type","subtitle","collection_number","rarity","set_code","language","year","artist","company","foil","quantity","condition","notes","commander","deck"];
+  const EXPORT_HEADERS = ["name","color","type","subtitle","collection_number","rarity","set_code","language","year","artist","foil","quantity","condition","notes","commander","deck"];
 
   function cardToRow(c) {
     const deckName = c.deck_id > 0 ? (decks.find(d => d.id === c.deck_id)?.name ?? "") : "";
     return [c.name, c.color, c.type, c.subtitle, c.collection_number, c.rarity,
-            c.set_code, c.language, c.year, c.artist, c.company,
+            c.set_code, c.language, c.year, c.artist,
             c.foil ? "sim" : "nao", c.quantity, c.condition, c.notes,
             c.commander ? "sim" : "nao", deckName];
   }
@@ -2775,9 +2777,8 @@ export default function App() {
               <option value="DE">Alemão</option>
             </select>
           </label>
-          {field("Ano", "year", { type: "number", placeholder: "Ex: 2016", min: "1993" })}
+          {field("Ano", "year", { type: "number", placeholder: "Ex: 2016" })}
           {field("Artista", "artist", { placeholder: "Ex: Ryan Pancoast" })}
-          {field("Empresa", "company")}
           <label>
             Condição
             <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
@@ -2916,6 +2917,18 @@ export default function App() {
                 <option value="R">Rare (R)</option>
                 <option value="M">Mythic (M)</option>
                 <option value="T">Token (T)</option>
+              </select>
+              <select className="filter-select" value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
+                <option value="">Todos os tipos</option>
+                <option value="Creature">Criatura</option>
+                <option value="Instant">Instantâneo</option>
+                <option value="Sorcery">Feitiço</option>
+                <option value="Enchantment">Encantamento</option>
+                <option value="Artifact">Artefato</option>
+                <option value="Land">Terreno</option>
+                <option value="Planeswalker">Planeswalker</option>
+                <option value="Battle">Batalha</option>
+                <option value="Legendary">Lendário</option>
               </select>
             </div>
             {availableColors.length > 0 && (
@@ -3130,7 +3143,6 @@ export default function App() {
                   <div><span>Idioma</span>{selectedCard.local.language || "—"}</div>
                   <div><span>Ano</span>{selectedCard.local.year || "—"}</div>
                   <div><span>Artista</span>{selectedCard.external?.artist || selectedCard.local.artist || "—"}</div>
-                  <div><span>Empresa</span>{selectedCard.local.company || "—"}</div>
                   <div><span>Custo</span>{selectedCard.external?.mana_cost || selectedCard.local.mana_cost || "—"}</div>
                   <div><span>Quantidade</span>{selectedCard.local.quantity}</div>
                   <div><span>Condição</span>{selectedCard.local.condition || "—"}</div>
@@ -3221,9 +3233,8 @@ export default function App() {
                       <option value="DE">Alemão</option>
                     </select>
                   </label>
-                  <label>Ano<input type="number" min="1993" value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} /></label>
+                  <label>Ano<input type="number" placeholder="Ex: 2016" value={editForm.year || ""} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} /></label>
                   <label>Artista<input value={editForm.artist} onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })} /></label>
-                  <label>Empresa<input value={editForm.company} onChange={(e) => setEditForm({ ...editForm, company: e.target.value })} /></label>
                   <label>Condição
                     <select value={editForm.condition} onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}>
                       <option value="mint">Mint</option>

@@ -43,9 +43,8 @@ type Card struct {
 	Colors           string `json:"colors"`
 	Language         string `json:"language"`
 	Year             int    `json:"year"`
-	Artist           string `json:"artist"`
-	Company          string `json:"company"`
-	Foil             bool   `json:"foil"`
+	Artist           string  `json:"artist"`
+	Foil             bool    `json:"foil"`
 	FullArt          bool    `json:"full_art"`
 	PreRelease       bool    `json:"prerelease"`
 	Commander        bool    `json:"commander"`
@@ -80,7 +79,6 @@ type CreateCardInput struct {
 	Language         string `json:"language"`
 	Year             int    `json:"year"`
 	Artist           string `json:"artist"`
-	Company          string `json:"company"`
 	Foil             bool   `json:"foil"`
 	FullArt          bool   `json:"full_art"`
 	PreRelease       bool   `json:"prerelease"`
@@ -104,7 +102,6 @@ type UpdateCardInput struct {
 	Language         string `json:"language"`
 	Year             int    `json:"year"`
 	Artist           string `json:"artist"`
-	Company          string `json:"company"`
 	Foil             bool   `json:"foil"`
 	FullArt          bool   `json:"full_art"`
 	PreRelease       bool   `json:"prerelease"`
