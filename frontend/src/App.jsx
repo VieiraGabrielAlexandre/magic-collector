@@ -653,9 +653,11 @@ export default function App() {
       commander_damage_received: currentPlayer.commander_damage_received,
     };
 
-    const newLife = field === "life" ? pending.life + delta : pending.life;
+    const oldCmdDmg = pending.commander_damage_received;
+    const newCmdDmg = field === "commander_damage_received" ? Math.max(0, oldCmdDmg + delta) : oldCmdDmg;
+    const cmdDmgDelta = newCmdDmg - oldCmdDmg;
+    const newLife = field === "life" ? pending.life + delta : pending.life - cmdDmgDelta;
     const newPoison = field === "poison" ? Math.max(0, pending.poison + delta) : pending.poison;
-    const newCmdDmg = field === "commander_damage_received" ? Math.max(0, pending.commander_damage_received + delta) : pending.commander_damage_received;
 
     playerPending.current[playerId] = { life: newLife, poison: newPoison, commander_damage_received: newCmdDmg };
 
@@ -667,7 +669,7 @@ export default function App() {
         : p),
     }) : prev);
 
-    // Cancela flush anterior e agenda novo
+    // Envia para o backend em background após pausa nas alterações
     clearTimeout(playerTimers.current[playerId]);
     const sessionId = activeSession.id;
     playerTimers.current[playerId] = setTimeout(async () => {
@@ -675,13 +677,15 @@ export default function App() {
       delete playerPending.current[playerId];
       try {
         const updated = await updateGameSessionPlayer(sessionId, playerId, values);
+        // Só sincroniza status de eliminação — nunca reverte os valores exibidos
         setActiveSession(prev => prev ? ({
           ...prev,
-          players: prev.players.map(p => p.id === playerId ? updated : p),
+          players: prev.players.map(p => p.id === playerId
+            ? { ...p, is_eliminated: updated.is_eliminated, eliminated_reason: updated.eliminated_reason }
+            : p),
         }) : prev);
       } catch {
-        const session = await getGameSession(sessionId);
-        setActiveSession(session);
+        // Falha silenciosa: os valores exibidos estão corretos, sincroniza na próxima ação
       }
     }, 800);
   }
@@ -2125,81 +2129,83 @@ export default function App() {
               {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
 
               {(() => {
+                const PLAYER_COLORS = ['#3b82f6','#a855f7','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16'];
                 const alivePlayers = activeSession.players.filter(p => !p.is_eliminated);
                 const winnerId = activeSession.status === "active" && activeSession.players.length > 1 && alivePlayers.length === 1
                   ? alivePlayers[0].id : null;
+                const isFinished = activeSession.status === "finished";
                 return (
-              <div className={`score-players-grid score-grid-${Math.min(activeSession.players.length, 4)}`}>
-                {activeSession.players.map(player => (
-                  <div key={player.id} className={`score-player-card${player.is_eliminated ? " elim" : ""}${player.id === winnerId ? " winner" : ""}`}>
-                    {player.is_eliminated && <div className="score-skull">☠</div>}
+                  <div className="score-players-list">
+                    {activeSession.players.map((player, idx) => {
+                      const color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
+                      const isWinner = player.id === winnerId;
+                      const isElim = player.is_eliminated;
+                      return (
+                        <div
+                          key={player.id}
+                          className={`score-prow${isElim ? " prow-elim" : ""}${isWinner ? " prow-winner" : ""}`}
+                          style={{ '--pcolor': color }}
+                        >
+                          <div className="score-prow-head">
+                            <div className="score-prow-badge">
+                              {isElim ? '💀' : isWinner ? '👑' : player.short_code}
+                            </div>
+                            <div className="score-prow-nameblock">
+                              <span className="score-prow-name">{player.name}</span>
+                              {isElim && (
+                                <span className="score-prow-elim-tag">
+                                  {player.eliminated_reason === "life" && "☠ Sem vida"}
+                                  {player.eliminated_reason === "commander_damage" && "⚔ Cmd damage"}
+                                  {player.eliminated_reason === "poison" && "☣ Tóxico"}
+                                </span>
+                              )}
+                              {isWinner && <span className="score-prow-winner-tag">🏆 Vencedor!</span>}
+                            </div>
+                            {!isFinished && activeSession.players.length > 2 && (
+                              <button type="button" className="score-remove-player" title="Remover" onClick={() => handleRemoveSessionPlayer(player.id)}>✕</button>
+                            )}
+                          </div>
 
-                    <div className="score-player-top">
-                      <span className="score-player-code">{player.short_code}</span>
-                      <span className="score-player-name">{player.name}</span>
-                      {player.is_eliminated && (
-                        <span className="score-elim-reason">
-                          {player.eliminated_reason === "life" && "Sem vida"}
-                          {player.eliminated_reason === "commander_damage" && "Cmd damage"}
-                          {player.eliminated_reason === "poison" && "Tóxico"}
-                        </span>
-                      )}
-                      {activeSession.status === "active" && activeSession.players.length > 2 && (
-                        <button
-                          type="button"
-                          className="score-remove-player"
-                          title="Remover jogador"
-                          onClick={() => handleRemoveSessionPlayer(player.id)}
-                        >✕</button>
-                      )}
-                    </div>
+                          {!isElim && (
+                            <div className="score-prow-stats">
+                              {/* Linha 1 – Vida ocupa a largura toda */}
+                              <div className="score-pstat score-pstat-life">
+                                <span className="score-pstat-icon" title="Vida">❤️</span>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
+                                <span className={`score-pstat-val${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>{player.life}</span>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
+                              </div>
 
-                    {/* Vida */}
-                    <div className="score-stat">
-                      <span className="score-stat-label">Vida</span>
-                      <span className={`score-stat-val${player.life <= 0 ? " score-val-dead" : player.life <= 5 ? " score-val-low" : ""}`}>
-                        {player.life}
-                      </span>
-                      <div className="score-ctrl">
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
-                      </div>
-                    </div>
+                              {/* Linha 2 – Cmd e Tóxico lado a lado */}
+                              <div className="score-prow-subrow">
+                                <div className="score-pstat score-pstat-sub">
+                                  <span className="score-pstat-icon" title="Dano de Comandante">⚔️</span>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
+                                  <span className={`score-pstat-val score-pstat-val-sub${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
+                                    {player.commander_damage_received}<small>/21</small>
+                                  </span>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
+                                </div>
 
-                    {/* Dano de comandante */}
-                    <div className="score-stat">
-                      <span className="score-stat-label">
-                        Comandante <span className="score-stat-limit">/ 21</span>
-                      </span>
-                      <span className={`score-stat-val score-stat-val-md${player.commander_damage_received >= 21 ? " score-val-dead" : player.commander_damage_received >= 15 ? " score-val-low" : ""}`}>
-                        {player.commander_damage_received}
-                      </span>
-                      <div className="score-ctrl">
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
-                      </div>
-                    </div>
-
-                    {/* Tóxico */}
-                    <div className="score-stat score-stat-poison">
-                      <span className="score-stat-label">
-                        Tóxico <span className="score-stat-limit">/ 10</span>
-                      </span>
-                      <span className={`score-stat-val score-stat-val-sm${player.poison >= 10 ? " score-val-dead" : player.poison >= 7 ? " score-val-low" : ""}`}>
-                        {player.poison}
-                      </span>
-                      <div className="score-ctrl score-ctrl-sm">
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "poison", -1)}>−1</button>
-                        <button type="button" disabled={activeSession.status === "finished"} onClick={() => handleUpdatePlayer(player.id, "poison", +1)}>+1</button>
-                      </div>
-                    </div>
+                                <div className="score-pstat score-pstat-sub">
+                                  <span className="score-pstat-icon" title="Contadores de Veneno">☣️</span>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "poison", -1)}>−1</button>
+                                  <span className={`score-pstat-val score-pstat-val-sub${player.poison >= 10 ? " dead" : player.poison >= 7 ? " low" : ""}`}>
+                                    {player.poison}<small>/10</small>
+                                  </span>
+                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "poison", +1)}>+1</button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
                 );
               })()}
 

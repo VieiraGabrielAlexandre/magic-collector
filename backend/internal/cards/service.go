@@ -144,13 +144,10 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 	}
 
 	card := Card{
+		// Campos do usuário
 		Name:             input.Name,
-		Colors:           input.Colors,
-		Color:            ColorsJSONToDisplay(input.Colors),
-		Type:             input.Type,
 		Subtitle:         input.Subtitle,
 		CollectionNumber: input.CollectionNumber,
-		Rarity:           input.Rarity,
 		SetCode:          input.SetCode,
 		Language:         input.Language,
 		Year:             input.Year,
@@ -164,6 +161,41 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		Quantity:         input.Quantity,
 		Condition:        input.Condition,
 		Notes:            input.Notes,
+		// Campos externos: preserva os valores do banco até o re-fetch
+		MTGID:    current.MTGID,
+		Type:     current.Type,
+		ManaCost: current.ManaCost,
+		Colors:   current.Colors,
+		Color:    current.Color,
+		Rarity:   current.Rarity,
+		PriceUSD: current.PriceUSD,
+		ImageURL: current.ImageURL,
+		FullArt:  current.FullArt,
+	}
+
+	// Re-fetch do Scryfall para atualizar campos externos (type, rarity, image, colors, mana_cost, price)
+	var ext *mtgapi.ExternalCard
+	if current.MTGID != "" {
+		ext, _ = s.mtgClient.GetByMTGID(current.MTGID)
+	}
+	if ext == nil {
+		if card.PreRelease {
+			ext, _ = s.mtgClient.SearchPreRelease(card.Name, card.Language, card.Artist)
+		} else {
+			ext, _ = s.mtgClient.Search(card.SetCode, card.CollectionNumber, card.Language, card.Artist)
+		}
+	}
+	if ext != nil {
+		colorsJSON, _ := json.Marshal(ext.Colors)
+		card.MTGID = ext.ID
+		card.Type = ext.Type
+		card.ManaCost = ext.ManaCost
+		card.Colors = string(colorsJSON)
+		card.Color = ColorsJSONToDisplay(card.Colors)
+		card.Rarity = ext.Rarity
+		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
+		card.ImageURL = ext.ImageURL
+		card.FullArt = ext.FullArt
 	}
 
 	if input.Propagate {

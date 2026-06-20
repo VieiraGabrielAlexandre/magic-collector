@@ -259,11 +259,11 @@ func (r *Repository) Update(id string, card Card) error {
 		fullArtIntU = 1
 	}
 	_, err := r.db.Exec(
-		"UPDATE cards SET name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
-			" rarity=?, set_code=?, language=?, year=?, artist=?, company=?,"+
+		"UPDATE cards SET mtg_id=?, name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
+			" rarity=?, set_code=?, mana_cost=?, language=?, year=?, artist=?, company=?,"+
 			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=?, full_art=? WHERE id=?",
-		card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
-		card.Rarity, card.SetCode, card.Language, card.Year, card.Artist,
+		card.MTGID, card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
+		card.Rarity, card.SetCode, card.ManaCost, card.Language, card.Year, card.Artist,
 		card.Company, foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
 		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, fullArtIntU, id,
 	)

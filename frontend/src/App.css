@@ -4804,113 +4804,88 @@ input[type="radio"] {
   flex-wrap: wrap;
 }
 
-/* ── Players grid ── */
-.score-players-grid {
-  display: grid;
-  gap: 0.85rem;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 600px) {
-  .score-players-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (min-width: 960px) {
-  .score-players-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (min-width: 1300px) {
-  .score-grid-4 { grid-template-columns: repeat(4, 1fr); }
-}
-
-/* ── Player card ── */
-.score-player-card {
-  background: #161b22;
-  border: 2px solid #388bfd55;
-  border-radius: 12px;
-  padding: 1rem;
-  position: relative;
+/* ── Players list (row layout) ── */
+.score-players-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  transition: border-color 0.2s, opacity 0.2s;
-}
-.score-player-card.elim {
-  border-color: #f8514955;
-  opacity: 0.65;
-}
-@keyframes winner-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(63,185,80,0.25), inset 0 0 0 1px rgba(63,185,80,0.15); }
-  50%       { box-shadow: 0 0 22px rgba(63,185,80,0.45), inset 0 0 0 1px rgba(63,185,80,0.30); }
-}
-.score-player-card.winner {
-  border-color: #3fb950;
-  background: linear-gradient(160deg, #0d1f12 0%, #161b22 100%);
-  animation: winner-pulse 2s ease-in-out infinite;
-}
-.score-player-card.winner .score-player-name {
-  color: #3fb950;
-  font-weight: 700;
-}
-.score-player-card.winner::before {
-  content: "🏆";
-  position: absolute;
-  top: 0.5rem;
-  right: 0.6rem;
-  font-size: 1.1rem;
-  opacity: 0.85;
+  gap: 0.55rem;
 }
 
-.score-skull {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -55%);
-  font-size: 5rem;
-  opacity: 0.12;
-  pointer-events: none;
-  line-height: 1;
-  user-select: none;
+.score-prow {
+  background: #161b22;
+  border-radius: 12px;
+  border-left: 4px solid var(--pcolor, #388bfd);
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition: opacity 0.2s;
+}
+.score-prow.prow-elim {
+  opacity: 0.6;
+  border-left-color: #f85149 !important;
+  background: rgba(248,81,73,0.04);
+}
+.score-prow.prow-winner {
+  background: rgba(16,185,129,0.07);
+  border-left-color: #10b981 !important;
+  box-shadow: 0 0 0 1px rgba(16,185,129,0.18);
 }
 
-.score-player-top {
+.score-prow-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
+  gap: 0.65rem;
 }
-
-.score-player-code {
-  background: #21262d;
-  border: 1px solid #388bfd;
-  border-radius: 4px;
-  padding: 2px 7px;
+.score-prow-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--pcolor, #388bfd);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: monospace;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #388bfd;
   text-transform: uppercase;
+  flex-shrink: 0;
+  letter-spacing: -0.03em;
+  font-size: 1.1rem;
 }
-.score-player-card.elim .score-player-code {
-  border-color: #f85149;
-  color: #f85149;
+.score-prow.prow-elim .score-prow-badge {
+  background: #2a1515;
+  font-size: 1.35rem;
 }
-
-.score-player-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #e6edf3;
+.score-prow-nameblock {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.score-prow-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e6edf3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.score-elim-reason {
-  font-size: 0.65rem;
+.score-prow-winner-tag {
+  font-size: 0.75rem;
+  color: #10b981;
   font-weight: 700;
+  white-space: nowrap;
+}
+.score-prow-elim-tag {
+  font-size: 0.7rem;
   color: #f85149;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -4920,83 +4895,107 @@ input[type="radio"] {
   color: #484f58;
   cursor: pointer;
   font-size: 0.8rem;
-  padding: 3px 5px;
-  border-radius: 3px;
-  margin-left: auto;
+  padding: 4px 6px;
+  border-radius: 4px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 .score-remove-player:hover { color: #f85149; background: rgba(248,81,73,0.1); }
 
-/* ── Stat block ── */
-.score-stat {
-  position: relative;
-  z-index: 1;
-}
-.score-stat-poison {
-  padding-top: 0.6rem;
-  border-top: 1px solid #21262d;
+/* Stats: coluna com duas linhas */
+.score-prow-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.score-stat-label {
-  display: block;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #8b949e;
-  margin-bottom: 0.2rem;
-}
-.score-stat-limit {
-  opacity: 0.65;
-  font-size: 0.6rem;
+.score-pstat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.score-stat-val {
-  display: block;
-  font-size: 3rem;
+/* Linha 1 – Vida preenche toda a largura */
+.score-pstat-life {
+  width: 100%;
+}
+.score-pstat-life button {
+  flex: 1;
+}
+
+/* Linha 2 – Cmd + Tóxico lado a lado */
+.score-prow-subrow {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.score-pstat-sub {
+  flex: 1;
+  min-width: 140px;
+}
+
+.score-pstat-icon {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Valor da vida (grande) */
+.score-pstat-val {
+  font-size: 2.2rem;
   font-weight: 900;
   color: #e6edf3;
-  line-height: 1;
-  margin-bottom: 0.4rem;
   font-variant-numeric: tabular-nums;
+  min-width: 2.5ch;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
-.score-stat-val-md { font-size: 2rem; }
-.score-stat-val-sm { font-size: 1.5rem; }
-
-.score-val-low { color: #d29922; }
-.score-val-dead { color: #f85149; }
-
-/* ── Controls ── */
-.score-ctrl {
-  display: flex;
-  gap: 4px;
+/* Valor menor para cmd/veneno */
+.score-pstat-val-sub {
+  font-size: 1.5rem;
 }
-.score-ctrl button {
-  flex: 1;
+.score-pstat-val small {
+  font-size: 0.42em;
+  color: #6e7681;
+  font-weight: 400;
+  vertical-align: super;
+  margin-left: 1px;
+}
+.score-pstat-val.low { color: #d29922; }
+.score-pstat-val.dead { color: #f85149; }
+
+.score-pstat button {
   background: #21262d;
   border: 1px solid #30363d;
-  color: #e6edf3;
+  color: #c9d1d9;
   border-radius: 7px;
-  padding: 9px 2px;
-  font-size: 0.88rem;
+  padding: 8px 10px;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  min-height: 42px;
+  min-height: 40px;
   touch-action: manipulation;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
   user-select: none;
+  white-space: nowrap;
 }
-.score-ctrl button:hover:not(:disabled) {
-  background: #30363d;
-  border-color: #8b949e;
-}
-.score-ctrl button:active:not(:disabled) {
-  background: #388bfd;
-  border-color: #388bfd;
+.score-pstat button:hover:not(:disabled) {
+  background: var(--pcolor, #388bfd);
+  border-color: var(--pcolor, #388bfd);
   color: #fff;
 }
-.score-ctrl button:disabled { opacity: 0.35; cursor: not-allowed; }
+.score-pstat button:active:not(:disabled) { filter: brightness(1.25); }
+.score-pstat button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.score-ctrl-sm button { min-height: 36px; font-size: 0.82rem; padding: 6px 2px; }
+@media (max-width: 520px) {
+  .score-pstat-val { font-size: 1.9rem; }
+  .score-pstat-val-sub { font-size: 1.3rem; }
+  .score-pstat button { padding: 8px 7px; }
+  .score-prow { padding: 0.65rem 0.75rem; }
+}
 
 /* ── Add player area ── */
 .score-add-player-area {
@@ -5027,14 +5026,6 @@ input[type="radio"] {
 @media (max-width: 480px) {
   .score-play-header { gap: 0.4rem; }
   .score-play-name { font-size: 0.95rem; }
-  .score-stat-val { font-size: 2.4rem; }
-  .score-stat-val-md { font-size: 1.6rem; }
-  .score-ctrl button { padding: 10px 1px; min-height: 40px; }
-  .score-skull { font-size: 4rem; }
   .score-form-row { grid-template-columns: 1fr; }
-}
-
-@media (min-width: 600px) and (max-width: 959px) {
-  .score-stat-val { font-size: 2.6rem; }
 }
 
