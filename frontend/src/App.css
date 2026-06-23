@@ -529,6 +529,169 @@ button.danger:hover:not(:disabled) {
 .deck-card-item {
   align-items: flex-start;
 }
+
+/* Comandante em destaque na lista do deck */
+.deck-card-commander {
+  border-left: 3px solid var(--gold);
+  background: linear-gradient(90deg, rgba(200,155,60,0.08) 0%, transparent 60%);
+}
+.deck-card-commander .list-item-name strong {
+  color: var(--gold-light);
+}
+.deck-cmd-crown {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+/* Botão de anomalia no header */
+.deck-anomaly-btn {
+  background: rgba(249,115,22,0.12);
+  border: 1px solid rgba(249,115,22,0.4);
+  color: #fb923c;
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.deck-anomaly-btn:hover { background: rgba(249,115,22,0.22); box-shadow: none; }
+
+/* Comandantes na listagem de decks */
+.deck-commanders-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.2rem;
+}
+.deck-cmd-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(200,155,60,0.1);
+  border: 1px solid rgba(200,155,60,0.35);
+  border-radius: 8px;
+  padding: 3px 8px 3px 4px;
+  max-width: 240px;
+}
+.deck-cmd-pill-img {
+  width: 28px;
+  height: 20px;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.deck-cmd-pill-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Modal de anomalias */
+.anomaly-modal { max-width: 480px; }
+.anomaly-modal-title { font-size: 1.15rem; margin: 0 0 0.2rem; }
+.anomaly-modal-sub { color: var(--text-muted); font-size: 13px; margin: 0 0 1rem; }
+.anomaly-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.anomaly-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  background: rgba(249,115,22,0.07);
+  border: 1px solid rgba(249,115,22,0.25);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+.anomaly-icon { font-size: 1.3rem; flex-shrink: 0; }
+.anomaly-text { display: flex; flex-direction: column; gap: 2px; }
+.anomaly-text strong { font-size: 13px; color: #fb923c; }
+.anomaly-text span { font-size: 12px; color: var(--text-muted); }
+
+/* ── Deck filter bar ───────────────────────────────────────────────────── */
+.deck-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+}
+.deck-filter-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.deck-filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-top: 5px;
+  white-space: nowrap;
+  min-width: 46px;
+}
+.deck-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.deck-filter-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  color: var(--text-muted);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.deck-filter-chip:hover {
+  border-color: var(--gold-dim);
+  color: var(--gold-light);
+}
+.deck-filter-chip.active {
+  background: rgba(200,155,60,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.dfc-count {
+  opacity: 0.65;
+  font-weight: 400;
+}
+/* Color chips */
+.deck-color-chip.dc-w { border-color: #c8b27a; color: #c8b27a; }
+.deck-color-chip.dc-w.active { background: rgba(200,178,122,0.18); border-color: #c8b27a; color: #c8b27a; }
+.deck-color-chip.dc-u { border-color: #5b9bd5; color: #5b9bd5; }
+.deck-color-chip.dc-u.active { background: rgba(91,155,213,0.18); border-color: #5b9bd5; color: #5b9bd5; }
+.deck-color-chip.dc-b { border-color: #9b8db0; color: #9b8db0; }
+.deck-color-chip.dc-b.active { background: rgba(155,141,176,0.18); border-color: #9b8db0; color: #9b8db0; }
+.deck-color-chip.dc-r { border-color: #e06050; color: #e06050; }
+.deck-color-chip.dc-r.active { background: rgba(224,96,80,0.18); border-color: #e06050; color: #e06050; }
+.deck-color-chip.dc-g { border-color: #5aa85a; color: #5aa85a; }
+.deck-color-chip.dc-g.active { background: rgba(90,168,90,0.18); border-color: #5aa85a; color: #5aa85a; }
+.deck-color-chip.dc-c { border-color: #888; color: #aaa; }
+.deck-color-chip.dc-c.active { background: rgba(136,136,136,0.18); border-color: #aaa; color: #ccc; }
+.deck-filter-clear {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid rgba(248,81,73,0.4);
+  color: #f85149;
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.deck-filter-clear:hover { background: rgba(248,81,73,0.1); box-shadow: none; }
 .deck-card-thumb {
   flex-shrink: 0;
   width: 54px;

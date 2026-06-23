@@ -13,7 +13,7 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
 		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color,
-		       COUNT(DISTINCT c.id) AS card_count,
+		       COALESCE(SUM(c.quantity), 0) AS card_count,
 		       COALESCE(d.evaluation, '') AS evaluation,
 		       COALESCE(DATE_FORMAT(d.evaluated_at, '%Y-%m-%dT%H:%i:%s'), '') AS evaluated_at,
 		       COALESCE(bs.wins,   0) AS battle_wins,
@@ -55,6 +55,27 @@ func (r *Repository) List() ([]Deck, error) {
 		d.Commander = commanderInt == 1
 		result = append(result, d)
 	}
+
+	// Popula comandantes de cada deck em uma única query
+	cmdRows, err := r.db.Query(
+		`SELECT deck_id, id, name, image_url FROM cards WHERE commander = 1 AND deck_id > 0`)
+	if err == nil {
+		defer cmdRows.Close()
+		cmdMap := map[int][]CommanderCard{}
+		for cmdRows.Next() {
+			var deckID int
+			var cc CommanderCard
+			if cmdRows.Scan(&deckID, &cc.ID, &cc.Name, &cc.ImageURL) == nil {
+				cmdMap[deckID] = append(cmdMap[deckID], cc)
+			}
+		}
+		for i := range result {
+			if cmds, ok := cmdMap[result[i].ID]; ok {
+				result[i].Commanders = cmds
+			}
+		}
+	}
+
 	return result, nil
 }
 

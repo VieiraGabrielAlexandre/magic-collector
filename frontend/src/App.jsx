@@ -470,6 +470,11 @@ export default function App() {
   const [unassignedTotal, setUnassignedTotal] = useState(0);
   const [deckSearch, setDeckSearch] = useState("");
   const [deckInnerTab, setDeckInnerTab] = useState("cards");
+  const [deckTypeFilter, setDeckTypeFilter] = useState("");
+  const [deckColorFilter, setDeckColorFilter] = useState("");
+  const [deckSetFilter, setDeckSetFilter] = useState("");
+  const [deckPage, setDeckPage] = useState(1);
+  const [deckAnomalyModal, setDeckAnomalyModal] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
 
   const EMPTY_IMPORT_FORM = { set_code: "", deck_name: "", language: "PT", colors: "", commander: false, theme_color: "", description: "" };
@@ -835,9 +840,9 @@ export default function App() {
       const formData = preview.found && preview.card
         ? { ...payload, name: preview.card.printed_name || preview.card.name || "", type: preview.card.type || "" }
         : payload;
-      setConfirmCard({ found: preview.found, card: preview.card ?? null, formData });
+      setConfirmCard({ found: preview.found, card: preview.card ?? null, formData, origin: "quickAdd" });
     } catch {
-      setConfirmCard({ found: false, card: null, formData: payload });
+      setConfirmCard({ found: false, card: null, formData: payload, origin: "quickAdd" });
     } finally {
       setConfirmLoading(false);
     }
@@ -950,6 +955,10 @@ export default function App() {
     setDeckSearch("");
     setDeckInnerTab("cards");
     setUnassignedPage(1);
+    setDeckTypeFilter("");
+    setDeckColorFilter("");
+    setDeckSetFilter("");
+    setDeckPage(1);
     await Promise.all([loadDeckCards(deck.id), loadUnassigned(1, "")]);
     if (deck.set_code && !deck.icon_uri) {
       const result = await fetchDeckIcon(deck.id);
@@ -1168,6 +1177,97 @@ export default function App() {
 
   const deckTotalQuantity = deckCards.reduce((sum, c) => sum + (c.quantity || 1), 0);
 
+  function deckCardTypeGroup(type) {
+    const t = type || "";
+    if (t.includes("Land")) return "Terreno";
+    if (t.includes("Legendary") && t.includes("Creature")) return "Criatura Lendária";
+    if (t.includes("Creature")) return "Criatura";
+    if (t.includes("Planeswalker")) return "Planeswalker";
+    if (t.includes("Legendary") && t.includes("Enchantment")) return "Encantamento Lendário";
+    if (t.includes("Enchantment")) return "Encantamento";
+    if (t.includes("Legendary") && t.includes("Artifact")) return "Artefato Lendário";
+    if (t.includes("Artifact")) return "Artefato";
+    if (t.includes("Instant")) return "Instantâneo";
+    if (t.includes("Sorcery")) return "Feitiço";
+    if (t.includes("Battle")) return "Batalha";
+    return "Outro";
+  }
+
+  const _deckTypeCounts = {};
+  const _deckColorCounts = {};
+  const _deckSetCounts = {};
+  for (const c of deckCards) {
+    const qty = c.quantity || 1;
+    const tg = deckCardTypeGroup(c.type);
+    _deckTypeCounts[tg] = (_deckTypeCounts[tg] || 0) + qty;
+    try {
+      const cols = JSON.parse(c.colors || "[]");
+      if (cols.length === 0) { _deckColorCounts["C"] = (_deckColorCounts["C"] || 0) + qty; }
+      else { for (const col of cols) _deckColorCounts[col] = (_deckColorCounts[col] || 0) + qty; }
+    } catch {}
+    const sc = (c.set_code || "").toUpperCase();
+    if (sc) _deckSetCounts[sc] = (_deckSetCounts[sc] || 0) + qty;
+  }
+  const DECK_TYPE_ORDER = ["Criatura Lendária","Criatura","Planeswalker","Encantamento Lendário","Encantamento","Artefato Lendário","Artefato","Instantâneo","Feitiço","Batalha","Terreno","Outro"];
+  const deckTypeCounts = DECK_TYPE_ORDER.filter(t => _deckTypeCounts[t]).map(t => ({ label: t, count: _deckTypeCounts[t] }));
+  const DECK_COLOR_ORDER = ["W","U","B","R","G","C"];
+  const deckColorCounts = DECK_COLOR_ORDER.filter(col => _deckColorCounts[col]).map(col => ({ code: col, count: _deckColorCounts[col] }));
+  const deckSetCounts = Object.entries(_deckSetCounts).sort(([,a],[,b]) => b - a).map(([set, count]) => ({ set, count }));
+
+  // Anomalias do deck
+  const BASIC_LAND_NAMES = new Set(["Plains","Island","Swamp","Mountain","Forest","Wastes",
+    "Snow-Covered Plains","Snow-Covered Island","Snow-Covered Swamp",
+    "Snow-Covered Mountain","Snow-Covered Forest"]);
+  const deckAnomalies = (() => {
+    const anomalies = [];
+    const total = deckCards.reduce((s, c) => s + (c.quantity || 1), 0);
+    if (total > 100) {
+      anomalies.push({ icon: "🃏", label: `${total} cartas no deck`, detail: "Formato Commander permite no máximo 100 cartas." });
+    }
+    for (const c of deckCards) {
+      if (!BASIC_LAND_NAMES.has(c.name) && (c.quantity || 1) > 1) {
+        anomalies.push({ icon: "📋", label: `"${c.name}" tem ${c.quantity} cópias`, detail: "Regra singleton: apenas 1 cópia de cada carta não-terreno básico." });
+      }
+    }
+    // Cor fora da identidade — apenas Commander com cores definidas
+    if (managingDeck?.commander && managingDeck.colors) {
+      const allowed = new Set(managingDeck.colors.split(",").map(x => x.trim()).filter(Boolean));
+      for (const c of deckCards) {
+        if (c.commander) continue; // o próprio comandante define a identidade
+        try {
+          const cardColors = JSON.parse(c.colors || "[]");
+          const outside = cardColors.filter(col => col !== "C" && !allowed.has(col));
+          if (outside.length > 0) {
+            anomalies.push({
+              icon: "🎨",
+              label: `"${c.name}" tem cor fora da identidade`,
+              detail: `Cor(es) ${outside.join(", ")} não pertencem à identidade do deck (${managingDeck.colors}).`,
+            });
+          }
+        } catch {}
+      }
+    }
+    return anomalies;
+  })();
+
+  // Comandantes sobem para o topo da lista
+  const deckCardsSorted = [...deckCards].sort((a, b) => (b.commander ? 1 : 0) - (a.commander ? 1 : 0));
+
+  const filteredDeckCards = deckCardsSorted.filter(c => {
+    if (deckTypeFilter && deckCardTypeGroup(c.type) !== deckTypeFilter) return false;
+    if (deckColorFilter) {
+      try {
+        const cols = JSON.parse(c.colors || "[]");
+        if (deckColorFilter === "C" ? cols.length !== 0 : !cols.includes(deckColorFilter)) return false;
+      } catch { return false; }
+    }
+    if (deckSetFilter && (c.set_code || "").toUpperCase() !== deckSetFilter) return false;
+    return true;
+  });
+  const DECK_PAGE_SIZE = 20;
+  const deckTotalPages = Math.max(1, Math.ceil(filteredDeckCards.length / DECK_PAGE_SIZE));
+  const pagedDeckCards = filteredDeckCards.slice((deckPage - 1) * DECK_PAGE_SIZE, deckPage * DECK_PAGE_SIZE);
+
   // ── Guarda de autenticação (todos os hooks já foram chamados acima) ───
   if (!authReady) return (
     <div className="auth-loading">
@@ -1249,6 +1349,11 @@ export default function App() {
                     <span className="total-badge">{deckTotalQuantity} cartas</span>
                     <span className="unique-badge">{deckCards.length} únicas</span>
                     <span className="unique-badge">{unassignedTotal} sem deck</span>
+                    {deckAnomalies.length > 0 && (
+                      <button type="button" className="deck-anomaly-btn" onClick={() => setDeckAnomalyModal(true)}>
+                        ⚠️ {deckAnomalies.length} anomalia{deckAnomalies.length > 1 ? "s" : ""}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1266,11 +1371,73 @@ export default function App() {
               <div className="deck-manage-grid">
                 <section className="card list-section">
                   <div className="list-header">
-                    <h3 className="section-title">No deck <span className="total-badge">{deckTotalQuantity}</span><span className="unique-badge">{deckCards.length} únicas</span></h3>
+                    <h3 className="section-title">
+                      No deck <span className="total-badge">{deckTotalQuantity}</span>
+                      <span className="unique-badge">{deckCards.length} únicas</span>
+                      {(deckTypeFilter || deckColorFilter || deckSetFilter) && (
+                        <span className="unique-badge" style={{color:"var(--gold)"}}>
+                          {filteredDeckCards.length} filtradas
+                        </span>
+                      )}
+                    </h3>
                   </div>
+
+                  {deckCards.length > 0 && (
+                    <div className="deck-filter-bar">
+                      {deckTypeCounts.length > 0 && (
+                        <div className="deck-filter-group">
+                          <span className="deck-filter-label">Tipo</span>
+                          <div className="deck-filter-chips">
+                            {deckTypeCounts.map(({label, count}) => (
+                              <button key={label} type="button"
+                                className={`deck-filter-chip${deckTypeFilter === label ? " active" : ""}`}
+                                onClick={() => { setDeckTypeFilter(deckTypeFilter === label ? "" : label); setDeckPage(1); }}>
+                                {label} <span className="dfc-count">({count})</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {deckColorCounts.length > 0 && (
+                        <div className="deck-filter-group">
+                          <span className="deck-filter-label">Cor</span>
+                          <div className="deck-filter-chips">
+                            {deckColorCounts.map(({code, count}) => (
+                              <button key={code} type="button"
+                                className={`deck-filter-chip deck-color-chip dc-${code.toLowerCase()}${deckColorFilter === code ? " active" : ""}`}
+                                onClick={() => { setDeckColorFilter(deckColorFilter === code ? "" : code); setDeckPage(1); }}>
+                                {code} <span className="dfc-count">({count})</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {deckSetCounts.length > 1 && (
+                        <div className="deck-filter-group">
+                          <span className="deck-filter-label">Coleção</span>
+                          <div className="deck-filter-chips">
+                            {deckSetCounts.map(({set, count}) => (
+                              <button key={set} type="button"
+                                className={`deck-filter-chip${deckSetFilter === set ? " active" : ""}`}
+                                onClick={() => { setDeckSetFilter(deckSetFilter === set ? "" : set); setDeckPage(1); }}>
+                                {set} <span className="dfc-count">({count})</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(deckTypeFilter || deckColorFilter || deckSetFilter) && (
+                        <button type="button" className="deck-filter-clear"
+                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckPage(1); }}>
+                          ✕ Limpar filtros
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div className="list">
-                    {deckCards.map((card) => (
-                      <div className={`list-item deck-card-item${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                    {pagedDeckCards.map((card) => (
+                      <div className={`list-item deck-card-item${card.commander ? " deck-card-commander" : ""}${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
                         {card.image_url && (
                           <div className="deck-card-thumb">
                             <img src={card.image_url} alt={card.name} loading="lazy" />
@@ -1278,6 +1445,7 @@ export default function App() {
                         )}
                         <div className="list-item-info">
                           <div className="list-item-name">
+                            {card.commander && <span className="deck-cmd-crown" title="Comandante">👑</span>}
                             <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
                             {card.foil && <span className="foil-text">✦</span>}
                             <CardColorIcons card={card} />
@@ -1296,8 +1464,21 @@ export default function App() {
                         </div>
                       </div>
                     ))}
+                    {filteredDeckCards.length === 0 && deckCards.length > 0 && (
+                      <p className="empty">Nenhuma carta nesse filtro.</p>
+                    )}
                     {deckCards.length === 0 && <p className="empty">Nenhuma carta no deck.</p>}
                   </div>
+
+                  {deckTotalPages > 1 && (
+                    <div className="pagination" style={{marginTop:"0.6rem"}}>
+                      <button disabled={deckPage === 1} onClick={() => setDeckPage(p => p - 1)}>‹</button>
+                      {Array.from({length: deckTotalPages}, (_, i) => i + 1).map(p => (
+                        <button key={p} className={deckPage === p ? "active" : ""} onClick={() => setDeckPage(p)}>{p}</button>
+                      ))}
+                      <button disabled={deckPage === deckTotalPages} onClick={() => setDeckPage(p => p + 1)}>›</button>
+                    </div>
+                  )}
                 </section>
 
                 <section className="card list-section">
@@ -1439,6 +1620,16 @@ export default function App() {
                         {deck.commander && <span className="commander-badge">CMD</span>}
                         <ColorPips colors={deck.colors} />
                       </div>
+                      {deck.commanders?.length > 0 && (
+                        <div className="deck-commanders-row">
+                          {deck.commanders.map(cmd => (
+                            <div key={cmd.id} className="deck-cmd-pill">
+                              {cmd.image_url && <img src={cmd.image_url} alt={cmd.name} className="deck-cmd-pill-img" />}
+                              <span className="deck-cmd-pill-name">👑 {cmd.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="deck-list-meta">
                         {deck.set_code && <span className="deck-set-label">{deck.set_code.toUpperCase()}</span>}
                         <span className="total-badge">{deck.card_count} cartas</span>
@@ -2343,7 +2534,7 @@ export default function App() {
                     <p className="confirm-card-question">Esta é a carta que você quer cadastrar?</p>
                     <div className="confirm-card-actions">
                       <button type="button" className="confirm-yes" onClick={handleConfirmCreate}>✓ Sim, cadastrar esta carta</button>
-                      <button type="button" className="confirm-no" onClick={() => setConfirmCard(null)}>← Voltar e editar</button>
+                      <button type="button" className="confirm-no" onClick={() => { if (confirmCard?.origin === "quickAdd") setQuickAddModal(true); setConfirmCard(null); }}>← Voltar e editar</button>
                     </div>
                   </>
                 ) : (
@@ -2355,12 +2546,34 @@ export default function App() {
                     </div>
                     <div className="confirm-card-actions">
                       <button type="button" className="confirm-yes" onClick={handleConfirmCreate}>✓ Cadastrar assim mesmo</button>
-                      <button type="button" className="confirm-no" onClick={() => setConfirmCard(null)}>← Voltar e editar</button>
+                      <button type="button" className="confirm-no" onClick={() => { if (confirmCard?.origin === "quickAdd") setQuickAddModal(true); setConfirmCard(null); }}>← Voltar e editar</button>
                     </div>
                   </>
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL ANOMALIAS DO DECK ── */}
+      {deckAnomalyModal && (
+        <div className="modal-overlay" onClick={() => setDeckAnomalyModal(false)}>
+          <div className="modal anomaly-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setDeckAnomalyModal(false)}>✕</button>
+            <h2 className="anomaly-modal-title">⚠️ Anomalias do deck</h2>
+            <p className="anomaly-modal-sub">{managingDeck?.name}</p>
+            <div className="anomaly-list">
+              {deckAnomalies.map((a, i) => (
+                <div key={i} className="anomaly-item">
+                  <span className="anomaly-icon">{a.icon}</span>
+                  <div className="anomaly-text">
+                    <strong>{a.label}</strong>
+                    <span>{a.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
