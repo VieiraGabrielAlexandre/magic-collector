@@ -286,17 +286,19 @@ function renderEvalMarkdown(text) {
 
 // ── Deck theme colors ───────────────────────────────────────────────────
 const DECK_THEME_COLORS = [
-  { id: "",          label: "Nenhuma"                                                   },
-  { id: "crimson",   label: "Vermelho",  bg: "#3a0c0c", border: "#7a2020", text: "#ff9090" },
-  { id: "sapphire",  label: "Azul",      bg: "#081428", border: "#1a4080", text: "#80c0ff" },
-  { id: "emerald",   label: "Verde",     bg: "#071a0c", border: "#1a5828", text: "#80d890" },
-  { id: "violet",    label: "Roxo",      bg: "#150a28", border: "#4a2890", text: "#c090f0" },
-  { id: "gold",      label: "Dourado",   bg: "#221404", border: "#805010", text: "#e8c060" },
-  { id: "teal",      label: "Turquesa",  bg: "#041820", border: "#0c6878", text: "#60d0c8" },
-  { id: "ember",     label: "Laranja",   bg: "#280e04", border: "#904010", text: "#f09050" },
-  { id: "silver",    label: "Prata",     bg: "#0e1218", border: "#384858", text: "#a0b8c8" },
-  { id: "rose",      label: "Rosa",      bg: "#280a18", border: "#8a1e50", text: "#f080b0" },
-  { id: "bone",      label: "Marfim",    bg: "#1c1608", border: "#6a5828", text: "#e0d8b0" },
+  { id: "",          label: "Nenhuma"                                                                        },
+  { id: "pearl",     label: "Branco",    bg: "#181614", border: "#b0a898", text: "#eeeade", swatch: "#ccc4b4" },
+  { id: "obsidian",  label: "Preto",     bg: "#07060e", border: "#28203c", text: "#7a6092", swatch: "#0e0b1c" },
+  { id: "crimson",   label: "Vermelho",  bg: "#3a0c0c", border: "#7a2020", text: "#ff9090"                   },
+  { id: "sapphire",  label: "Azul",      bg: "#081428", border: "#1a4080", text: "#80c0ff"                   },
+  { id: "emerald",   label: "Verde",     bg: "#071a0c", border: "#1a5828", text: "#80d890"                   },
+  { id: "violet",    label: "Roxo",      bg: "#150a28", border: "#4a2890", text: "#c090f0"                   },
+  { id: "gold",      label: "Dourado",   bg: "#221404", border: "#805010", text: "#e8c060"                   },
+  { id: "teal",      label: "Turquesa",  bg: "#041820", border: "#0c6878", text: "#60d0c8"                   },
+  { id: "ember",     label: "Laranja",   bg: "#280e04", border: "#904010", text: "#f09050"                   },
+  { id: "silver",    label: "Prata",     bg: "#0e1218", border: "#384858", text: "#a0b8c8"                   },
+  { id: "rose",      label: "Rosa",      bg: "#280a18", border: "#8a1e50", text: "#f080b0"                   },
+  { id: "bone",      label: "Marfim",    bg: "#1c1608", border: "#6a5828", text: "#e0d8b0"                   },
 ];
 
 function getDeckTheme(themeId) {
@@ -350,7 +352,7 @@ function DeckColorSelect({ value, onChange }) {
     <label>
       Cor do deck
       <div className="deck-color-select-row">
-        {theme?.bg && <span className="deck-color-swatch" style={{ background: theme.bg, borderColor: theme.border }} />}
+        {theme?.bg && <span className="deck-color-swatch" style={{ background: theme.swatch ?? theme.bg, borderColor: theme.border }} />}
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -2349,49 +2351,40 @@ export default function App() {
                                 <span className="score-prow-elim-tag">
                                   {player.eliminated_reason === "life" && "☠ Sem vida"}
                                   {player.eliminated_reason === "commander_damage" && "⚔ Cmd damage"}
-                                  {player.eliminated_reason === "poison" && "☣ Tóxico"}
                                 </span>
                               )}
                               {isWinner && <span className="score-prow-winner-tag">🏆 Vencedor!</span>}
                             </div>
+                            {!isElim && (
+                              <div className="score-life-header">
+                                <span className="score-life-icon">❤️</span>
+                                <span className={`score-life-big${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>
+                                  {player.life}
+                                </span>
+                              </div>
+                            )}
                             {!isFinished && activeSession.players.length > 2 && (
                               <button type="button" className="score-remove-player" title="Remover" onClick={() => handleRemoveSessionPlayer(player.id)}>✕</button>
                             )}
                           </div>
 
                           {!isElim && (
-                            <div className="score-prow-stats">
-                              {/* Linha 1 – Vida ocupa a largura toda */}
-                              <div className="score-pstat score-pstat-life">
-                                <span className="score-pstat-icon" title="Vida">❤️</span>
+                            <div className="score-controls">
+                              <div className="score-life-row">
                                 <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
                                 <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
-                                <span className={`score-pstat-val${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>{player.life}</span>
                                 <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
                                 <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
                               </div>
-
-                              {/* Linha 2 – Cmd e Tóxico lado a lado */}
-                              <div className="score-prow-subrow">
-                                <div className="score-pstat score-pstat-sub">
-                                  <span className="score-pstat-icon" title="Dano de Comandante">⚔️</span>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
-                                  <span className={`score-pstat-val score-pstat-val-sub${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
-                                    {player.commander_damage_received}<small>/21</small>
-                                  </span>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
-                                </div>
-
-                                <div className="score-pstat score-pstat-sub">
-                                  <span className="score-pstat-icon" title="Contadores de Veneno">☣️</span>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "poison", -1)}>−1</button>
-                                  <span className={`score-pstat-val score-pstat-val-sub${player.poison >= 10 ? " dead" : player.poison >= 7 ? " low" : ""}`}>
-                                    {player.poison}<small>/10</small>
-                                  </span>
-                                  <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "poison", +1)}>+1</button>
-                                </div>
+                              <div className="score-cmd-row">
+                                <span className="score-cmd-label">⚔️ Cmd</span>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
+                                <span className={`score-cmd-val${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
+                                  {player.commander_damage_received}<small>/21</small>
+                                </span>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
+                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
                               </div>
                             </div>
                           )}

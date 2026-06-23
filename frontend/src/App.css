@@ -5065,99 +5065,123 @@ input[type="radio"] {
 }
 .score-remove-player:hover { color: #f85149; background: rgba(248,81,73,0.1); }
 
-/* Stats: coluna com duas linhas */
-.score-prow-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.score-pstat {
+/* ── Life display no header ── */
+.score-life-header {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 2px;
 }
-
-/* Linha 1 – Vida preenche toda a largura */
-.score-pstat-life {
-  width: 100%;
-}
-.score-pstat-life button {
-  flex: 1;
-}
-
-/* Linha 2 – Cmd + Tóxico lado a lado */
-.score-prow-subrow {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-.score-pstat-sub {
-  flex: 1;
-  min-width: 140px;
-}
-
-.score-pstat-icon {
-  font-size: 1.05rem;
-  flex-shrink: 0;
-  width: 22px;
-  text-align: center;
-  line-height: 1;
-}
-
-/* Valor da vida (grande) */
-.score-pstat-val {
-  font-size: 2.2rem;
+.score-life-icon { font-size: 0.9rem; line-height: 1; }
+.score-life-big {
+  font-size: 2.6rem;
   font-weight: 900;
-  color: #e6edf3;
+  color: var(--pcolor, #388bfd);
   font-variant-numeric: tabular-nums;
-  min-width: 2.5ch;
-  text-align: center;
-  flex-shrink: 0;
+  min-width: 2ch;
+  text-align: right;
   line-height: 1;
 }
-/* Valor menor para cmd/veneno */
-.score-pstat-val-sub {
-  font-size: 1.5rem;
-}
-.score-pstat-val small {
-  font-size: 0.42em;
-  color: #6e7681;
-  font-weight: 400;
-  vertical-align: super;
-  margin-left: 1px;
-}
-.score-pstat-val.low { color: #d29922; }
-.score-pstat-val.dead { color: #f85149; }
+.score-life-big.low  { color: #d29922; }
+.score-life-big.dead { color: #f85149; }
 
-.score-pstat button {
+/* ── Controles ── */
+.score-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Botões de vida — 4 colunas iguais */
+.score-life-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.score-life-row button {
   background: #21262d;
   border: 1px solid #30363d;
   color: #c9d1d9;
-  border-radius: 7px;
-  padding: 8px 10px;
-  font-size: 0.82rem;
+  border-radius: 8px;
+  padding: 11px 0;
+  font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
-  min-height: 40px;
+  touch-action: manipulation;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none;
+}
+.score-life-row button:hover:not(:disabled) {
+  background: var(--pcolor, #388bfd);
+  border-color: var(--pcolor, #388bfd);
+  color: #fff;
+}
+.score-life-row button:active:not(:disabled) { filter: brightness(1.2); }
+.score-life-row button:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* Faixa de dano de comandante */
+.score-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+.score-cmd-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+.score-cmd-row button {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
   touch-action: manipulation;
   transition: background 0.1s, border-color 0.1s, color 0.1s;
   user-select: none;
   white-space: nowrap;
 }
-.score-pstat button:hover:not(:disabled) {
-  background: var(--pcolor, #388bfd);
-  border-color: var(--pcolor, #388bfd);
-  color: #fff;
+.score-cmd-row button:hover:not(:disabled) {
+  background: rgba(200,155,60,0.18);
+  border-color: var(--gold-dim);
+  color: var(--gold-light);
 }
-.score-pstat button:active:not(:disabled) { filter: brightness(1.25); }
-.score-pstat button:disabled { opacity: 0.3; cursor: not-allowed; }
+.score-cmd-row button:active:not(:disabled) { filter: brightness(1.2); }
+.score-cmd-row button:disabled { opacity: 0.25; cursor: not-allowed; }
+.score-cmd-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #e6edf3;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+  text-align: center;
+  flex: 1;
+}
+.score-cmd-val small {
+  font-size: 0.55em;
+  color: #6e7681;
+  font-weight: 400;
+}
+.score-cmd-val.low  { color: #d29922; }
+.score-cmd-val.dead { color: #f85149; }
 
 @media (max-width: 520px) {
-  .score-pstat-val { font-size: 1.9rem; }
-  .score-pstat-val-sub { font-size: 1.3rem; }
-  .score-pstat button { padding: 8px 7px; }
-  .score-prow { padding: 0.65rem 0.75rem; }
+  .score-life-big { font-size: 2.1rem; }
+  .score-prow { padding: 0.7rem 0.8rem; }
+  .score-life-row button { padding: 10px 0; }
 }
 
 /* ── Add player area ── */
