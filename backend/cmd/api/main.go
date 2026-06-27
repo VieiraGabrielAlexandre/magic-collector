@@ -97,6 +97,7 @@ func main() {
 	api.POST("/cards/refresh-prices", handler.RefreshPrices)
 	api.POST("/cards/refresh-images", handler.RefreshImages)
 	api.POST("/cards/suggest-decks", handler.SuggestDecks)
+	api.POST("/cards/analyze-deck", handler.AnalyzeDeck)
 	api.POST("/cards", handler.Create)
 	api.GET("/cards/:id", handler.GetByID)
 	api.PUT("/cards/:id", handler.Update)

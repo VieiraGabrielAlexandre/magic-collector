@@ -511,12 +511,16 @@ func (r *Repository) UpdateColorsAndMTGID(id int, mtgID, colors, color string) e
 	return err
 }
 
-// EvalCardInfo contém os campos mínimos necessários para gerar a avaliação IA de um deck.
+// EvalCardInfo contém os campos necessários para gerar a avaliação IA de um deck.
 type EvalCardInfo struct {
-	Name     string
-	Type     string
-	ManaCost string
-	Rarity   string
+	Name             string
+	Type             string
+	ManaCost         string
+	Rarity           string
+	SetCode          string
+	CollectionNumber string
+	Quantity         int
+	IsCommander      bool
 }
 
 // ColorCombo representa uma combinação de cores disponível na coleção.
@@ -597,6 +601,19 @@ type DeckBuilderCard struct {
 	Rarity   string
 	Colors   string
 	Quantity int
+}
+
+// AnalysisCard inclui set_code, collection_number e image_url para a tela de análise completa.
+type AnalysisCard struct {
+	Name             string
+	Type             string
+	ManaCost         string
+	Rarity           string
+	Colors           string
+	Quantity         int
+	SetCode          string
+	CollectionNumber string
+	ImageURL         string
 }
 
 // ── Estatísticas da coleção ─────────────────────────────────────────────
@@ -712,6 +729,37 @@ func (r *Repository) GetStats() (CollectionStats, error) {
 	return s, nil
 }
 
+// ListAllForAnalysis retorna TODAS as cartas da coleção (independente de deck)
+// agrupadas por nome, para a tela de análise completa.
+func (r *Repository) ListAllForAnalysis() ([]AnalysisCard, error) {
+	rows, err := r.db.Query(`
+		SELECT name,
+		       COALESCE(MAX(` + "`type`" + `), '') AS type,
+		       COALESCE(MAX(mana_cost), '') AS mana_cost,
+		       COALESCE(MAX(rarity), '') AS rarity,
+		       COALESCE(MAX(colors), '') AS colors,
+		       SUM(quantity) AS total_qty,
+		       COALESCE(MAX(set_code), '') AS set_code,
+		       COALESCE(MAX(collection_number), '') AS collection_number,
+		       COALESCE(MAX(image_url), '') AS image_url
+		FROM cards
+		GROUP BY name
+		ORDER BY ` + "`type`" + `, name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []AnalysisCard
+	for rows.Next() {
+		var c AnalysisCard
+		if err := rows.Scan(&c.Name, &c.Type, &c.ManaCost, &c.Rarity, &c.Colors, &c.Quantity, &c.SetCode, &c.CollectionNumber, &c.ImageURL); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}
+
 // ListForDeckBuilder retorna todas as cartas sem deck agrupadas por nome,
 // com a quantidade total disponível de cada uma.
 func (r *Repository) ListForDeckBuilder() ([]DeckBuilderCard, error) {
@@ -741,11 +789,12 @@ func (r *Repository) ListForDeckBuilder() ([]DeckBuilderCard, error) {
 	return result, nil
 }
 
-// ListForEval retorna nome, tipo, custo de mana e raridade de todas as cartas de um deck.
+// ListForEval retorna todos os dados necessários para gerar a avaliação IA de um deck.
 func (r *Repository) ListForEval(deckID int) ([]EvalCardInfo, error) {
 	rows, err := r.db.Query(
-		`SELECT name, COALESCE(` + "`type`" + `, ''), COALESCE(mana_cost, ''), COALESCE(rarity, '')
-		 FROM cards WHERE deck_id = ? ORDER BY ` + "`type`" + `, name`, deckID)
+		`SELECT name, COALESCE(`+"`type`"+`, ''), COALESCE(mana_cost, ''), COALESCE(rarity, ''),
+		        COALESCE(set_code, ''), COALESCE(collection_number, ''), quantity, commander
+		 FROM cards WHERE deck_id = ? ORDER BY commander DESC, `+"`type`"+`, name`, deckID)
 	if err != nil {
 		return nil, err
 	}
@@ -753,9 +802,11 @@ func (r *Repository) ListForEval(deckID int) ([]EvalCardInfo, error) {
 	var result []EvalCardInfo
 	for rows.Next() {
 		var c EvalCardInfo
-		if err := rows.Scan(&c.Name, &c.Type, &c.ManaCost, &c.Rarity); err != nil {
+		var cmdInt int
+		if err := rows.Scan(&c.Name, &c.Type, &c.ManaCost, &c.Rarity, &c.SetCode, &c.CollectionNumber, &c.Quantity, &cmdInt); err != nil {
 			return nil, err
 		}
+		c.IsCommander = cmdInt == 1
 		result = append(result, c)
 	}
 	return result, nil

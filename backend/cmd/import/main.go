@@ -90,7 +90,7 @@ func main() {
 		language := strings.TrimSpace(record[7])
 		yearStr := strings.TrimSpace(record[8])
 		artist := strings.TrimSpace(record[9])
-		company := strings.TrimSpace(record[10])
+		_ = strings.TrimSpace(record[10]) // company (coluna removida do banco)
 		foilStr := strings.ToLower(strings.TrimSpace(record[11]))
 
 		if name == "" {
@@ -122,7 +122,6 @@ func main() {
 				Language:         language,
 				Year:             year,
 				Artist:           artist,
-				Company:          company,
 				Foil:             foil,
 				Quantity:         1,
 				Condition:        "played",

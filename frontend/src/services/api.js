@@ -161,6 +161,17 @@ export async function suggestDecks(params = {}) {
   return json;
 }
 
+export async function analyzeCollectionDeck(params = {}) {
+  const res = await authFetch(`${BASE_URL}/cards/analyze-deck`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(params),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao analisar coleção");
+  return json;
+}
+
 // ── Decks ─────────────────────────────────────────────────────────────────────
 
 export async function listDecks() {

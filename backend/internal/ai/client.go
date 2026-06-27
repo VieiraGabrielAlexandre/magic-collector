@@ -53,7 +53,7 @@ func (c *Client) Complete(prompt string) (string, error) {
 
 	body, _ := json.Marshal(chatRequest{
 		Model:     defaultModel,
-		MaxTokens: 4096,
+		MaxTokens: 8192,
 		Messages:  []chatMessage{{Role: "user", Content: prompt}},
 	})
 

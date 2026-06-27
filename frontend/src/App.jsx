@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, addGameSessionPlayer, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
@@ -241,7 +241,8 @@ function StatsPanel({ stats, loading }) {
   );
 }
 
-// ── AI Evaluation markdown renderer ─────────────────────────────────────
+// ── AI Evaluation renderers ───────────────────────────────────────────────
+
 function renderInlineBold(text) {
   const parts = text.split(/\*\*(.+?)\*\*/g);
   return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
@@ -276,6 +277,199 @@ function renderEvalMarkdown(text) {
   });
   flushList("end");
   return elements;
+}
+
+function EvalChips({ items }) {
+  if (!items || items.length === 0) return <span className="ej-empty">—</span>;
+  return (
+    <div className="ej-chips">
+      {items.map((item, i) => <span key={i} className="ej-chip">{item}</span>)}
+    </div>
+  );
+}
+
+function EvalCardList({ items }) {
+  if (!items || items.length === 0) return <span className="ej-empty">Nenhuma</span>;
+  return (
+    <ul className="ej-card-list">
+      {items.map((c, i) => <li key={i}>{c}</li>)}
+    </ul>
+  );
+}
+
+const BRACKET_LABELS = ["", "Casual", "Casual+", "Focado", "Otimizado", "Competitivo (cEDH)"];
+const BRACKET_COLORS = ["", "#4a7a3a", "#5a6a2a", "#8a6020", "#9a3a20", "#7a2080"];
+
+function EvalJSONView({ data }) {
+  const bracketColor = BRACKET_COLORS[data.bracket] || "#555";
+  const bracketLabel = BRACKET_LABELS[data.bracket] || `Bracket ${data.bracket}`;
+
+  function BoolBadge({ val }) {
+    return val
+      ? <span className="ej-bool-yes">Sim</span>
+      : <span className="ej-bool-no">Não</span>;
+  }
+
+  return (
+    <div className="ej-root">
+
+      {/* ── Arquétipos ── */}
+      <div className="ej-archetypes">
+        <div className="ej-arch-main">{data.arch_principal || "—"}</div>
+        {data.arch_secundary && <div className="ej-arch-sec">{data.arch_secundary}</div>}
+      </div>
+
+      {/* ── Plano de jogo ── */}
+      <div className="ej-section">
+        <div className="ej-row2">
+          <div className="ej-block">
+            <div className="ej-label">Plano de Jogo</div>
+            <p className="ej-text">{data.game_plan}</p>
+          </div>
+          <div className="ej-block">
+            <div className="ej-label">Como Vence</div>
+            <p className="ej-text">{data.win_condition}</p>
+          </div>
+        </div>
+        <div className="ej-row2">
+          <div className="ej-block">
+            <div className="ej-label">Recuperação de Recursos</div>
+            <p className="ej-text">{data.resource_recovery}</p>
+          </div>
+          {data.has_plan_b && (
+            <div className="ej-block">
+              <div className="ej-label">Plano B</div>
+              <p className="ej-text">{data.plan_b || "—"}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Características ── */}
+      <div className="ej-section">
+        <div className="ej-traits">
+          <div className="ej-trait"><span className="ej-trait-label">Possui Explosão</span><BoolBadge val={data.has_explosion} /></div>
+          <div className="ej-trait"><span className="ej-trait-label">Possui Engine</span><BoolBadge val={data.has_engine} /></div>
+          <div className="ej-trait"><span className="ej-trait-label">Possui Plano B</span><BoolBadge val={data.has_plan_b} /></div>
+          <div className="ej-trait"><span className="ej-trait-label">Dep. do Comandante</span><span className="ej-trait-val">{data.commander_dependency || "—"}</span></div>
+        </div>
+      </div>
+
+      {/* ── Velocidade ── */}
+      {data.speed && (
+        <div className="ej-section">
+          <div className="ej-label">Velocidade</div>
+          <div className="ej-speed">
+            <div className="ej-speed-phase">
+              <div className="ej-speed-tag ej-speed-early">Early</div>
+              <p className="ej-speed-text">{data.speed.early || "—"}</p>
+            </div>
+            <div className="ej-speed-phase">
+              <div className="ej-speed-tag ej-speed-mid">Mid</div>
+              <p className="ej-speed-text">{data.speed.mid || "—"}</p>
+            </div>
+            <div className="ej-speed-phase">
+              <div className="ej-speed-tag ej-speed-late">Late</div>
+              <p className="ej-speed-text">{data.speed.late || "—"}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mecânicas, Keywords, Tribos ── */}
+      <div className="ej-section ej-row3">
+        <div className="ej-block">
+          <div className="ej-label">Mecânicas</div>
+          <EvalChips items={data.mechanics} />
+        </div>
+        <div className="ej-block">
+          <div className="ej-label">Keywords</div>
+          <EvalChips items={data.keywords} />
+        </div>
+        <div className="ej-block">
+          <div className="ej-label">Tribos</div>
+          <EvalChips items={data.tribes} />
+        </div>
+      </div>
+
+      {/* ── Análise de cartas ── */}
+      <div className="ej-section">
+        <div className="ej-label ej-section-title">Análise de Cartas</div>
+        <div className="ej-cards-grid">
+          <div className="ej-card-group ej-cg-core">
+            <div className="ej-cg-header">🔑 Núcleo do Deck</div>
+            <EvalCardList items={data.core_cards} />
+          </div>
+          <div className="ej-card-group ej-cg-win">
+            <div className="ej-cg-header">🏆 Win Conditions</div>
+            <EvalCardList items={data.win_condition_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">⚡ Aceleram</div>
+            <EvalCardList items={data.acceleration_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">📚 Geram Vantagem</div>
+            <EvalCardList items={data.advantage_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">🛡 Protegem</div>
+            <EvalCardList items={data.protection_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">✂ Removem</div>
+            <EvalCardList items={data.removal_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">⚙ Engine</div>
+            <EvalCardList items={data.engine_cards} />
+          </div>
+          <div className="ej-card-group ej-cg-never">
+            <div className="ej-cg-header">💎 Nunca Removeria</div>
+            <EvalCardList items={data.never_remove_cards} />
+          </div>
+          <div className="ej-card-group">
+            <div className="ej-cg-header">🔄 Opcionais</div>
+            <EvalCardList items={data.optional_cards} />
+          </div>
+          {data.weak_cards && data.weak_cards.length > 0 && (
+            <div className="ej-card-group ej-cg-weak">
+              <div className="ej-cg-header">⚠ Parecem Fracas</div>
+              <EvalCardList items={data.weak_cards} />
+            </div>
+          )}
+          {data.displaced_cards && data.displaced_cards.length > 0 && (
+            <div className="ej-card-group ej-cg-displaced">
+              <div className="ej-cg-header">🚫 Deslocadas</div>
+              <EvalCardList items={data.displaced_cards} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Bracket ── */}
+      <div className="ej-section ej-bracket-section">
+        <div className="ej-bracket-badge" style={{ background: bracketColor }}>
+          <span className="ej-bracket-num">{data.bracket}</span>
+          <span className="ej-bracket-name">{bracketLabel}</span>
+        </div>
+        <p className="ej-text ej-bracket-exp">{data.bracket_explanation}</p>
+      </div>
+
+    </div>
+  );
+}
+
+function renderEvalContent(text) {
+  if (!text) return null;
+  // Tenta interpretar como JSON estruturado (novo formato)
+  try {
+    const data = JSON.parse(text);
+    if (data && typeof data === "object" && data.arch_principal) {
+      return <EvalJSONView data={data} />;
+    }
+  } catch (_) { /* não é JSON, usa markdown */ }
+  return renderEvalMarkdown(text);
 }
 
 // ── Deck theme colors ───────────────────────────────────────────────────
@@ -439,6 +633,14 @@ export default function App() {
   const [deckBuilderConfig, setDeckBuilderConfig] = useState(EMPTY_DECK_CONFIG);
   const [deckBuilderStep, setDeckBuilderStep] = useState("config"); // "config" | "loading" | "result"
   const [deckBuilderApproving, setDeckBuilderApproving] = useState(false);
+
+  // ── Tela de Análise de Deck ──────────────────────────────────────────────
+  const EMPTY_ANALYZE_CONFIG = { format: "auto", goal: "competitive", colors: "" };
+  const [analyzeConfig, setAnalyzeConfig] = useState(EMPTY_ANALYZE_CONFIG);
+  const [analyzeStep, setAnalyzeStep] = useState("config"); // config | loading | result
+  const [analyzeResult, setAnalyzeResult] = useState(null);
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [analyzeInnerTab, setAnalyzeInnerTab] = useState("selected"); // selected | rejected | list | analysis
 
   const [quickAddModal, setQuickAddModal] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
@@ -1170,6 +1372,26 @@ export default function App() {
     }
   }
 
+  async function handleAnalyzeDeck() {
+    setAnalyzeStep("loading");
+    setAnalyzeError("");
+    setAnalyzeResult(null);
+    try {
+      const result = await analyzeCollectionDeck(analyzeConfig);
+      if (result.error_ia) {
+        setAnalyzeError(result.error_ia);
+        setAnalyzeStep("config");
+        return;
+      }
+      setAnalyzeResult(result);
+      setAnalyzeInnerTab("selected");
+      setAnalyzeStep("result");
+    } catch (e) {
+      setAnalyzeError(e.message || "Erro ao analisar coleção");
+      setAnalyzeStep("config");
+    }
+  }
+
   async function handleAssignCard(cardId) {
     await assignCardToDeck(cardId, managingDeck.id);
     await Promise.all([loadDeckCards(managingDeck.id), loadUnassigned(unassignedPage, deckSearch)]);
@@ -1394,6 +1616,9 @@ export default function App() {
         <button role="tab" type="button" aria-selected={activeTab === "score"} className={`tab tab-score${activeTab === "score" ? " active" : ""}`} onClick={() => setActiveTab("score")}>
           <span className="tab-icon" aria-hidden="true">🎮</span><span className="tab-label">Pontuação</span>
         </button>
+        <button role="tab" type="button" aria-selected={activeTab === "analyze"} className={`tab tab-analyze${activeTab === "analyze" ? " active" : ""}`} onClick={() => setActiveTab("analyze")}>
+          <span className="tab-icon" aria-hidden="true">🧬</span><span className="tab-label">Análise</span>
+        </button>
       </nav>
 
       {activeTab === "decks" && (
@@ -1615,7 +1840,7 @@ export default function App() {
                       <span className="eval-meta">Gerado em {managingDeck.evaluated_at?.replace("T", " ") ?? ""}</span>
                       <button type="button" className="eval-redo-btn" onClick={handleEvaluate} disabled={evaluating}>♻ Refazer Avaliação</button>
                     </div>
-                    <div className="eval-content">{renderEvalMarkdown(managingDeck.evaluation)}</div>
+                    <div className="eval-content">{renderEvalContent(managingDeck.evaluation)}</div>
                   </>
                 ) : (
                   <div className="eval-empty">
@@ -3256,6 +3481,228 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── TELA DE ANÁLISE DE DECK ─────────────────────────────────────── */}
+      {activeTab === "analyze" && (
+        <section className="analyze-screen">
+
+          {/* Config */}
+          {analyzeStep === "config" && (
+            <div className="az-config-wrap">
+              <div className="az-config-card">
+                <h2 className="az-title">🧬 Análise de Coleção</h2>
+                <p className="az-subtitle">
+                  A IA analisa <strong>toda a sua coleção</strong> e monta o deck mais competitivo possível para o formato escolhido — ignorando se as cartas já estão em outros decks.
+                </p>
+
+                {analyzeError && (
+                  <div className="az-error">
+                    <span>⚠</span> {analyzeError}
+                    <button type="button" onClick={() => setAnalyzeError("")}>✕</button>
+                  </div>
+                )}
+
+                <div className="az-section">
+                  <span className="az-label">Formato</span>
+                  <div className="az-options">
+                    {[
+                      { id: "auto",      icon: "🤖", label: "Auto",      desc: "A IA escolhe o melhor" },
+                      { id: "commander", icon: "👑", label: "Commander",  desc: "100 cartas singleton" },
+                      { id: "casual60",  icon: "🃏", label: "60 Cartas",  desc: "Deck padrão" },
+                    ].map(f => (
+                      <button key={f.id} type="button"
+                        className={`az-opt${analyzeConfig.format === f.id ? " active" : ""}`}
+                        onClick={() => setAnalyzeConfig({ ...analyzeConfig, format: f.id })}>
+                        <span className="az-opt-icon">{f.icon}</span>
+                        <span className="az-opt-label">{f.label}</span>
+                        <span className="az-opt-desc">{f.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="az-section">
+                  <span className="az-label">Objetivo</span>
+                  <div className="az-options">
+                    {[
+                      { id: "competitive", icon: "⚡", label: "Competitivo", desc: "Máxima eficiência" },
+                      { id: "fun",         icon: "🎉", label: "Divertido",   desc: "Sinergias temáticas" },
+                    ].map(g => (
+                      <button key={g.id} type="button"
+                        className={`az-opt${analyzeConfig.goal === g.id ? " active" : ""}`}
+                        onClick={() => setAnalyzeConfig({ ...analyzeConfig, goal: g.id })}>
+                        <span className="az-opt-icon">{g.icon}</span>
+                        <span className="az-opt-label">{g.label}</span>
+                        <span className="az-opt-desc">{g.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="az-section">
+                  <span className="az-label">Cores <em className="az-label-hint">(opcional — restringe identidade de cor)</em></span>
+                  <div className="az-color-picker">
+                    {[
+                      { code: "W", label: "Branco", bg: "#f9fafb", fg: "#000" },
+                      { code: "U", label: "Azul",   bg: "#3b82f6", fg: "#fff" },
+                      { code: "B", label: "Preto",  bg: "#6b21a8", fg: "#fff" },
+                      { code: "R", label: "Vermelho", bg: "#dc2626", fg: "#fff" },
+                      { code: "G", label: "Verde",  bg: "#16a34a", fg: "#fff" },
+                    ].map(({ code, label, bg, fg }) => {
+                      const selected = analyzeConfig.colors.split(",").filter(Boolean).includes(code);
+                      return (
+                        <button key={code} type="button" title={label}
+                          className={`az-color-btn${selected ? " active" : ""}`}
+                          style={{ "--c-bg": bg, "--c-fg": fg }}
+                          onClick={() => {
+                            const cur = analyzeConfig.colors ? analyzeConfig.colors.split(",").filter(Boolean) : [];
+                            const next = selected ? cur.filter(c => c !== code) : [...cur, code];
+                            setAnalyzeConfig({ ...analyzeConfig, colors: next.join(",") });
+                          }}>
+                          {code}
+                        </button>
+                      );
+                    })}
+                    {analyzeConfig.colors && (
+                      <button type="button" className="az-color-clear"
+                        onClick={() => setAnalyzeConfig({ ...analyzeConfig, colors: "" })}>
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <button type="button" className="az-run-btn" onClick={handleAnalyzeDeck}>
+                  🧬 Analisar Coleção
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Loading */}
+          {analyzeStep === "loading" && (
+            <div className="az-loading">
+              <div className="az-loading-orb"></div>
+              <p className="az-loading-title">Analisando sua coleção…</p>
+              <p className="az-loading-sub">A IA está avaliando todas as cartas e montando o deck ideal.<br/>Isso pode levar 1–3 minutos.</p>
+            </div>
+          )}
+
+          {/* Result */}
+          {analyzeStep === "result" && analyzeResult && (
+            <div className="az-result">
+
+              {/* Deck header */}
+              <div className="az-deck-header">
+                <div className="az-deck-info">
+                  <h2 className="az-deck-name">{analyzeResult.deck_name || "Deck Sugerido"}</h2>
+                  <div className="az-deck-meta">
+                    {analyzeResult.deck_commander && <span className="az-badge az-badge-cmd">👑 Commander</span>}
+                    {analyzeResult.deck_colors && analyzeResult.deck_colors.split(",").map(c => (
+                      <span key={c} className={`az-color-pip az-pip-${c.trim().toLowerCase()}`}>{c.trim()}</span>
+                    ))}
+                    <span className="az-badge">{analyzeResult.card_count} cartas na coleção analisadas</span>
+                    {analyzeResult.selected_cards && <span className="az-badge az-badge-sel">✓ {analyzeResult.selected_cards.length} selecionadas</span>}
+                    {analyzeResult.rejected_cards && <span className="az-badge az-badge-rej">✗ {analyzeResult.rejected_cards.length} descartadas</span>}
+                  </div>
+                  {analyzeResult.deck_description && <p className="az-deck-desc">{analyzeResult.deck_description}</p>}
+                </div>
+                <button type="button" className="az-restart-btn" onClick={() => { setAnalyzeStep("config"); setAnalyzeResult(null); }}>
+                  ↩ Nova Análise
+                </button>
+              </div>
+
+              {/* Inner tabs */}
+              <div className="az-inner-tabs">
+                <button type="button" className={`az-inner-tab${analyzeInnerTab === "selected" ? " active" : ""}`} onClick={() => setAnalyzeInnerTab("selected")}>
+                  ✓ Selecionadas <span className="az-tab-count">{analyzeResult.selected_cards?.length ?? 0}</span>
+                </button>
+                <button type="button" className={`az-inner-tab${analyzeInnerTab === "rejected" ? " active" : ""}`} onClick={() => setAnalyzeInnerTab("rejected")}>
+                  ✗ Descartadas <span className="az-tab-count">{analyzeResult.rejected_cards?.length ?? 0}</span>
+                </button>
+                <button type="button" className={`az-inner-tab${analyzeInnerTab === "list" ? " active" : ""}`} onClick={() => setAnalyzeInnerTab("list")}>
+                  📋 Lista do Deck
+                </button>
+                <button type="button" className={`az-inner-tab${analyzeInnerTab === "analysis" ? " active" : ""}`} onClick={() => setAnalyzeInnerTab("analysis")}>
+                  📊 Análise
+                </button>
+              </div>
+
+              {/* Selected cards */}
+              {analyzeInnerTab === "selected" && (
+                <div className="az-cards-panel">
+                  {analyzeResult.lands && (
+                    <div className="az-lands-row">
+                      <span className="az-lands-icon">🌲</span>
+                      <span className="az-lands-count">{analyzeResult.lands.total} terrenos</span>
+                      <span className="az-lands-reason">{analyzeResult.lands.motivo}</span>
+                    </div>
+                  )}
+                  <div className="az-cards-grid">
+                    {(analyzeResult.selected_cards || []).map((card, i) => (
+                      <div key={i} className="az-card-item">
+                        <div className="az-card-top">
+                          <span className="az-card-name">{card.nome}</span>
+                          <span className="az-card-role az-role">{card.papel}</span>
+                        </div>
+                        <div className="az-card-mid">
+                          {card.conjunto && <span className="az-card-set">{card.conjunto} #{card.numero}</span>}
+                          {card.copias_usadas > 0 && <span className="az-card-copies">×{card.copias_usadas}</span>}
+                        </div>
+                        {card.motivo && <p className="az-card-reason">{card.motivo}</p>}
+                      </div>
+                    ))}
+                    {(!analyzeResult.selected_cards || analyzeResult.selected_cards.length === 0) && (
+                      <p className="az-empty">Nenhuma carta selecionada retornada.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Rejected cards */}
+              {analyzeInnerTab === "rejected" && (
+                <div className="az-cards-panel">
+                  <div className="az-rejected-list">
+                    {(analyzeResult.rejected_cards || []).map((card, i) => (
+                      <div key={i} className="az-rejected-item">
+                        <div className="az-rejected-top">
+                          <span className="az-card-name">{card.nome}</span>
+                          {card.papel && <span className="az-card-role az-role az-role-rej">{card.papel}</span>}
+                        </div>
+                        {card.motivo && <p className="az-card-reason az-reason-rej">{card.motivo}</p>}
+                      </div>
+                    ))}
+                    {(!analyzeResult.rejected_cards || analyzeResult.rejected_cards.length === 0) && (
+                      <p className="az-empty">Nenhuma carta descartada registrada.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Deck list */}
+              {analyzeInnerTab === "list" && (
+                <div className="az-cards-panel az-list-panel">
+                  <div className="az-list-actions">
+                    <button type="button" className="az-copy-btn"
+                      onClick={() => navigator.clipboard.writeText(analyzeResult.deck_list || "")}>
+                      📋 Copiar Lista
+                    </button>
+                  </div>
+                  <pre className="az-deck-list">{analyzeResult.deck_list}</pre>
+                </div>
+              )}
+
+              {/* Analysis */}
+              {analyzeInnerTab === "analysis" && (
+                <div className="az-cards-panel az-analysis-panel">
+                  <div className="eval-content">{renderEvalMarkdown(analyzeResult.analysis)}</div>
+                </div>
+              )}
+
+            </div>
+          )}
+        </section>
       )}
 
       {activeTab === "collection" && <section className="card list-section collection-full">

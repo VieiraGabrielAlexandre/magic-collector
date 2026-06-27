@@ -633,3 +633,309 @@ Regras do bloco CARTAS:
 		outputExample,
 	)
 }
+
+// ── Analyze Deck (tela de análise — usa TODAS as cartas da coleção) ───────────
+
+// AnalyzeInput parametriza a análise de deck completa.
+type AnalyzeInput struct {
+	Format string `json:"format"` // "auto" | "casual60" | "commander"
+	Goal   string `json:"goal"`   // "fun" | "competitive"
+	Colors string `json:"colors"`
+}
+
+// analyzeSelected é uma carta que entrou no deck.
+type analyzeSelected struct {
+	Nome        string `json:"nome"`
+	Conjunto    string `json:"conjunto"`
+	Numero      string `json:"numero"`
+	Papel       string `json:"papel"`
+	CopiasUsadas int   `json:"copias_usadas"`
+	Motivo      string `json:"motivo"`
+}
+
+// analyzeRejected é uma carta avaliada mas não incluída.
+type analyzeRejected struct {
+	Nome   string `json:"nome"`
+	Papel  string `json:"papel"`
+	Motivo string `json:"motivo"`
+}
+
+// analyzeTerrenosInfo resume os terrenos do deck.
+type analyzeTerrenosInfo struct {
+	Total  int    `json:"total"`
+	Motivo string `json:"motivo"`
+}
+
+// analyzeOutput agrega toda a resposta estruturada da IA.
+type analyzeOutput struct {
+	Selecionadas []analyzeSelected   `json:"selecionadas"`
+	Descartadas  []analyzeRejected   `json:"descartadas"`
+	Terrenos     analyzeTerrenosInfo `json:"terrenos"`
+}
+
+func parseAnalyzeOutput(raw string) (*deckSuggestion, *analyzeOutput, string, string) {
+	// Verifica bloco de erro
+	const errStart = "<<<ERRO>>>"
+	const errEnd = "<<<FIM_ERRO>>>"
+	if es := strings.Index(raw, errStart); es != -1 {
+		if ee := strings.Index(raw, errEnd); ee > es {
+			jsonStr := strings.TrimSpace(raw[es+len(errStart) : ee])
+			var errObj struct{ Motivo string `json:"motivo"` }
+			if json.Unmarshal([]byte(jsonStr), &errObj) == nil && errObj.Motivo != "" {
+				return nil, nil, "", errObj.Motivo
+			}
+			return nil, nil, "", jsonStr
+		}
+	}
+
+	// Extrai o bloco DECK
+	const deckStart = "<<<DECK>>>"
+	const deckEnd = "<<<FIM_DECK>>>"
+	var suggestion *deckSuggestion
+	ds := strings.Index(raw, deckStart)
+	de := strings.Index(raw, deckEnd)
+	if ds != -1 && de > ds {
+		var s deckSuggestion
+		if json.Unmarshal([]byte(strings.TrimSpace(raw[ds+len(deckStart):de])), &s) == nil {
+			suggestion = &s
+		}
+	}
+
+	// Extrai o bloco ANALISE
+	const analStart = "<<<ANALISE>>>"
+	const analEnd = "<<<FIM_ANALISE>>>"
+	var output *analyzeOutput
+	as := strings.Index(raw, analStart)
+	ae := strings.Index(raw, analEnd)
+	if as != -1 && ae > as {
+		var o analyzeOutput
+		if json.Unmarshal([]byte(strings.TrimSpace(raw[as+len(analStart):ae])), &o) == nil {
+			output = &o
+		}
+	}
+
+	// Extrai análise em texto livre (depois dos blocos)
+	analysis := ""
+	if ae != -1 {
+		analysis = strings.TrimSpace(raw[ae+len(analEnd):])
+	}
+
+	return suggestion, output, analysis, ""
+}
+
+func (h *Handler) AnalyzeDeck(c *gin.Context) {
+	var input AnalyzeInput
+	_ = c.ShouldBindJSON(&input)
+	if input.Format == "" {
+		input.Format = "auto"
+	}
+	if input.Goal == "" {
+		input.Goal = "fun"
+	}
+
+	cards, err := h.service.GetAllCardsForAnalysis()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar cartas: " + err.Error()})
+		return
+	}
+	if len(cards) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nenhuma carta encontrada na coleção"})
+		return
+	}
+
+	prompt := buildAnalyzePrompt(cards, input)
+	raw, err := h.aiClient.Complete(prompt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro na API de IA: " + err.Error()})
+		return
+	}
+
+	suggestion, output, analysis, errIA := parseAnalyzeOutput(raw)
+
+	resp := gin.H{"card_count": len(cards)}
+	if errIA != "" {
+		resp["error_ia"] = errIA
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	if suggestion != nil {
+		resp["deck_name"] = suggestion.Nome
+		resp["deck_colors"] = suggestion.Cores
+		resp["deck_commander"] = suggestion.Commander
+		resp["deck_list"] = suggestion.Lista
+		resp["deck_description"] = suggestion.Descricao
+	}
+	if output != nil {
+		resp["selected_cards"] = output.Selecionadas
+		resp["rejected_cards"] = output.Descartadas
+		resp["lands"] = output.Terrenos
+	}
+	resp["analysis"] = analysis
+	c.JSON(http.StatusOK, resp)
+}
+
+func buildAnalyzePrompt(cards []AnalysisCard, input AnalyzeInput) string {
+	cats := map[string][]string{
+		"Criatura": {}, "Planeswalker": {}, "Feitiço": {},
+		"Mágica Imediata": {}, "Artefato": {}, "Encantamento": {},
+		"Terreno": {}, "Outros": {},
+	}
+	order := []string{"Criatura", "Planeswalker", "Feitiço", "Mágica Imediata", "Artefato", "Encantamento", "Terreno", "Outros"}
+
+	totalQty := 0
+	for _, c := range cards {
+		totalQty += c.Quantity
+		t := strings.ToLower(c.Type)
+		group := "Outros"
+		switch {
+		case strings.Contains(t, "creature") || strings.Contains(t, "criatura"):
+			group = "Criatura"
+		case strings.Contains(t, "planeswalker"):
+			group = "Planeswalker"
+		case strings.Contains(t, "sorcery") || strings.Contains(t, "feitiço"):
+			group = "Feitiço"
+		case strings.Contains(t, "instant") || strings.Contains(t, "imediata"):
+			group = "Mágica Imediata"
+		case strings.Contains(t, "artifact") || strings.Contains(t, "artefato"):
+			group = "Artefato"
+		case strings.Contains(t, "enchantment") || strings.Contains(t, "encantamento"):
+			group = "Encantamento"
+		case strings.Contains(t, "land") || strings.Contains(t, "terreno"):
+			group = "Terreno"
+		}
+		set := strings.ToUpper(c.SetCode)
+		if set == "" {
+			set = "???"
+		}
+		entry := fmt.Sprintf("%s (%s #%s) ×%d", c.Name, set, c.CollectionNumber, c.Quantity)
+		if c.ManaCost != "" {
+			entry += " " + c.ManaCost
+		}
+		if c.Rarity != "" {
+			entry += " [" + c.Rarity + "]"
+		}
+		cats[group] = append(cats[group], entry)
+	}
+
+	var cardList strings.Builder
+	for _, cat := range order {
+		if len(cats[cat]) == 0 {
+			continue
+		}
+		cardList.WriteString(fmt.Sprintf("\n### %s (%d únicos)\n", cat, len(cats[cat])))
+		for _, entry := range cats[cat] {
+			cardList.WriteString("- " + entry + "\n")
+		}
+	}
+
+	formatInstr := buildFormatInstr(input.Format)
+	goalInstr := "**Objetivo: DIVERTIDO** — priorize sinergias temáticas, combos interessantes e plano de jogo divertido."
+	if input.Goal == "competitive" {
+		goalInstr = "**Objetivo: COMPETITIVO** — maximize consistência, eficiência, curva de mana, remoções e vantagem de cartas."
+	}
+	colorInstr := ""
+	if input.Colors != "" {
+		colorInstr = fmt.Sprintf("\n**Cores preferidas:** %s (em Commander, só se compatível com o comandante).", input.Colors)
+	}
+
+	return fmt.Sprintf(`Você é um especialista em Magic: The Gathering e deck-building.
+
+## COLEÇÃO COMPLETA (%d cópias totais, %d únicas)
+%s
+
+## PARÂMETROS
+%s
+%s
+%s
+
+## REGRAS GERAIS
+1. Use somente cartas da lista, respeitando quantidades.
+2. Terrenos básicos (Plains/Island/Swamp/Mountain/Forest) podem ser adicionados livremente.
+3. Em Commander: singleton, exatamente 100 cartas.
+4. Em Casual 60: até 4 cópias por carta, exatamente 60 cartas.
+5. Não invente cartas não-básicas.
+
+## FORMATO DE SAÍDA
+
+PASSO 1 — Deck (obrigatório):
+
+<<<DECK>>>
+{
+  "nome": "...",
+  "cores": "W,U,...",
+  "commander": true,
+  "descricao": "...",
+  "lista": "Commander\n1 Nome\n\nCriaturas\n1 Nome\n\nTerrenos\n8 Island"
+}
+<<<FIM_DECK>>>
+
+PASSO 2 — Análise estruturada de todas as cartas (obrigatório):
+
+<<<ANALISE>>>
+{
+  "selecionadas": [
+    {
+      "nome": "Nome Exato da Carta",
+      "conjunto": "SET",
+      "numero": "123",
+      "papel": "Ramp",
+      "copias_usadas": 1,
+      "motivo": "Por que esta carta está no deck"
+    }
+  ],
+  "descartadas": [
+    {
+      "nome": "Nome Exato da Carta",
+      "papel": "Remoção",
+      "motivo": "Por que foi excluída (cor, sinergia, eficiência...)"
+    }
+  ],
+  "terrenos": {
+    "total": 37,
+    "motivo": "Justificativa da quantidade e distribuição"
+  }
+}
+<<<FIM_ANALISE>>>
+
+Regras da análise:
+- "selecionadas": todas as cartas não-básicas incluídas no deck (exceto terrenos básicos).
+- "descartadas": todas as cartas avaliadas mas NÃO incluídas, com motivo claro.
+- "conjunto" e "numero": use exatamente como estão na lista da coleção.
+- Nunca omita cartas. Toda carta da coleção deve aparecer em "selecionadas" ou "descartadas".
+
+PASSO 3 — Análise estratégica em markdown:
+
+## Estratégia Central
+...
+
+## Sinergias Principais
+...
+
+## Como Jogar
+...
+
+## Pontos Fortes
+...
+
+## Limitações e o que comprar para melhorar
+...
+
+Se for impossível montar o deck, emita:
+<<<ERRO>>>
+{"motivo": "Explicação detalhada"}
+<<<FIM_ERRO>>>`,
+		totalQty, len(cards), cardList.String(),
+		formatInstr, goalInstr, colorInstr,
+	)
+}
+
+func buildFormatInstr(format string) string {
+	switch format {
+	case "commander":
+		return `**Formato: COMMANDER** — exatamente 100 cartas, com 1 comandante (criatura lendária), singleton para não-básicos, identidade de cor respeitada.`
+	case "casual60":
+		return `**Formato: CASUAL 60** — exatamente 60 cartas, sem comandante, até 4 cópias por carta não-básica, curva de mana jogável.`
+	default:
+		return `**Formato: AUTO** — escolha Commander se houver bom comandante e suporte, senão Casual 60. Siga todas as regras do formato escolhido.`
+	}
+}

@@ -27,6 +27,7 @@ type cardRepository interface {
 	ListColorCombos() ([]ColorCombo, error)
 	GetStats() (CollectionStats, error)
 	ListForDeckBuilder() ([]DeckBuilderCard, error)
+	ListAllForAnalysis() ([]AnalysisCard, error)
 }
 
 // mtgAPIClient abstrai chamadas à Scryfall para o Service.
@@ -58,5 +59,6 @@ type cardService interface {
 	RefreshImages() (ImageRefreshResult, error)
 	RefreshPrices(emptyOnly bool) (PriceRefreshResult, error)
 	GetCardsForDeckBuilder() ([]DeckBuilderCard, error)
+	GetAllCardsForAnalysis() ([]AnalysisCard, error)
 	ExportAll() ([]Card, error)
 }

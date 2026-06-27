@@ -240,6 +240,10 @@ func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {
 	return s.repository.ListForDeckBuilder()
 }
 
+func (s *Service) GetAllCardsForAnalysis() ([]AnalysisCard, error) {
+	return s.repository.ListAllForAnalysis()
+}
+
 func (s *Service) ListColorCombos() ([]ColorCombo, error) {
 	return s.repository.ListColorCombos()
 }
