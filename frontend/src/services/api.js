@@ -306,6 +306,50 @@ export async function acquireWishlistItem(id, data) {
   return json;
 }
 
+// ── Tokens ───────────────────────────────────────────────────────────────────
+
+export async function listTokens() {
+  const res = await authFetch(`${BASE_URL}/tokens`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function previewToken(data) {
+  const res = await authFetch(`${BASE_URL}/tokens/preview`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar token");
+  return json;
+}
+
+export async function createToken(data) {
+  const res = await authFetch(`${BASE_URL}/tokens`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao cadastrar token");
+  return json;
+}
+
+export async function updateTokenQuantity(id, quantity) {
+  await authFetch(`${BASE_URL}/tokens/${id}/quantity`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ quantity }),
+  });
+}
+
+export async function deleteToken(id) {
+  const res = await authFetch(`${BASE_URL}/tokens/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover token");
+  return res.json();
+}
+
 // ── Game Sessions ─────────────────────────────────────────────────────────────
 
 export async function listGameSessions() {

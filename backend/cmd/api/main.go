@@ -14,6 +14,7 @@ import (
 	game_sessions "magic-collection-api/internal/game_sessions"
 	"magic-collection-api/internal/importer"
 	"magic-collection-api/internal/mtgapi"
+	"magic-collection-api/internal/tokens"
 	"magic-collection-api/internal/wishlist"
 
 	"github.com/gin-gonic/gin"
@@ -64,6 +65,10 @@ func main() {
 	gameSessionRepo := game_sessions.NewRepository(db)
 	gameSessionSvc := game_sessions.NewService(gameSessionRepo)
 	gameSessionHandler := game_sessions.NewHandler(gameSessionSvc)
+
+	tokenRepo := tokens.NewRepository(db)
+	tokenSvc := tokens.NewService(tokenRepo, mtgClient)
+	tokenHandler := tokens.NewHandler(tokenSvc)
 
 	authRepo := auth.NewRepository(db)
 	authSvc := auth.NewService(authRepo)
@@ -119,6 +124,12 @@ func main() {
 	api.PUT("/wishlist/:id", wishlistHandler.Update)
 	api.DELETE("/wishlist/:id", wishlistHandler.Delete)
 	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
+
+	api.GET("/tokens", tokenHandler.List)
+	api.POST("/tokens/preview", tokenHandler.Preview)
+	api.POST("/tokens", tokenHandler.Create)
+	api.PATCH("/tokens/:id/quantity", tokenHandler.UpdateQuantity)
+	api.DELETE("/tokens/:id", tokenHandler.Delete)
 
 	api.GET("/game-sessions", gameSessionHandler.List)
 	api.POST("/game-sessions", gameSessionHandler.Create)

@@ -201,6 +201,37 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS tokens (
+			id                INT          NOT NULL AUTO_INCREMENT,
+			name              VARCHAR(255) NOT NULL DEFAULT '',
+			type_line         VARCHAR(255) NOT NULL DEFAULT '',
+			oracle_text       TEXT         NOT NULL,
+			power             VARCHAR(10)  NOT NULL DEFAULT '',
+			toughness         VARCHAR(10)  NOT NULL DEFAULT '',
+			colors            TEXT         NOT NULL,
+			set_code          VARCHAR(20)  NOT NULL DEFAULT '',
+			collection_number VARCHAR(20)  NOT NULL DEFAULT '',
+			mtg_id            VARCHAR(100) NOT NULL DEFAULT '',
+			image_url         TEXT         NOT NULL,
+			double_faced      TINYINT(1)   NOT NULL DEFAULT 0,
+			back_name         VARCHAR(255) NOT NULL DEFAULT '',
+			back_type_line    VARCHAR(255) NOT NULL DEFAULT '',
+			back_oracle_text  TEXT         NOT NULL,
+			back_image_url    TEXT         NOT NULL,
+			back_power        VARCHAR(10)  NOT NULL DEFAULT '',
+			back_toughness    VARCHAR(10)  NOT NULL DEFAULT '',
+			artist            VARCHAR(255) NOT NULL DEFAULT '',
+			quantity          INT          NOT NULL DEFAULT 1,
+			foil              TINYINT(1)   NOT NULL DEFAULT 0,
+			created_at        DATETIME     DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
 	seedUsers(db)
 
 	return db, nil

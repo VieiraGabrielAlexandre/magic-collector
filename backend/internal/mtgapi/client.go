@@ -72,10 +72,37 @@ type scryfallList struct {
 }
 
 type scryfallCardFace struct {
+	Name        string            `json:"name"`
+	TypeLine    string            `json:"type_line"`
+	OracleText  string            `json:"oracle_text"`
+	Power       string            `json:"power"`
+	Toughness   string            `json:"toughness"`
 	ImageURIs   map[string]string `json:"image_uris"`
 	PrintedName string            `json:"printed_name"`
 	ManaCost    string            `json:"mana_cost"`
 	Colors      []string          `json:"colors"`
+}
+
+// ExternalToken holds token data fetched from Scryfall (single or double-faced).
+type ExternalToken struct {
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	TypeLine         string   `json:"type_line"`
+	OracleText       string   `json:"oracle_text"`
+	Power            string   `json:"power"`
+	Toughness        string   `json:"toughness"`
+	Colors           []string `json:"colors"`
+	SetCode          string   `json:"set_code"`
+	CollectionNumber string   `json:"collection_number"`
+	ImageURL         string   `json:"image_url"`
+	DoubleFaced      bool     `json:"double_faced"`
+	BackName         string   `json:"back_name"`
+	BackTypeLine     string   `json:"back_type_line"`
+	BackOracleText   string   `json:"back_oracle_text"`
+	BackImageURL     string   `json:"back_image_url"`
+	BackPower        string   `json:"back_power"`
+	BackToughness    string   `json:"back_toughness"`
+	Artist           string   `json:"artist"`
 }
 
 type scryfallCard struct {
@@ -468,6 +495,83 @@ func toLangCode(lang string) string {
 	default:
 		return "en"
 	}
+}
+
+// SearchToken busca um token da Scryfall pelo set base (sem o 't') e número.
+// A URL de busca é construída como: /cards/t{setCode}/{number}
+func (c *Client) SearchToken(setCode, number string) (*ExternalToken, error) {
+	if setCode == "" || number == "" {
+		return nil, nil
+	}
+	endpoint := fmt.Sprintf("%s/t%s/%s", apiBase, strings.ToLower(strings.TrimSpace(setCode)), strings.TrimSpace(number))
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "magic-collector/1.0")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+
+	var sc scryfallCard
+	if err := json.NewDecoder(resp.Body).Decode(&sc); err != nil {
+		return nil, err
+	}
+	if sc.ID == "" {
+		return nil, nil
+	}
+
+	tok := &ExternalToken{
+		ID:               sc.ID,
+		Name:             sc.Name,
+		TypeLine:         sc.TypeLine,
+		OracleText:       sc.OracleText,
+		Power:            sc.Power,
+		Toughness:        sc.Toughness,
+		Colors:           sc.Colors,
+		SetCode:          strings.ToUpper(sc.Set),
+		CollectionNumber: sc.CollectorNumber,
+		Artist:           sc.Artist,
+	}
+	if sc.ImageURIs != nil {
+		tok.ImageURL = sc.ImageURIs["normal"]
+	}
+
+	if len(sc.CardFaces) >= 2 {
+		tok.DoubleFaced = true
+		f0, f1 := sc.CardFaces[0], sc.CardFaces[1]
+		if f0.Name != "" {
+			tok.Name = f0.Name
+		}
+		if len(f0.Colors) > 0 {
+			tok.Colors = f0.Colors
+		}
+		tok.TypeLine = f0.TypeLine
+		tok.OracleText = f0.OracleText
+		tok.Power = f0.Power
+		tok.Toughness = f0.Toughness
+		if f0.ImageURIs != nil {
+			tok.ImageURL = f0.ImageURIs["normal"]
+		}
+		tok.BackName = f1.Name
+		tok.BackTypeLine = f1.TypeLine
+		tok.BackOracleText = f1.OracleText
+		tok.BackPower = f1.Power
+		tok.BackToughness = f1.Toughness
+		if f1.ImageURIs != nil {
+			tok.BackImageURL = f1.ImageURIs["normal"]
+		}
+	}
+
+	return tok, nil
 }
 
 // artistsMatch retorna true quando os nomes de artista são compatíveis.

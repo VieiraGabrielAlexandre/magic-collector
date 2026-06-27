@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, addGameSessionPlayer, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listWishlist, logout, previewCard, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer } from "./services/api";
+import { acquireWishlistItem, addGameSessionPlayer, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
-const EMPTY_FORM = {
-  name: "", color: "", type: "", subtitle: "", collection_number: "",
-  rarity: "", set_code: "", language: "PT", year: "", artist: "",
-  foil: false, full_art: false, prerelease: false, commander: false, deck_id: 0, quantity: 1,
-  condition: "played", notes: "",
-};
 
 const SORT_OPTIONS = [
   { value: "name", label: "Nome" },
@@ -414,8 +408,6 @@ export default function App() {
     setSessionElapsed("");
   }
 
-  const [form, setForm] = useState(EMPTY_FORM);
-
   const [cards, setCards] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalQuantity, setTotalQuantity] = useState(0);
@@ -524,6 +516,18 @@ export default function App() {
   const [listResult, setListResult] = useState(null);
   const [listError, setListError] = useState("");
 
+  // ── Tokens ─────────────────────────────────────────────────────────────────
+  const EMPTY_TOKEN_FORM = { set_code: "", collection_number: "", quantity: 1, foil: false, double_faced: false, back_set_code: "", back_collection_number: "" };
+  const [tokenList, setTokenList] = useState([]);
+  const [tokenAddModal, setTokenAddModal] = useState(false);
+  const [tokenForm, setTokenForm] = useState(EMPTY_TOKEN_FORM);
+  const [tokenPreviewFront, setTokenPreviewFront] = useState(null); // { found, token }
+  const [tokenPreviewBack, setTokenPreviewBack] = useState(null);   // { found, token }
+  const [tokenSearchingFront, setTokenSearchingFront] = useState(false);
+  const [tokenSearchingBack, setTokenSearchingBack] = useState(false);
+  const [tokenSearchError, setTokenSearchError] = useState("");
+  const [tokenDetail, setTokenDetail] = useState(null);
+
   const searchTimer = useRef(null);
   const deckSearchTimer = useRef(null);
 
@@ -557,6 +561,87 @@ export default function App() {
   async function loadBattles() {
     const data = await listBattles();
     setBattles(data ?? []);
+  }
+
+  async function loadTokensList() {
+    const data = await listTokens();
+    setTokenList(data ?? []);
+  }
+
+  async function handleTokenSearchFront(e) {
+    e.preventDefault();
+    setTokenSearchingFront(true);
+    setTokenSearchError("");
+    setTokenPreviewFront(null);
+    try {
+      const result = await previewToken({ set_code: tokenForm.set_code, collection_number: tokenForm.collection_number });
+      setTokenPreviewFront(result);
+      if (!result.found) setTokenSearchError("Frente não encontrada na Scryfall. Verifique o código e número.");
+    } catch (err) {
+      setTokenSearchError(err.message || "Erro ao buscar frente");
+    } finally {
+      setTokenSearchingFront(false);
+    }
+  }
+
+  async function handleTokenSearchBack(e) {
+    e.preventDefault();
+    setTokenSearchingBack(true);
+    setTokenSearchError("");
+    setTokenPreviewBack(null);
+    try {
+      const result = await previewToken({ set_code: tokenForm.back_set_code, collection_number: tokenForm.back_collection_number });
+      setTokenPreviewBack(result);
+      if (!result.found) setTokenSearchError("Verso não encontrado na Scryfall. Verifique o código e número.");
+    } catch (err) {
+      setTokenSearchError(err.message || "Erro ao buscar verso");
+    } finally {
+      setTokenSearchingBack(false);
+    }
+  }
+
+  async function handleTokenConfirm() {
+    const isSaving = tokenSearchingFront || tokenSearchingBack;
+    if (isSaving) return;
+    setTokenSearchingFront(true);
+    try {
+      const payload = {
+        set_code: tokenForm.set_code,
+        collection_number: tokenForm.collection_number,
+        quantity: Number(tokenForm.quantity),
+        foil: tokenForm.foil,
+      };
+      if (tokenForm.double_faced && tokenPreviewFront?.found && tokenPreviewBack?.found) {
+        payload.back_set_code = tokenForm.back_set_code;
+        payload.back_collection_number = tokenForm.back_collection_number;
+      }
+      await createToken(payload);
+      setTokenPreviewFront(null);
+      setTokenPreviewBack(null);
+      setTokenForm(EMPTY_TOKEN_FORM);
+      setTokenAddModal(false);
+      await loadTokensList();
+    } catch (err) {
+      setTokenSearchError(err.message || "Erro ao cadastrar token");
+    } finally {
+      setTokenSearchingFront(false);
+    }
+  }
+
+  async function handleTokenDelete(id) {
+    await deleteToken(id);
+    await loadTokensList();
+  }
+
+  async function handleTokenQuantityChange(tok, delta) {
+    const newQty = Math.max(1, (tok.quantity || 1) + delta);
+    if (newQty === tok.quantity) return;
+    setTokenList(prev => prev.map(t => t.id === tok.id ? { ...t, quantity: newQty } : t));
+    try {
+      await updateTokenQuantity(tok.id, newQty);
+    } catch {
+      setTokenList(prev => prev.map(t => t.id === tok.id ? { ...t, quantity: tok.quantity } : t));
+    }
   }
 
   async function handleBattleSubmit(e) {
@@ -777,6 +862,7 @@ export default function App() {
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
   useEffect(() => { loadGameSessions(); }, []);
+  useEffect(() => { loadTokensList(); }, []);
   useEffect(() => {
     listColorCombos().then(data => setAvailableColors(data ?? []));
   }, []);
@@ -806,27 +892,10 @@ export default function App() {
     loadCards({ page: p });
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const colorArr = form.color.split(",").filter(Boolean);
-    const payload = { ...form, quantity: Number(form.quantity), year: Number(form.year) || 0, colors: JSON.stringify(colorArr) };
-    setConfirmLoading(true);
-    try {
-      const preview = await previewCard(payload);
-      setConfirmCard({ found: preview.found, card: preview.card ?? null, formData: payload });
-    } catch {
-      // Se o preview falhar (sem set_code, por exemplo), permite cadastrar diretamente
-      setConfirmCard({ found: false, card: null, formData: payload });
-    } finally {
-      setConfirmLoading(false);
-    }
-  }
-
   async function handleConfirmCreate() {
     if (!confirmCard) return;
     await createCard(confirmCard.formData);
     setConfirmCard(null);
-    setForm(EMPTY_FORM);
     setQuickAddForm({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
     setPage(1);
     loadCards({ page: 1 });
@@ -1165,13 +1234,6 @@ export default function App() {
     }
   }
 
-  const field = (label, key, extra = {}) => (
-    <label>
-      {label}
-      <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} {...extra} />
-    </label>
-  );
-
   const orderIcon = (f) => {
     if (sort !== f) return null;
     return order === "asc" ? " ↑" : " ↓";
@@ -1325,6 +1387,9 @@ export default function App() {
         </button>
         <button role="tab" type="button" aria-selected={activeTab === "wishlist"} className={`tab tab-wishlist${activeTab === "wishlist" ? " active" : ""}`} onClick={() => setActiveTab("wishlist")}>
           <span className="tab-icon" aria-hidden="true">⭐</span><span className="tab-label">Wishlist</span>
+        </button>
+        <button role="tab" type="button" aria-selected={activeTab === "tokens"} className={`tab tab-tokens${activeTab === "tokens" ? " active" : ""}`} onClick={() => setActiveTab("tokens")}>
+          <span className="tab-icon" aria-hidden="true">🎭</span><span className="tab-label">Tokens</span>
         </button>
         <button role="tab" type="button" aria-selected={activeTab === "score"} className={`tab tab-score${activeTab === "score" ? " active" : ""}`} onClick={() => setActiveTab("score")}>
           <span className="tab-icon" aria-hidden="true">🎮</span><span className="tab-label">Pontuação</span>
@@ -2112,6 +2177,252 @@ export default function App() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── ABA TOKENS ── */}
+      {activeTab === "tokens" && (
+        <div className="tokens-page">
+          <div className="tokens-page-header">
+            <h2>Tokens <span className="total-badge">{tokenList.length}</span></h2>
+            <button type="button" className="token-add-btn" onClick={() => { setTokenAddModal(true); setTokenPreviewFront(null); setTokenPreviewBack(null); setTokenForm(EMPTY_TOKEN_FORM); setTokenSearchError(""); }}>
+              ＋ Adicionar Token
+            </button>
+          </div>
+
+          {tokenList.length === 0 ? (
+            <p className="empty">Nenhum token cadastrado. Clique em "Adicionar Token" para buscar na Scryfall.</p>
+          ) : (
+            <div className="tokens-grid">
+              {tokenList.map(tok => (
+                <div key={tok.id} className={`token-card${tok.foil ? " token-foil" : ""}${tok.double_faced ? " token-dfc" : ""}`}
+                  onClick={() => setTokenDetail(tok)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && setTokenDetail(tok)}>
+                  <div className={`token-images${tok.double_faced && tok.back_image_url ? " token-images-dfc" : ""}`}>
+                    {tok.image_url
+                      ? <img src={tok.image_url} alt={tok.name} className="token-img" loading="lazy" />
+                      : <div className="token-img-placeholder">?</div>
+                    }
+                    {tok.double_faced && tok.back_image_url && (
+                      <img src={tok.back_image_url} alt={tok.back_name || tok.name} className="token-img" loading="lazy" />
+                    )}
+                  </div>
+                  <div className="token-body">
+                    <div className="token-name">
+                      {tok.name}
+                      {tok.double_faced && tok.back_name && tok.back_name !== tok.name && (
+                        <span className="token-dfc-sep"> ↔ {tok.back_name}</span>
+                      )}
+                    </div>
+                    <div className="token-type">{tok.type_line}</div>
+                    {tok.power && <div className="token-pt">{tok.power}/{tok.toughness}</div>}
+                    <div className="token-meta">
+                      <span className="token-set">{tok.set_code} #{tok.collection_number}</span>
+                      {tok.double_faced && <span className="token-dfc-badge">↔</span>}
+                      {tok.foil && <span className="token-foil-badge">✦</span>}
+                    </div>
+                    <div className="token-qty-row" onClick={e => e.stopPropagation()}>
+                      <button type="button" className="token-qty-btn" onClick={() => handleTokenQuantityChange(tok, -1)}>−</button>
+                      <span className="token-qty">×{tok.quantity}</span>
+                      <button type="button" className="token-qty-btn" onClick={() => handleTokenQuantityChange(tok, +1)}>+</button>
+                    </div>
+                  </div>
+                  <button type="button" className="token-delete-btn danger" aria-label="Remover token"
+                    onClick={e => { e.stopPropagation(); handleTokenDelete(tok.id); }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Modal detalhe do token */}
+          {tokenDetail && (
+            <div className="modal-overlay" onClick={() => setTokenDetail(null)}>
+              <div className="modal token-detail-modal" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" aria-label="Fechar" onClick={() => setTokenDetail(null)}>✕</button>
+                <div className="token-detail-images">
+                  {tokenDetail.image_url && (
+                    <img src={tokenDetail.image_url} alt={tokenDetail.name} className="token-detail-img" />
+                  )}
+                  {tokenDetail.double_faced && tokenDetail.back_image_url && (
+                    <img src={tokenDetail.back_image_url} alt={tokenDetail.back_name || tokenDetail.name} className="token-detail-img" />
+                  )}
+                </div>
+                <div className="token-detail-body">
+                  {/* Frente */}
+                  <div className="token-detail-face">
+                    {tokenDetail.double_faced && <div className="token-face-label">Frente</div>}
+                    <h2 className="token-detail-name">{tokenDetail.name}</h2>
+                    <div className="token-detail-type">{tokenDetail.type_line}</div>
+                    {tokenDetail.power && (
+                      <div className="token-detail-pt">{tokenDetail.power} / {tokenDetail.toughness}</div>
+                    )}
+                    {tokenDetail.oracle_text && (
+                      <div className="token-detail-oracle">{tokenDetail.oracle_text}</div>
+                    )}
+                  </div>
+
+                  {/* Verso (dupla face) */}
+                  {tokenDetail.double_faced && tokenDetail.back_name && (
+                    <div className="token-detail-face token-detail-back-face">
+                      <div className="token-face-label">Verso</div>
+                      <h3 className="token-detail-name">{tokenDetail.back_name}</h3>
+                      <div className="token-detail-type">{tokenDetail.back_type_line}</div>
+                      {tokenDetail.back_power && (
+                        <div className="token-detail-pt">{tokenDetail.back_power} / {tokenDetail.back_toughness}</div>
+                      )}
+                      {tokenDetail.back_oracle_text && (
+                        <div className="token-detail-oracle">{tokenDetail.back_oracle_text}</div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="token-detail-meta-row">
+                    <span className="token-set">{tokenDetail.set_code} #{tokenDetail.collection_number}</span>
+                    {tokenDetail.artist && <span>🎨 {tokenDetail.artist}</span>}
+                    {tokenDetail.foil && <span className="token-foil-badge">✦ Foil</span>}
+                    {tokenDetail.double_faced && <span className="token-dfc-badge">↔ Dupla Face</span>}
+                    <span>×{tokenDetail.quantity}</span>
+                  </div>
+
+                  <div className="token-detail-actions">
+                    <div className="token-qty-row">
+                      <button type="button" className="token-qty-btn" onClick={() => { handleTokenQuantityChange(tokenDetail, -1); setTokenDetail(prev => prev ? { ...prev, quantity: Math.max(1, prev.quantity - 1) } : prev); }}>−</button>
+                      <span className="token-qty">×{tokenDetail.quantity}</span>
+                      <button type="button" className="token-qty-btn" onClick={() => { handleTokenQuantityChange(tokenDetail, +1); setTokenDetail(prev => prev ? { ...prev, quantity: prev.quantity + 1 } : prev); }}>+</button>
+                    </div>
+                    <button type="button" className="danger" onClick={() => { handleTokenDelete(tokenDetail.id); setTokenDetail(null); }}>
+                      ✕ Remover token
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal adicionar token */}
+          {tokenAddModal && (() => {
+            const frontDone = tokenPreviewFront?.found;
+            const backDone = tokenPreviewBack?.found;
+            const canConfirm = tokenForm.double_faced ? (frontDone && backDone) : frontDone;
+            const isSaving = tokenSearchingFront || tokenSearchingBack;
+            return (
+              <div className="modal-overlay" onClick={() => { if (!isSaving) setTokenAddModal(false); }}>
+                <div className="modal token-add-modal" onClick={e => e.stopPropagation()}>
+                  <button className="modal-close" aria-label="Fechar" onClick={() => setTokenAddModal(false)}>✕</button>
+                  <h3>Adicionar Token</h3>
+                  <p className="quick-add-hint">
+                    Informe a sigla da coleção <strong>sem o "t"</strong> (ex: <code>grn</code>) e o número do token.
+                  </p>
+
+                  {/* Opções globais */}
+                  <div className="token-options-row">
+                    <label>
+                      Quantidade
+                      <input type="number" min="1" value={tokenForm.quantity}
+                        onChange={e => setTokenForm({ ...tokenForm, quantity: Number(e.target.value) })} />
+                    </label>
+                    <label className="checkbox-label">
+                      <input type="checkbox" checked={tokenForm.foil}
+                        onChange={e => setTokenForm({ ...tokenForm, foil: e.target.checked })} />
+                      ✦ Foil
+                    </label>
+                    <label className="checkbox-label token-dfc-toggle">
+                      <input type="checkbox" checked={tokenForm.double_faced}
+                        onChange={e => { setTokenForm({ ...tokenForm, double_faced: e.target.checked }); setTokenPreviewBack(null); }} />
+                      ↔ Dupla Face
+                    </label>
+                  </div>
+
+                  {/* Busca da FRENTE */}
+                  <div className="token-face-section">
+                    <div className="token-face-section-title">
+                      {tokenForm.double_faced ? "Frente" : "Token"}
+                      {frontDone && <span className="token-face-ok">✓</span>}
+                    </div>
+                    {frontDone ? (
+                      <div className="token-face-preview">
+                        {tokenPreviewFront.token?.image_url && (
+                          <img src={tokenPreviewFront.token.image_url} alt={tokenPreviewFront.token.name} className="token-face-preview-img" />
+                        )}
+                        <div>
+                          <strong>{tokenPreviewFront.token?.name}</strong>
+                          <div className="token-face-preview-type">{tokenPreviewFront.token?.type_line}</div>
+                          {tokenPreviewFront.token?.power && <div>{tokenPreviewFront.token.power}/{tokenPreviewFront.token.toughness}</div>}
+                          <div className="token-face-preview-set">{tokenPreviewFront.token?.set_code} #{tokenPreviewFront.token?.collection_number}</div>
+                        </div>
+                        <button type="button" className="token-face-reset" onClick={() => setTokenPreviewFront(null)}>✎</button>
+                      </div>
+                    ) : (
+                      <form className="token-face-form" onSubmit={handleTokenSearchFront}>
+                        <input required placeholder="Sigla (ex: grn)" value={tokenForm.set_code}
+                          onChange={e => setTokenForm({ ...tokenForm, set_code: e.target.value.toLowerCase().trim() })} />
+                        <input required placeholder="Nº (ex: 1)" value={tokenForm.collection_number}
+                          onChange={e => setTokenForm({ ...tokenForm, collection_number: e.target.value.trim() })} />
+                        <button type="submit" disabled={tokenSearchingFront}>
+                          {tokenSearchingFront ? "…" : "🔍"}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* Busca do VERSO (dupla face) */}
+                  {tokenForm.double_faced && (
+                    <div className="token-face-section">
+                      <div className="token-face-section-title">
+                        Verso
+                        {backDone && <span className="token-face-ok">✓</span>}
+                      </div>
+                      {backDone ? (
+                        <div className="token-face-preview">
+                          {tokenPreviewBack.token?.image_url && (
+                            <img src={tokenPreviewBack.token.image_url} alt={tokenPreviewBack.token.name} className="token-face-preview-img" />
+                          )}
+                          <div>
+                            <strong>{tokenPreviewBack.token?.name}</strong>
+                            <div className="token-face-preview-type">{tokenPreviewBack.token?.type_line}</div>
+                            {tokenPreviewBack.token?.power && <div>{tokenPreviewBack.token.power}/{tokenPreviewBack.token.toughness}</div>}
+                            <div className="token-face-preview-set">{tokenPreviewBack.token?.set_code} #{tokenPreviewBack.token?.collection_number}</div>
+                          </div>
+                          <button type="button" className="token-face-reset" onClick={() => setTokenPreviewBack(null)}>✎</button>
+                        </div>
+                      ) : (
+                        <form className="token-face-form" onSubmit={handleTokenSearchBack}>
+                          <input required placeholder="Sigla (ex: grn)" value={tokenForm.back_set_code}
+                            onChange={e => setTokenForm({ ...tokenForm, back_set_code: e.target.value.toLowerCase().trim() })} />
+                          <input required placeholder="Nº (ex: 2)" value={tokenForm.back_collection_number}
+                            onChange={e => setTokenForm({ ...tokenForm, back_collection_number: e.target.value.trim() })} />
+                          <button type="submit" disabled={tokenSearchingBack}>
+                            {tokenSearchingBack ? "…" : "🔍"}
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Preview dupla face */}
+                  {tokenForm.double_faced && frontDone && backDone && (
+                    <div className="token-dfc-preview-row">
+                      <img src={tokenPreviewFront.token?.image_url} alt={tokenPreviewFront.token?.name} className="token-dfc-preview-img" />
+                      <span className="token-dfc-arrow">↔</span>
+                      <img src={tokenPreviewBack.token?.image_url} alt={tokenPreviewBack.token?.name} className="token-dfc-preview-img" />
+                    </div>
+                  )}
+
+                  {tokenSearchError && <p className="form-error">{tokenSearchError}</p>}
+
+                  {canConfirm && (
+                    <div className="token-preview-actions">
+                      <button type="button" className="confirm-yes" disabled={isSaving} onClick={handleTokenConfirm}>
+                        {isSaving ? "Salvando…" : "✓ Adicionar à coleção"}
+                      </button>
+                      <button type="button" className="confirm-no" onClick={() => { setTokenPreviewFront(null); setTokenPreviewBack(null); setTokenSearchError(""); }}>
+                        ← Buscar outro
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       )}
 
       {/* ── ABA PONTUAÇÃO ── */}
@@ -2947,102 +3258,17 @@ export default function App() {
         </div>
       )}
 
-      {activeTab === "collection" && <section className="grid">
-        {/* ── FORMULÁRIO ── */}
-        <form className="card form collection-form-panel" onSubmit={handleSubmit}>
-          <div className="form-title-row">
-            <h2>Cadastrar Carta</h2>
-            <button type="button" className="quick-add-btn" onClick={(e) => { e.preventDefault(); setQuickAddModal(true); }}>⚡ Busca Rápida</button>
-          </div>
-          {field("Nome *", "name", { placeholder: "Ex: Lightning Bolt", required: true })}
-          <ManaColorPicker value={form.color} onChange={(v) => setForm({ ...form, color: v })} />
-          {field("Tipo", "type", { placeholder: "Ex: Criatura, Instant" })}
-          {field("Subtítulo", "subtitle", { placeholder: "Ex: Humano Soldado" })}
-          {field("Nº na coleção", "collection_number", { placeholder: "Ex: 17" })}
-          <label>
-            Raridade
-            <select value={form.rarity} onChange={(e) => setForm({ ...form, rarity: e.target.value })}>
-              <option value="">Selecione</option>
-              <option value="L">Land (L)</option>
-              <option value="C">Common (C)</option>
-              <option value="U">Uncommon (U)</option>
-              <option value="R">Rare (R)</option>
-              <option value="M">Mythic (M)</option>
-              <option value="T">Token (T)</option>
-            </select>
-          </label>
-          {field("Sigla da coleção", "set_code", { placeholder: "Ex: KLD, TMT" })}
-          <label>
-            Idioma
-            <select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
-              <option value="PT">Português</option>
-              <option value="EN">Inglês</option>
-              <option value="ES">Espanhol</option>
-              <option value="JP">Japonês</option>
-              <option value="FR">Francês</option>
-              <option value="DE">Alemão</option>
-            </select>
-          </label>
-          {field("Ano", "year", { type: "number", placeholder: "Ex: 2016" })}
-          {field("Artista", "artist", { placeholder: "Ex: Ryan Pancoast" })}
-          <label>
-            Condição
-            <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
-              <option value="mint">Mint</option>
-              <option value="near_mint">Near Mint</option>
-              <option value="played">Played</option>
-              <option value="damaged">Damaged</option>
-            </select>
-          </label>
-          <label>
-            Quantidade
-            <input type="number" value={form.quantity} min="1"
-              onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" checked={form.foil}
-              onChange={(e) => setForm({ ...form, foil: e.target.checked })} />
-            Foil
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" checked={form.full_art}
-              onChange={(e) => setForm({ ...form, full_art: e.target.checked })} />
-            Full Art
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" checked={form.prerelease}
-              onChange={(e) => setForm({ ...form, prerelease: e.target.checked })} />
-            Pré-release
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" checked={form.commander}
-              onChange={(e) => setForm({ ...form, commander: e.target.checked })} />
-            Commander
-          </label>
-          <label>
-            Deck
-            <select value={form.deck_id} onChange={(e) => setForm({ ...form, deck_id: Number(e.target.value) })}>
-              <option value={0}>— Nenhum —</option>
-              {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Observações
-            <textarea value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Ex: carta em bom estado" />
-          </label>
-          <button type="submit">Cadastrar</button>
-        </form>
-
+      {activeTab === "collection" && <section className="card list-section collection-full">
         {/* ── LISTA ── */}
-        <section className="card list-section">
           <div className="list-header">
             <div className="list-header-top">
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
               <div className="toolbar-group">
-                <button type="button" className="mobile-quick-add-btn" onClick={() => setQuickAddModal(true)}>
+                <button type="button" className="quick-add-btn-toolbar" onClick={() => setQuickAddModal(true)}>
                   ⚡ Busca Rápida
+                </button>
+                <button type="button" className="tokens-tab-btn" onClick={() => setActiveTab("tokens")}>
+                  🎭 Tokens
                 </button>
                 <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
                   📊 Stats
@@ -3299,8 +3525,8 @@ export default function App() {
               <button type="button" onClick={() => handlePage(page + 1)} disabled={page >= totalPages}>›</button>
             </div>
           )}
-        </section>
-      </section>}
+      </section>
+      }
 
       {/* ── MODAL DETALHES ── */}
       {(selectedCard || loadingDetail) && (
@@ -3476,17 +3702,12 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* ── FAB MOBILE: Busca Rápida ── */}
+      {/* ── FAB MOBILE ── */}
       {activeTab === "collection" && (
-        <button
-          type="button"
-          className="mobile-fab"
-          onClick={() => setQuickAddModal(true)}
-          aria-label="Adicionar carta"
-          title="Busca Rápida"
-        >
-          +
-        </button>
+        <button type="button" className="mobile-fab" onClick={() => setQuickAddModal(true)} aria-label="Adicionar carta" title="Busca Rápida">+</button>
+      )}
+      {activeTab === "tokens" && (
+        <button type="button" className="mobile-fab mobile-fab-token" onClick={() => { setTokenAddModal(true); setTokenPreviewFront(null); setTokenPreviewBack(null); setTokenForm(EMPTY_TOKEN_FORM); setTokenSearchError(""); }} aria-label="Adicionar token" title="Adicionar Token">+</button>
       )}
       </main>
     </>
