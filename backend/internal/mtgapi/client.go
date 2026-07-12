@@ -51,7 +51,10 @@ type ExternalCard struct {
 	PrintedType string            `json:"printed_type"` // type line no idioma da carta
 	ManaCost    string            `json:"mana_cost"`
 	Colors      []string          `json:"colors"`
-	ImageURL    string            `json:"image_url"`
+	ImageURL     string            `json:"image_url"`
+	DoubleFaced  bool              `json:"double_faced"`
+	BackImageURL string            `json:"back_image_url"`
+	BackName     string            `json:"back_name"`
 	Text        string            `json:"text"`         // oracle text em inglês
 	PrintedText string            `json:"printed_text"` // texto no idioma da carta
 	FlavorText  string            `json:"flavor_text"`
@@ -149,11 +152,29 @@ func yearFromReleasedAt(releasedAt string) int {
 
 func (s *scryfallCard) toExternal() *ExternalCard {
 	imageURL := ""
+	backImageURL := ""
+	doubleFaced := false
+	backName := ""
+
 	if s.ImageURIs != nil {
 		if u, ok := s.ImageURIs["normal"]; ok {
 			imageURL = u
 		}
-	} else if len(s.CardFaces) > 0 && s.CardFaces[0].ImageURIs != nil {
+	} else if len(s.CardFaces) >= 2 {
+		// DFC: cada face tem suas próprias image_uris
+		doubleFaced = true
+		if s.CardFaces[0].ImageURIs != nil {
+			if u, ok := s.CardFaces[0].ImageURIs["normal"]; ok {
+				imageURL = u
+			}
+		}
+		if s.CardFaces[1].ImageURIs != nil {
+			if u, ok := s.CardFaces[1].ImageURIs["normal"]; ok {
+				backImageURL = u
+			}
+		}
+		backName = s.CardFaces[1].Name
+	} else if len(s.CardFaces) == 1 && s.CardFaces[0].ImageURIs != nil {
 		if u, ok := s.CardFaces[0].ImageURIs["normal"]; ok {
 			imageURL = u
 		}
@@ -170,28 +191,31 @@ func (s *scryfallCard) toExternal() *ExternalCard {
 	}
 
 	return &ExternalCard{
-		ID:          s.ID,
-		Name:        s.Name,
-		PrintedName: printedName,
-		Set:         strings.ToUpper(s.Set),
-		SetName:     s.SetName,
-		Rarity:      NormalizeRarity(s.Rarity),
-		Type:        s.TypeLine,
-		PrintedType: s.PrintedTypeLine,
-		ManaCost:    s.ManaCost,
-		Colors:      colors,
-		ImageURL:    imageURL,
-		Text:        s.OracleText,
-		PrintedText: s.PrintedText,
-		FlavorText:  s.FlavorText,
-		Artist:      s.Artist,
-		Number:      s.CollectorNumber,
-		Power:       s.Power,
-		Toughness:   s.Toughness,
-		Prices:      s.Prices,
-		ScryfallURI: s.ScryfallURI,
-		FullArt:     s.FullArt,
-		Year:        yearFromReleasedAt(s.ReleasedAt),
+		ID:           s.ID,
+		Name:         s.Name,
+		PrintedName:  printedName,
+		Set:          strings.ToUpper(s.Set),
+		SetName:      s.SetName,
+		Rarity:       NormalizeRarity(s.Rarity),
+		Type:         s.TypeLine,
+		PrintedType:  s.PrintedTypeLine,
+		ManaCost:     s.ManaCost,
+		Colors:       colors,
+		ImageURL:     imageURL,
+		DoubleFaced:  doubleFaced,
+		BackImageURL: backImageURL,
+		BackName:     backName,
+		Text:         s.OracleText,
+		PrintedText:  s.PrintedText,
+		FlavorText:   s.FlavorText,
+		Artist:       s.Artist,
+		Number:       s.CollectorNumber,
+		Power:        s.Power,
+		Toughness:    s.Toughness,
+		Prices:       s.Prices,
+		ScryfallURI:  s.ScryfallURI,
+		FullArt:      s.FullArt,
+		Year:         yearFromReleasedAt(s.ReleasedAt),
 	}
 }
 

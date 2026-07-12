@@ -4,37 +4,50 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "instance_type" {
-  description = "EC2 instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "ssh_public_key" {
-  description = "Conteúdo da chave pública SSH (ex: cat ~/.ssh/id_rsa.pub)"
-  type        = string
-}
-
-variable "allowed_ssh_cidr" {
-  description = "CIDR liberado para SSH. Use seu IP: curl ifconfig.me/ip"
-  type        = string
-  default     = "0.0.0.0/0"
-}
-
 variable "app_name" {
   description = "Prefixo usado nos nomes dos recursos AWS"
   type        = string
   default     = "magic-collector"
 }
 
-variable "volume_size_gb" {
-  description = "Tamanho do disco EBS em GB"
-  type        = number
-  default     = 20
-}
-
 variable "domain_name" {
   description = "Domínio registrado para a aplicação (ex: magic-collector.site)"
   type        = string
   default     = "magic-collector.site"
+}
+
+# ── Banco de dados (MySQL externo) ────────────────────────────────────────────
+variable "db_host" {
+  description = "Host do MySQL externo"
+  type        = string
+}
+
+variable "db_port" {
+  description = "Porta do MySQL"
+  type        = string
+  default     = "3306"
+}
+
+variable "db_user" {
+  description = "Usuário do MySQL"
+  type        = string
+}
+
+variable "db_password" {
+  description = "Senha do MySQL"
+  type        = string
+  sensitive   = true
+}
+
+variable "db_name" {
+  description = "Nome do banco de dados"
+  type        = string
+}
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+variable "openai_api_key" {
+  description = "Chave da API OpenAI para avaliações de IA"
+  type        = string
+  sensitive   = true
+  default     = ""
 }

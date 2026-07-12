@@ -90,6 +90,8 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		card.Color = ColorsJSONToDisplay(card.Colors)
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
+		card.DoubleFaced = ext.DoubleFaced
+		card.ImageURLBack = ext.BackImageURL
 		card.FullArt = ext.FullArt
 		if ext.Year > 0 {
 			card.Year = ext.Year
@@ -199,6 +201,8 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		card.Rarity = ext.Rarity
 		card.PriceUSD = parsePriceUSD(ext.Prices, card.Foil)
 		card.ImageURL = ext.ImageURL
+		card.DoubleFaced = ext.DoubleFaced
+		card.ImageURLBack = ext.BackImageURL
 		card.FullArt = ext.FullArt
 		if ext.Year > 0 {
 			card.Year = ext.Year

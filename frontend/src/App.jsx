@@ -642,6 +642,19 @@ export default function App() {
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeInnerTab, setAnalyzeInnerTab] = useState("selected"); // selected | rejected | list | analysis
 
+  // ── Double-faced cards (DFC) ────────────────────────────────────────────
+  const [flippedCards, setFlippedCards] = useState(new Set());
+  const [modalFlipped, setModalFlipped] = useState(false);
+
+  function toggleFlip(id, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    setFlippedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  }
+
   const [quickAddModal, setQuickAddModal] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
   const [openMenu, setOpenMenu] = useState(null);
@@ -1125,6 +1138,7 @@ export default function App() {
     setDetailFromDeck(false);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setModalFlipped(false);
     try {
       const data = await getCard(id);
       setSelectedCard(data);
@@ -1137,6 +1151,7 @@ export default function App() {
     setDetailFromDeck(true);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setModalFlipped(false);
     try {
       const data = await getCard(id);
       setSelectedCard(data);
@@ -1424,6 +1439,53 @@ export default function App() {
     XLSX.writeFile(wb, "colecao.xlsx");
   }
 
+  const DECK_EXPORT_HEADERS = [
+    "nome", "tipo", "subtitulo", "mana_cost", "cores", "cor_display",
+    "raridade", "set", "numero", "idioma", "ano", "artista",
+    "foil", "prerelease", "full_art", "commander", "quantidade",
+    "condicao", "notas", "preco_usd",
+  ];
+
+  function deckCardToRow(c) {
+    return [
+      c.name, c.type, c.subtitle, c.mana_cost, c.colors, c.color,
+      c.rarity, c.set_code, c.collection_number, c.language, c.year, c.artist,
+      c.foil ? "sim" : "nao",
+      c.prerelease ? "sim" : "nao",
+      c.full_art ? "sim" : "nao",
+      c.commander ? "sim" : "nao",
+      c.quantity, c.condition, c.notes,
+      c.price_usd ?? 0,
+    ];
+  }
+
+  function handleExportDeckCSV() {
+    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [DECK_EXPORT_HEADERS.join(","), ...deckCards.map((c) => deckCardToRow(c).map(escape).join(","))];
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `deck-${(managingDeck?.name || "deck").replace(/\s+/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleExportDeckXLSX() {
+    const rows = deckCards.map(deckCardToRow);
+    const ws = XLSX.utils.aoa_to_sheet([DECK_EXPORT_HEADERS, ...rows]);
+
+    // Larguras automáticas por coluna
+    ws["!cols"] = DECK_EXPORT_HEADERS.map((h, i) => {
+      const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] ?? "").length));
+      return { wch: Math.min(maxLen + 2, 40) };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, managingDeck?.name?.slice(0, 31) || "Deck");
+    XLSX.writeFile(wb, `deck-${(managingDeck?.name || "deck").replace(/\s+/g, "_")}.xlsx`);
+  }
+
   async function handleImportList(e) {
     e.preventDefault();
     setListLoading(true);
@@ -1672,6 +1734,16 @@ export default function App() {
                         </span>
                       )}
                     </h3>
+                    {deckCards.length > 0 && (
+                      <div className="deck-export-btns">
+                        <button type="button" className="deck-export-btn" title="Exportar cartas do deck em CSV" onClick={handleExportDeckCSV}>
+                          ↓ CSV
+                        </button>
+                        <button type="button" className="deck-export-btn deck-export-btn-xlsx" title="Exportar cartas do deck em XLSX" onClick={handleExportDeckXLSX}>
+                          ↓ XLSX
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {deckCards.length > 0 && (
@@ -1731,8 +1803,15 @@ export default function App() {
                     {pagedDeckCards.map((card) => (
                       <div className={`list-item deck-card-item${card.commander ? " deck-card-commander" : ""}${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
                         {card.image_url && (
-                          <div className="deck-card-thumb">
-                            <img src={card.image_url} alt={card.name} loading="lazy" />
+                          <div className={`deck-card-thumb${card.double_faced ? " dfc-thumb" : ""}`}>
+                            <img
+                              src={(card.double_faced && flippedCards.has(card.id) && card.image_url_back) ? card.image_url_back : card.image_url}
+                              alt={card.name} loading="lazy"
+                            />
+                            {card.double_faced && card.image_url_back && (
+                              <button type="button" className="thumb-flip-btn" title="Virar carta"
+                                onClick={(e) => toggleFlip(card.id, e)}>↺</button>
+                            )}
                           </div>
                         )}
                         <div className="list-item-info">
@@ -3872,21 +3951,31 @@ export default function App() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}`}
                   onClick={() => handleDetails(card.id)}
                   title={card.name}
                 >
-                  {card.image_url
-                    ? <img src={card.image_url} alt={card.name} loading="lazy" className="card-grid-img" />
-                    : <div className="card-grid-placeholder">
-                        <CardColorIcons card={card} />
-                        <span className="card-grid-placeholder-name">{card.name}</span>
-                      </div>
-                  }
+                  {(() => {
+                    const flipped = flippedCards.has(card.id);
+                    const showImg = (card.double_faced && flipped && card.image_url_back) ? card.image_url_back : card.image_url;
+                    return showImg
+                      ? <img src={showImg} alt={card.name} loading="lazy" className="card-grid-img" />
+                      : <div className="card-grid-placeholder">
+                          <CardColorIcons card={card} />
+                          <span className="card-grid-placeholder-name">{card.name}</span>
+                        </div>;
+                  })()}
+                  {card.double_faced && card.image_url_back && (
+                    <button type="button" className="grid-flip-btn" title="Virar carta"
+                      onClick={(e) => toggleFlip(card.id, e)}>
+                      ↺
+                    </button>
+                  )}
                   <div className="card-grid-overlay">
                     <div className="card-grid-name">
                       {card.foil && <span className="foil-text">✦ </span>}
                       {card.name}
+                      {card.double_faced && <span className="dfc-indicator" title="Dupla Face"> ↔</span>}
                     </div>
                     <div className="card-grid-meta">
                       {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
@@ -3983,18 +4072,35 @@ export default function App() {
 
             {loadingDetail && <p className="empty">Carregando...</p>}
 
-            {selectedCard && !editMode && (
+            {selectedCard && !editMode && (() => {
+              const backImg = selectedCard.external?.back_image_url || selectedCard.local?.image_url_back || "";
+              const frontImg = selectedCard.external?.image_url || selectedCard.local?.image_url || "";
+              const isDFC = !!(selectedCard.local?.double_faced || selectedCard.external?.double_faced || backImg);
+              const displayImg = isDFC && modalFlipped ? backImg : frontImg;
+              const backName = selectedCard.external?.back_name || "";
+              return (
               <>
                 <div className="modal-top">
-                  {selectedCard.external?.image_url && (
-                    <img src={selectedCard.external.image_url} alt={selectedCard.local.name} />
+                  {displayImg && (
+                    <div className="modal-card-img-wrap">
+                      <img src={displayImg} alt={selectedCard.local.name} className={`modal-card-img${isDFC && modalFlipped ? " dfc-back" : ""}`} />
+                      {isDFC && backImg && (
+                        <button type="button" className="dfc-flip-btn" title="Virar carta"
+                          onClick={() => setModalFlipped(f => !f)}>
+                          ↺ {modalFlipped ? "Frente" : "Verso"}
+                        </button>
+                      )}
+                    </div>
                   )}
                   <div>
                     <h2>
-                      {selectedCard.external?.printed_name || selectedCard.external?.name || selectedCard.local.name}
+                      {isDFC && modalFlipped && backName
+                        ? backName
+                        : (selectedCard.external?.printed_name || selectedCard.external?.name || selectedCard.local.name)}
                       {selectedCard.local.foil ? " ✦" : ""}
+                      {isDFC && <span className="dfc-badge-inline" title="Dupla Face">↔</span>}
                     </h2>
-                    {selectedCard.external?.printed_name && (
+                    {selectedCard.external?.printed_name && !modalFlipped && (
                       <p className="modal-en-name">{selectedCard.external.name}</p>
                     )}
                     <p className="modal-subtitle">
@@ -4080,7 +4186,8 @@ export default function App() {
                   )}
                 </div>
               </>
-            )}
+              );
+            })()}
 
             {selectedCard && editMode && (
               <form className="edit-form" onSubmit={(e) => { e.preventDefault(); handleEditSave(); }}>

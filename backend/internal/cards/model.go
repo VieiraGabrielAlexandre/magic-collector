@@ -55,6 +55,8 @@ type Card struct {
 	Notes            string  `json:"notes"`
 	PriceUSD         float64 `json:"price_usd"`
 	ImageURL         string  `json:"image_url"`
+	DoubleFaced      bool    `json:"double_faced"`
+	ImageURLBack     string  `json:"image_url_back"`
 }
 
 type PreviewCardInput struct {
