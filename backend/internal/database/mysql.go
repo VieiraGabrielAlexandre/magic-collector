@@ -87,6 +87,7 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE cards ADD COLUMN image_url       VARCHAR(500)   NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE cards ADD COLUMN double_faced    TINYINT(1)     NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE cards ADD COLUMN image_url_back  VARCHAR(500)   NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE cards ADD COLUMN proxy           TINYINT(1)     NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE cards DROP COLUMN IF EXISTS company`)
 
 	_, err = db.Exec(`

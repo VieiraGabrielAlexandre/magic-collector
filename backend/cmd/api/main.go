@@ -93,6 +93,7 @@ func main() {
 	api.POST("/cards/normalize-rarities", handler.NormalizeRarities)
 	api.GET("/cards/stats", handler.Stats)
 	api.GET("/cards/export", handler.Export)
+	api.GET("/cards/proxies", handler.ListProxies)
 	api.POST("/cards/preview", handler.Preview)
 	api.POST("/cards/refresh-prices", handler.RefreshPrices)
 	api.POST("/cards/refresh-images", handler.RefreshImages)

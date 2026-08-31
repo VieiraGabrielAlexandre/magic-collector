@@ -442,3 +442,10 @@ export async function restoreGameSession(id) {
   if (!res.ok) throw new Error(json.error || "Erro ao restaurar sessão");
   return json;
 }
+
+export async function listProxyCards() {
+  const res = await authFetch(`${BASE_URL}/cards/proxies`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar proxies");
+  return json;
+}

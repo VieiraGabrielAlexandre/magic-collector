@@ -60,6 +60,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		Quantity:         input.Quantity,
 		Condition:        input.Condition,
 		Notes:            input.Notes,
+		Proxy:            input.Proxy,
 	}
 
 	card.PreRelease = input.PreRelease
@@ -167,6 +168,7 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		Quantity:         input.Quantity,
 		Condition:        input.Condition,
 		Notes:            input.Notes,
+		Proxy:            input.Proxy,
 		// Campos externos: preserva os valores do banco até o re-fetch
 		MTGID:    current.MTGID,
 		Type:     current.Type,
@@ -238,6 +240,10 @@ func (s *Service) SetDeck(id string, deckID int) error {
 
 func (s *Service) ExportAll() ([]Card, error) {
 	return s.repository.ListAll()
+}
+
+func (s *Service) ListProxies() ([]Card, error) {
+	return s.repository.ListProxies()
 }
 
 func (s *Service) GetCardsForDeckBuilder() ([]DeckBuilderCard, error) {

@@ -55,7 +55,7 @@ var allowedSortFields = map[string]string{
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art, double_faced, image_url_back`
+	       artist, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art, double_faced, image_url_back, proxy`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -152,12 +152,12 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	var result []Card
 	for rows.Next() {
 		var c Card
-		var foilInt, prereleaseInt, commanderInt, fullArtInt int
+		var foilInt, prereleaseInt, commanderInt, fullArtInt, proxyInt int
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt,
 		)
 		if err != nil {
 			return ListResult{}, err
@@ -166,6 +166,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 		c.PreRelease = prereleaseInt == 1
 		c.Commander = commanderInt == 1
 		c.FullArt = fullArtInt == 1
+		c.Proxy = proxyInt == 1
 		result = append(result, c)
 	}
 
@@ -188,8 +189,8 @@ func (r *Repository) Create(card Card) (int64, error) {
 	stmt, err := r.db.Prepare("INSERT INTO cards " +
 		"(mtg_id, name, color, `type`, subtitle, collection_number," +
 		" rarity, set_code, mana_cost, colors, language, year," +
-		" artist, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art, double_faced, image_url_back)" +
-		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		" artist, foil, quantity, `condition`, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art, double_faced, image_url_back, proxy)" +
+		" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
@@ -215,12 +216,16 @@ func (r *Repository) Create(card Card) (int64, error) {
 	if card.DoubleFaced {
 		doubleFacedInt = 1
 	}
+	proxyInt := 0
+	if card.Proxy {
+		proxyInt = 1
+	}
 
 	result, err := stmt.Exec(
 		card.MTGID, card.Name, card.Color, card.Type, card.Subtitle,
 		card.CollectionNumber, card.Rarity, card.SetCode, card.ManaCost,
 		card.Colors, card.Language, card.Year, card.Artist,
-		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL, fullArtInt, doubleFacedInt, card.ImageURLBack,
+		foilInt, card.Quantity, card.Condition, card.Notes, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID, card.PriceUSD, card.ImageURL, fullArtInt, doubleFacedInt, card.ImageURLBack, proxyInt,
 	)
 	if err != nil {
 		return 0, err
@@ -234,12 +239,12 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 		"SELECT "+selectCols+" FROM cards WHERE id = ?", id)
 
 	var c Card
-	var foilInt, prereleaseInt, commanderInt, fullArtInt int
+	var foilInt, prereleaseInt, commanderInt, fullArtInt, proxyInt int
 	err := row.Scan(
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 		&c.Colors, &c.Language, &c.Year, &c.Artist,
-		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack,
+		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt,
 	)
 	if err != nil {
 		return nil, err
@@ -248,6 +253,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 	c.PreRelease = prereleaseInt == 1
 	c.Commander = commanderInt == 1
 	c.FullArt = fullArtInt == 1
+	c.Proxy = proxyInt == 1
 	return &c, nil
 }
 
@@ -272,14 +278,18 @@ func (r *Repository) Update(id string, card Card) error {
 	if card.DoubleFaced {
 		doubleFacedIntU = 1
 	}
+	proxyIntU := 0
+	if card.Proxy {
+		proxyIntU = 1
+	}
 	_, err := r.db.Exec(
 		"UPDATE cards SET mtg_id=?, name=?, color=?, colors=?, `type`=?, subtitle=?, collection_number=?,"+
 			" rarity=?, set_code=?, mana_cost=?, language=?, year=?, artist=?,"+
-			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=?, full_art=?, double_faced=?, image_url_back=? WHERE id=?",
+			" foil=?, prerelease=?, commander=?, precon_deck=?, deck_id=?, quantity=?, `condition`=?, notes=?, price_usd=?, image_url=?, full_art=?, double_faced=?, image_url_back=?, proxy=? WHERE id=?",
 		card.MTGID, card.Name, card.Color, card.Colors, card.Type, card.Subtitle, card.CollectionNumber,
 		card.Rarity, card.SetCode, card.ManaCost, card.Language, card.Year, card.Artist,
 		foilInt, prereleaseInt, commanderInt, card.PreconDeck, card.DeckID,
-		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, fullArtIntU, doubleFacedIntU, card.ImageURLBack, id,
+		card.Quantity, card.Condition, card.Notes, card.PriceUSD, card.ImageURL, fullArtIntU, doubleFacedIntU, card.ImageURLBack, proxyIntU, id,
 	)
 	return err
 }
@@ -336,12 +346,12 @@ func (r *Repository) ListAll() ([]Card, error) {
 	var result []Card
 	for rows.Next() {
 		var c Card
-		var foilInt, prereleaseInt, commanderInt, fullArtInt int
+		var foilInt, prereleaseInt, commanderInt, fullArtInt, proxyInt int
 		err := rows.Scan(
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt,
 		)
 		if err != nil {
 			return nil, err
@@ -350,6 +360,37 @@ func (r *Repository) ListAll() ([]Card, error) {
 		c.PreRelease = prereleaseInt == 1
 		c.Commander = commanderInt == 1
 		c.FullArt = fullArtInt == 1
+		c.Proxy = proxyInt == 1
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (r *Repository) ListProxies() ([]Card, error) {
+	rows, err := r.db.Query(`SELECT ` + selectCols + ` FROM cards WHERE proxy = 1 ORDER BY name ASC, set_code ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []Card
+	for rows.Next() {
+		var c Card
+		var foilInt, prereleaseInt, commanderInt, fullArtInt, proxyInt int
+		err := rows.Scan(
+			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
+			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
+			&c.Colors, &c.Language, &c.Year, &c.Artist,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		c.Foil = foilInt == 1
+		c.PreRelease = prereleaseInt == 1
+		c.Commander = commanderInt == 1
+		c.FullArt = fullArtInt == 1
+		c.Proxy = proxyInt == 1
 		result = append(result, c)
 	}
 	return result, nil

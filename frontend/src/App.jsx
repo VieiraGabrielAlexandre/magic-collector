@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listProxyCards, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
@@ -642,6 +642,10 @@ export default function App() {
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeInnerTab, setAnalyzeInnerTab] = useState("selected"); // selected | rejected | list | analysis
 
+  // ── Proxies ───────────────────────────────────────────────────────────────
+  const [proxyCards, setProxyCards] = useState([]);
+  const [proxyLoading, setProxyLoading] = useState(false);
+
   // ── Double-faced cards (DFC) ────────────────────────────────────────────
   const [flippedCards, setFlippedCards] = useState(new Set());
   const [modalFlipped, setModalFlipped] = useState(false);
@@ -1076,6 +1080,20 @@ export default function App() {
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
+
+  async function loadProxies() {
+    setProxyLoading(true);
+    try {
+      const data = await listProxyCards();
+      setProxyCards(data ?? []);
+    } finally {
+      setProxyLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "proxies") loadProxies();
+  }, [activeTab]);
   useEffect(() => { loadGameSessions(); }, []);
   useEffect(() => { loadTokensList(); }, []);
   useEffect(() => {
@@ -1189,7 +1207,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist,
-      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
     });
     setEditMode(true);
   }
@@ -1680,6 +1698,9 @@ export default function App() {
         </button>
         <button role="tab" type="button" aria-selected={activeTab === "analyze"} className={`tab tab-analyze${activeTab === "analyze" ? " active" : ""}`} onClick={() => setActiveTab("analyze")}>
           <span className="tab-icon" aria-hidden="true">🧬</span><span className="tab-label">Análise</span>
+        </button>
+        <button role="tab" type="button" aria-selected={activeTab === "proxies"} className={`tab tab-proxies${activeTab === "proxies" ? " active" : ""}`} onClick={() => setActiveTab("proxies")}>
+          <span className="tab-icon" aria-hidden="true">⚠</span><span className="tab-label">Proxies</span>
         </button>
       </nav>
 
@@ -3097,6 +3118,11 @@ export default function App() {
                   onChange={(e) => setQuickAddForm({ ...quickAddForm, foil: e.target.checked })} />
                 ✦ Foil
               </label>
+              <label className="checkbox-label proxy-checkbox">
+                <input type="checkbox" checked={quickAddForm.proxy || false}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, proxy: e.target.checked })} />
+                ⚠ Proxy
+              </label>
               <button type="submit" className="quick-add-submit">Buscar e Confirmar →</button>
             </form>
           </div>
@@ -3951,7 +3977,7 @@ export default function App() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}`}
                   onClick={() => handleDetails(card.id)}
                   title={card.name}
                 >
@@ -3974,6 +4000,7 @@ export default function App() {
                   <div className="card-grid-overlay">
                     <div className="card-grid-name">
                       {card.foil && <span className="foil-text">✦ </span>}
+                      {card.proxy && <span className="proxy-indicator" title="Proxy">⚠ </span>}
                       {card.name}
                       {card.double_faced && <span className="dfc-indicator" title="Dupla Face"> ↔</span>}
                     </div>
@@ -3997,7 +4024,7 @@ export default function App() {
                 const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
                 return (
                   <div
-                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.proxy ? " is-proxy" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
                     key={card.id}
                   >
                     <div className="list-item-info">
@@ -4006,6 +4033,7 @@ export default function App() {
                           {card.name}
                         </strong>
                         {card.foil && <span className="foil-text">✦</span>}
+                        {card.proxy && <span className="proxy-badge" title="Proxy">⚠ Proxy</span>}
                         {card.full_art && <span className="full-art-badge">◈ Full Art</span>}
                         <CardColorIcons card={card} />
                         {card.rarity && (
@@ -4063,6 +4091,73 @@ export default function App() {
           )}
       </section>
       }
+
+      {/* ── ABA PROXIES ─────────────────────────────────────────────────── */}
+      {activeTab === "proxies" && (
+        <section className="proxies-screen">
+          <div className="proxies-header">
+            <h2 className="proxies-title">⚠ Cartas Proxy</h2>
+            <p className="proxies-subtitle">
+              {proxyLoading ? "Carregando…" : `${proxyCards.length} ${proxyCards.length === 1 ? "carta proxy" : "cartas proxy"} na coleção`}
+            </p>
+            <button type="button" className="proxies-refresh-btn" onClick={loadProxies} disabled={proxyLoading}>↺ Atualizar</button>
+          </div>
+
+          {proxyLoading ? (
+            <div className="proxies-loading">
+              <div className="eval-spinner">⚙</div>
+              <p>Buscando proxies…</p>
+            </div>
+          ) : proxyCards.length === 0 ? (
+            <p className="empty proxies-empty">Nenhuma carta marcada como proxy.</p>
+          ) : (
+            <div className="list proxies-list">
+              {proxyCards.map((card) => {
+                const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
+                return (
+                  <div
+                    key={card.id}
+                    className={`list-item is-proxy${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                  >
+                    <div className="list-item-img-wrap">
+                      {card.image_url
+                        ? <img src={card.image_url} alt={card.name} className="list-item-thumb" loading="lazy" />
+                        : <div className="list-item-thumb-placeholder"><CardColorIcons card={card} /></div>
+                      }
+                    </div>
+                    <div className="list-item-info">
+                      <div className="list-item-name">
+                        <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                        {card.foil && <span className="foil-text">✦</span>}
+                        <span className="proxy-badge">⚠ Proxy</span>
+                        <CardColorIcons card={card} />
+                        {card.rarity && (
+                          <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>
+                        )}
+                        {assignedDeck ? (
+                          <span className="deck-badge" style={getDeckBadgeStyle(assignedDeck.theme_color)}>
+                            {assignedDeck.name}
+                          </span>
+                        ) : (
+                          <span className="deck-badge deck-badge-none">Sem deck</span>
+                        )}
+                      </div>
+                      <div className="list-item-meta">
+                        <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
+                        {card.condition && <span className="condition-tag">{card.condition}</span>}
+                      </div>
+                      <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
+                    </div>
+                    <div className="actions">
+                      <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── MODAL DETALHES ── */}
       {(selectedCard || loadingDetail) && (
@@ -4240,6 +4335,7 @@ export default function App() {
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.full_art || false} onChange={(e) => setEditForm({ ...editForm, full_art: e.target.checked })} />Full Art</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
+                  <label className="checkbox-label proxy-checkbox"><input type="checkbox" checked={editForm.proxy || false} onChange={(e) => setEditForm({ ...editForm, proxy: e.target.checked })} />⚠ Proxy</label>
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
                 <label>Observações<textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
