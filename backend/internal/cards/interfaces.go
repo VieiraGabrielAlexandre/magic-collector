@@ -28,6 +28,7 @@ type cardRepository interface {
 	GetStats() (CollectionStats, error)
 	ListForDeckBuilder() ([]DeckBuilderCard, error)
 	ListAllForAnalysis() ([]AnalysisCard, error)
+	ListProxies() ([]Card, error)
 }
 
 // mtgAPIClient abstrai chamadas à Scryfall para o Service.
@@ -61,4 +62,5 @@ type cardService interface {
 	GetCardsForDeckBuilder() ([]DeckBuilderCard, error)
 	GetAllCardsForAnalysis() ([]AnalysisCard, error)
 	ExportAll() ([]Card, error)
+	ListProxies() ([]Card, error)
 }

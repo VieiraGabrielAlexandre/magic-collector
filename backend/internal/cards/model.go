@@ -55,6 +55,9 @@ type Card struct {
 	Notes            string  `json:"notes"`
 	PriceUSD         float64 `json:"price_usd"`
 	ImageURL         string  `json:"image_url"`
+	DoubleFaced      bool    `json:"double_faced"`
+	ImageURLBack     string  `json:"image_url_back"`
+	Proxy            bool    `json:"proxy"`
 }
 
 type PreviewCardInput struct {
@@ -88,6 +91,7 @@ type CreateCardInput struct {
 	Quantity         int    `json:"quantity"`
 	Condition        string `json:"condition"`
 	Notes            string `json:"notes"`
+	Proxy            bool   `json:"proxy"`
 }
 
 type UpdateCardInput struct {
@@ -111,5 +115,6 @@ type UpdateCardInput struct {
 	Quantity         int    `json:"quantity"`
 	Condition        string `json:"condition"`
 	Notes            string `json:"notes"`
+	Proxy            bool   `json:"proxy"`
 	Propagate        bool   `json:"propagate"`
 }

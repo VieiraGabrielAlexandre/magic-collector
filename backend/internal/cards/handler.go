@@ -239,6 +239,15 @@ func (h *Handler) Export(c *gin.Context) {
 	c.JSON(http.StatusOK, cards)
 }
 
+func (h *Handler) ListProxies(c *gin.Context) {
+	cards, err := h.service.ListProxies()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar proxies"})
+		return
+	}
+	c.JSON(http.StatusOK, cards)
+}
+
 // SuggestDecksInput parametriza a geração de deck pela IA.
 type SuggestDecksInput struct {
 	Format    string `json:"format"`    // "auto" | "casual60" | "commander"

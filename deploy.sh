@@ -1,57 +1,160 @@
 #!/bin/bash
-# deploy.sh — faz deploy do Magic Collector no servidor AWS
-# Uso: ./deploy.sh <ip-do-servidor>
-# Exemplo: ./deploy.sh 34.196.63.122
-
+# deploy.sh — faz deploy do Magic Collector (Lambda + S3 + CloudFront)
+# Uso: ./deploy.sh [--backend-only | --frontend-only | --infra-only]
 set -euo pipefail
 
-SERVER_IP="${1:-34.196.63.122}"
-SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_rsa}"
-REMOTE_USER="ubuntu"
-REMOTE_DIR="/opt/magic-collector"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TERRAFORM_DIR="$ROOT_DIR/terraform"
+BACKEND_DIR="$ROOT_DIR/backend"
+FRONTEND_DIR="$ROOT_DIR/frontend"
+LAMBDA_ZIP="$TERRAFORM_DIR/lambda_package.zip"
 
-if [[ ! -f .env ]]; then
-  echo "ERRO: arquivo .env não encontrado."
-  exit 1
+# ── Cores ─────────────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+step()  { echo -e "\n${GREEN}==>${NC} $*"; }
+warn()  { echo -e "${YELLOW}AVISO:${NC} $*"; }
+die()   { echo -e "${RED}ERRO:${NC} $*" >&2; exit 1; }
+
+# ── Modo de deploy ────────────────────────────────────────────────────────────
+MODE="all"
+case "${1:-}" in
+  --backend-only)  MODE="backend"  ;;
+  --frontend-only) MODE="frontend" ;;
+  --infra-only)    MODE="infra"    ;;
+  "")              MODE="all"      ;;
+  *) die "Uso: ./deploy.sh [--backend-only | --frontend-only | --infra-only]" ;;
+esac
+
+# ── Pré-requisitos ────────────────────────────────────────────────────────────
+step "Verificando pré-requisitos..."
+command -v go        >/dev/null || die "go não encontrado"
+command -v aws       >/dev/null || die "aws CLI não encontrado (brew install awscli)"
+command -v terraform >/dev/null || die "terraform não encontrado (brew install terraform)"
+
+if [[ "$MODE" == "all" || "$MODE" == "frontend" ]]; then
+  command -v npm >/dev/null || die "npm não encontrado"
 fi
 
-SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
-REMOTE="$REMOTE_USER@$SERVER_IP"
+# ── Build do backend Lambda ───────────────────────────────────────────────────
+build_backend() {
+  step "Compilando backend Go para arm64 (Graviton)..."
+  cd "$BACKEND_DIR"
+  GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o bootstrap \
+    ./cmd/lambda
+  zip -j "$LAMBDA_ZIP" bootstrap
+  rm -f bootstrap
+  echo "   lambda_package.zip: $(du -sh "$LAMBDA_ZIP" | cut -f1)"
+}
 
-echo "==> Aguardando servidor estar pronto..."
-for i in $(seq 1 20); do
-  if ssh $SSH_OPTS "$REMOTE" "echo ok" &>/dev/null; then break; fi
-  echo "    tentativa $i/20, aguardando 15s..."
-  sleep 15
-done
+# ── Build do frontend React ───────────────────────────────────────────────────
+build_frontend() {
+  step "Build do frontend React..."
+  cd "$FRONTEND_DIR"
+  npm ci --silent
+  npm run build
+  echo "   dist/: $(du -sh dist | cut -f1)"
+}
 
-echo "==> Enviando arquivos para $SERVER_IP..."
-rsync -az --progress \
-  --exclude '.git' \
-  --exclude 'node_modules' \
-  --exclude 'terraform/.terraform' \
-  --exclude 'terraform/terraform.tfvars' \
-  --exclude 'terraform/terraform.tfstate*' \
-  --exclude 'data/' \
-  --exclude '.env' \
-  -e "ssh $SSH_OPTS" \
-  . "$REMOTE:$REMOTE_DIR/"
+# ── Terraform apply ───────────────────────────────────────────────────────────
+infra_apply() {
+  step "Aplicando infraestrutura com Terraform..."
+  cd "$TERRAFORM_DIR"
+  terraform init -upgrade -input=false -no-color 2>&1 | grep -E "provider|initialized|error" || true
+  terraform apply -auto-approve -input=false
+}
 
-echo "==> Enviando .env..."
-scp $SSH_OPTS .env "$REMOTE:$REMOTE_DIR/.env"
+# ── Deploy rápido: só atualiza o código Lambda (sem terraform) ────────────────
+deploy_backend_fast() {
+  local FUNCTION_NAME REGION
+  FUNCTION_NAME=$(cd "$TERRAFORM_DIR" && terraform output -raw cloudfront_distribution_id 2>/dev/null && echo "magic-collector" || echo "magic-collector")
+  REGION="us-east-1"
 
-echo "==> Buildando e subindo containers..."
-ssh $SSH_OPTS "$REMOTE" bash <<'SSHEOF'
-set -euo pipefail
-cd /opt/magic-collector
-docker compose -f docker-compose.prod.yml up --build -d --remove-orphans
-echo "--- Containers: ---"
-docker compose -f docker-compose.prod.yml ps
-SSHEOF
+  step "Atualizando código do Lambda diretamente (fast deploy)..."
+  aws lambda update-function-code \
+    --function-name magic-collector \
+    --zip-file "fileb://$LAMBDA_ZIP" \
+    --region "$REGION" \
+    --output text --query 'FunctionName' \
+    | xargs -I{} echo "   Função atualizada: {}"
 
-echo ""
-echo "✓ Deploy concluído!"
-echo "  https://magic-collector.site"
-echo "  Health: https://magic-collector.site/api/health"
-echo ""
-echo "  Logs: ssh ubuntu@$SERVER_IP 'docker compose -f /opt/magic-collector/docker-compose.prod.yml logs -f'"
+  # Aguarda a atualização ficar ativa
+  aws lambda wait function-updated \
+    --function-name magic-collector \
+    --region "$REGION"
+}
+
+# ── Deploy rápido: só atualiza o frontend no S3 ───────────────────────────────
+deploy_frontend_fast() {
+  local BUCKET DIST_ID
+  BUCKET=$(cd "$TERRAFORM_DIR" && terraform output -raw frontend_bucket 2>/dev/null) \
+    || die "Bucket não encontrado. Rode ./deploy.sh primeiro para criar a infra."
+  DIST_ID=$(cd "$TERRAFORM_DIR" && terraform output -raw cloudfront_distribution_id 2>/dev/null)
+
+  step "Sincronizando frontend para S3 (s3://$BUCKET)..."
+  aws s3 sync "$FRONTEND_DIR/dist/" "s3://$BUCKET/" \
+    --delete \
+    --region us-east-1
+
+  step "Invalidando cache do CloudFront ($DIST_ID)..."
+  aws cloudfront create-invalidation \
+    --distribution-id "$DIST_ID" \
+    --paths "/*" \
+    --region us-east-1 \
+    --output text --query 'Invalidation.Id' \
+    | xargs -I{} echo "   Invalidação: {}"
+}
+
+# ── Resumo final ──────────────────────────────────────────────────────────────
+print_summary() {
+  local APP_URL
+  APP_URL=$(cd "$TERRAFORM_DIR" && terraform output -raw app_url 2>/dev/null || echo "https://magic-collector.site")
+
+  echo ""
+  echo -e "${GREEN}✓ Deploy concluído!${NC}"
+  echo "  App:    $APP_URL"
+  echo "  Health: $APP_URL/api/health"
+  echo ""
+  echo "  Logs do Lambda:"
+  echo "  aws logs tail /aws/lambda/magic-collector --since 5m --follow --region us-east-1"
+  echo ""
+}
+
+# ── Execução ──────────────────────────────────────────────────────────────────
+case "$MODE" in
+  all)
+    build_backend
+    build_frontend
+    infra_apply
+    print_summary
+    ;;
+  backend)
+    build_backend
+    # Se a infra já existe, fast deploy; senão, terraform apply
+    if [[ -f "$TERRAFORM_DIR/terraform.tfstate" ]] && \
+       cd "$TERRAFORM_DIR" && terraform output frontend_bucket &>/dev/null; then
+      deploy_backend_fast
+    else
+      warn "Infra não encontrada, rodando terraform apply..."
+      infra_apply
+    fi
+    print_summary
+    ;;
+  frontend)
+    build_frontend
+    if [[ -f "$TERRAFORM_DIR/terraform.tfstate" ]] && \
+       cd "$TERRAFORM_DIR" && terraform output frontend_bucket &>/dev/null; then
+      deploy_frontend_fast
+    else
+      warn "Infra não encontrada, rodando terraform apply..."
+      infra_apply
+    fi
+    print_summary
+    ;;
+  infra)
+    infra_apply
+    print_summary
+    ;;
+esac

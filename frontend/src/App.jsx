@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listProxyCards, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import "./App.css";
 
@@ -642,6 +642,23 @@ export default function App() {
   const [analyzeError, setAnalyzeError] = useState("");
   const [analyzeInnerTab, setAnalyzeInnerTab] = useState("selected"); // selected | rejected | list | analysis
 
+  // ── Proxies ───────────────────────────────────────────────────────────────
+  const [proxyCards, setProxyCards] = useState([]);
+  const [proxyLoading, setProxyLoading] = useState(false);
+
+  // ── Double-faced cards (DFC) ────────────────────────────────────────────
+  const [flippedCards, setFlippedCards] = useState(new Set());
+  const [modalFlipped, setModalFlipped] = useState(false);
+
+  function toggleFlip(id, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    setFlippedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  }
+
   const [quickAddModal, setQuickAddModal] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
   const [openMenu, setOpenMenu] = useState(null);
@@ -1063,6 +1080,20 @@ export default function App() {
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
+
+  async function loadProxies() {
+    setProxyLoading(true);
+    try {
+      const data = await listProxyCards();
+      setProxyCards(data ?? []);
+    } finally {
+      setProxyLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "proxies") loadProxies();
+  }, [activeTab]);
   useEffect(() => { loadGameSessions(); }, []);
   useEffect(() => { loadTokensList(); }, []);
   useEffect(() => {
@@ -1125,6 +1156,7 @@ export default function App() {
     setDetailFromDeck(false);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setModalFlipped(false);
     try {
       const data = await getCard(id);
       setSelectedCard(data);
@@ -1137,6 +1169,7 @@ export default function App() {
     setDetailFromDeck(true);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setModalFlipped(false);
     try {
       const data = await getCard(id);
       setSelectedCard(data);
@@ -1174,7 +1207,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist,
-      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
     });
     setEditMode(true);
   }
@@ -1424,6 +1457,53 @@ export default function App() {
     XLSX.writeFile(wb, "colecao.xlsx");
   }
 
+  const DECK_EXPORT_HEADERS = [
+    "nome", "tipo", "subtitulo", "mana_cost", "cores", "cor_display",
+    "raridade", "set", "numero", "idioma", "ano", "artista",
+    "foil", "prerelease", "full_art", "commander", "quantidade",
+    "condicao", "notas", "preco_usd",
+  ];
+
+  function deckCardToRow(c) {
+    return [
+      c.name, c.type, c.subtitle, c.mana_cost, c.colors, c.color,
+      c.rarity, c.set_code, c.collection_number, c.language, c.year, c.artist,
+      c.foil ? "sim" : "nao",
+      c.prerelease ? "sim" : "nao",
+      c.full_art ? "sim" : "nao",
+      c.commander ? "sim" : "nao",
+      c.quantity, c.condition, c.notes,
+      c.price_usd ?? 0,
+    ];
+  }
+
+  function handleExportDeckCSV() {
+    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [DECK_EXPORT_HEADERS.join(","), ...deckCards.map((c) => deckCardToRow(c).map(escape).join(","))];
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `deck-${(managingDeck?.name || "deck").replace(/\s+/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleExportDeckXLSX() {
+    const rows = deckCards.map(deckCardToRow);
+    const ws = XLSX.utils.aoa_to_sheet([DECK_EXPORT_HEADERS, ...rows]);
+
+    // Larguras automáticas por coluna
+    ws["!cols"] = DECK_EXPORT_HEADERS.map((h, i) => {
+      const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] ?? "").length));
+      return { wch: Math.min(maxLen + 2, 40) };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, managingDeck?.name?.slice(0, 31) || "Deck");
+    XLSX.writeFile(wb, `deck-${(managingDeck?.name || "deck").replace(/\s+/g, "_")}.xlsx`);
+  }
+
   async function handleImportList(e) {
     e.preventDefault();
     setListLoading(true);
@@ -1619,6 +1699,9 @@ export default function App() {
         <button role="tab" type="button" aria-selected={activeTab === "analyze"} className={`tab tab-analyze${activeTab === "analyze" ? " active" : ""}`} onClick={() => setActiveTab("analyze")}>
           <span className="tab-icon" aria-hidden="true">🧬</span><span className="tab-label">Análise</span>
         </button>
+        <button role="tab" type="button" aria-selected={activeTab === "proxies"} className={`tab tab-proxies${activeTab === "proxies" ? " active" : ""}`} onClick={() => setActiveTab("proxies")}>
+          <span className="tab-icon" aria-hidden="true">⚠</span><span className="tab-label">Proxies</span>
+        </button>
       </nav>
 
       {activeTab === "decks" && (
@@ -1672,6 +1755,16 @@ export default function App() {
                         </span>
                       )}
                     </h3>
+                    {deckCards.length > 0 && (
+                      <div className="deck-export-btns">
+                        <button type="button" className="deck-export-btn" title="Exportar cartas do deck em CSV" onClick={handleExportDeckCSV}>
+                          ↓ CSV
+                        </button>
+                        <button type="button" className="deck-export-btn deck-export-btn-xlsx" title="Exportar cartas do deck em XLSX" onClick={handleExportDeckXLSX}>
+                          ↓ XLSX
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {deckCards.length > 0 && (
@@ -1731,8 +1824,15 @@ export default function App() {
                     {pagedDeckCards.map((card) => (
                       <div className={`list-item deck-card-item${card.commander ? " deck-card-commander" : ""}${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
                         {card.image_url && (
-                          <div className="deck-card-thumb">
-                            <img src={card.image_url} alt={card.name} loading="lazy" />
+                          <div className={`deck-card-thumb${card.double_faced ? " dfc-thumb" : ""}`}>
+                            <img
+                              src={(card.double_faced && flippedCards.has(card.id) && card.image_url_back) ? card.image_url_back : card.image_url}
+                              alt={card.name} loading="lazy"
+                            />
+                            {card.double_faced && card.image_url_back && (
+                              <button type="button" className="thumb-flip-btn" title="Virar carta"
+                                onClick={(e) => toggleFlip(card.id, e)}>↺</button>
+                            )}
                           </div>
                         )}
                         <div className="list-item-info">
@@ -3018,6 +3118,11 @@ export default function App() {
                   onChange={(e) => setQuickAddForm({ ...quickAddForm, foil: e.target.checked })} />
                 ✦ Foil
               </label>
+              <label className="checkbox-label proxy-checkbox">
+                <input type="checkbox" checked={quickAddForm.proxy || false}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, proxy: e.target.checked })} />
+                ⚠ Proxy
+              </label>
               <button type="submit" className="quick-add-submit">Buscar e Confirmar →</button>
             </form>
           </div>
@@ -3872,21 +3977,32 @@ export default function App() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}`}
                   onClick={() => handleDetails(card.id)}
                   title={card.name}
                 >
-                  {card.image_url
-                    ? <img src={card.image_url} alt={card.name} loading="lazy" className="card-grid-img" />
-                    : <div className="card-grid-placeholder">
-                        <CardColorIcons card={card} />
-                        <span className="card-grid-placeholder-name">{card.name}</span>
-                      </div>
-                  }
+                  {(() => {
+                    const flipped = flippedCards.has(card.id);
+                    const showImg = (card.double_faced && flipped && card.image_url_back) ? card.image_url_back : card.image_url;
+                    return showImg
+                      ? <img src={showImg} alt={card.name} loading="lazy" className="card-grid-img" />
+                      : <div className="card-grid-placeholder">
+                          <CardColorIcons card={card} />
+                          <span className="card-grid-placeholder-name">{card.name}</span>
+                        </div>;
+                  })()}
+                  {card.double_faced && card.image_url_back && (
+                    <button type="button" className="grid-flip-btn" title="Virar carta"
+                      onClick={(e) => toggleFlip(card.id, e)}>
+                      ↺
+                    </button>
+                  )}
                   <div className="card-grid-overlay">
                     <div className="card-grid-name">
                       {card.foil && <span className="foil-text">✦ </span>}
+                      {card.proxy && <span className="proxy-indicator" title="Proxy">⚠ </span>}
                       {card.name}
+                      {card.double_faced && <span className="dfc-indicator" title="Dupla Face"> ↔</span>}
                     </div>
                     <div className="card-grid-meta">
                       {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
@@ -3908,7 +4024,7 @@ export default function App() {
                 const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
                 return (
                   <div
-                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.proxy ? " is-proxy" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
                     key={card.id}
                   >
                     <div className="list-item-info">
@@ -3917,6 +4033,7 @@ export default function App() {
                           {card.name}
                         </strong>
                         {card.foil && <span className="foil-text">✦</span>}
+                        {card.proxy && <span className="proxy-badge" title="Proxy">⚠ Proxy</span>}
                         {card.full_art && <span className="full-art-badge">◈ Full Art</span>}
                         <CardColorIcons card={card} />
                         {card.rarity && (
@@ -3975,6 +4092,73 @@ export default function App() {
       </section>
       }
 
+      {/* ── ABA PROXIES ─────────────────────────────────────────────────── */}
+      {activeTab === "proxies" && (
+        <section className="proxies-screen">
+          <div className="proxies-header">
+            <h2 className="proxies-title">⚠ Cartas Proxy</h2>
+            <p className="proxies-subtitle">
+              {proxyLoading ? "Carregando…" : `${proxyCards.length} ${proxyCards.length === 1 ? "carta proxy" : "cartas proxy"} na coleção`}
+            </p>
+            <button type="button" className="proxies-refresh-btn" onClick={loadProxies} disabled={proxyLoading}>↺ Atualizar</button>
+          </div>
+
+          {proxyLoading ? (
+            <div className="proxies-loading">
+              <div className="eval-spinner">⚙</div>
+              <p>Buscando proxies…</p>
+            </div>
+          ) : proxyCards.length === 0 ? (
+            <p className="empty proxies-empty">Nenhuma carta marcada como proxy.</p>
+          ) : (
+            <div className="list proxies-list">
+              {proxyCards.map((card) => {
+                const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
+                return (
+                  <div
+                    key={card.id}
+                    className={`list-item is-proxy${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                  >
+                    <div className="list-item-img-wrap">
+                      {card.image_url
+                        ? <img src={card.image_url} alt={card.name} className="list-item-thumb" loading="lazy" />
+                        : <div className="list-item-thumb-placeholder"><CardColorIcons card={card} /></div>
+                      }
+                    </div>
+                    <div className="list-item-info">
+                      <div className="list-item-name">
+                        <strong className={card.foil ? "foil-text" : ""}>{card.name}</strong>
+                        {card.foil && <span className="foil-text">✦</span>}
+                        <span className="proxy-badge">⚠ Proxy</span>
+                        <CardColorIcons card={card} />
+                        {card.rarity && (
+                          <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>
+                        )}
+                        {assignedDeck ? (
+                          <span className="deck-badge" style={getDeckBadgeStyle(assignedDeck.theme_color)}>
+                            {assignedDeck.name}
+                          </span>
+                        ) : (
+                          <span className="deck-badge deck-badge-none">Sem deck</span>
+                        )}
+                      </div>
+                      <div className="list-item-meta">
+                        <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
+                        {card.condition && <span className="condition-tag">{card.condition}</span>}
+                      </div>
+                      <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
+                    </div>
+                    <div className="actions">
+                      <button type="button" onClick={() => handleDetails(card.id)}>Ver</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── MODAL DETALHES ── */}
       {(selectedCard || loadingDetail) && (
         <div className="modal-overlay" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>
@@ -3983,18 +4167,35 @@ export default function App() {
 
             {loadingDetail && <p className="empty">Carregando...</p>}
 
-            {selectedCard && !editMode && (
+            {selectedCard && !editMode && (() => {
+              const backImg = selectedCard.external?.back_image_url || selectedCard.local?.image_url_back || "";
+              const frontImg = selectedCard.external?.image_url || selectedCard.local?.image_url || "";
+              const isDFC = !!(selectedCard.local?.double_faced || selectedCard.external?.double_faced || backImg);
+              const displayImg = isDFC && modalFlipped ? backImg : frontImg;
+              const backName = selectedCard.external?.back_name || "";
+              return (
               <>
                 <div className="modal-top">
-                  {selectedCard.external?.image_url && (
-                    <img src={selectedCard.external.image_url} alt={selectedCard.local.name} />
+                  {displayImg && (
+                    <div className="modal-card-img-wrap">
+                      <img src={displayImg} alt={selectedCard.local.name} className={`modal-card-img${isDFC && modalFlipped ? " dfc-back" : ""}`} />
+                      {isDFC && backImg && (
+                        <button type="button" className="dfc-flip-btn" title="Virar carta"
+                          onClick={() => setModalFlipped(f => !f)}>
+                          ↺ {modalFlipped ? "Frente" : "Verso"}
+                        </button>
+                      )}
+                    </div>
                   )}
                   <div>
                     <h2>
-                      {selectedCard.external?.printed_name || selectedCard.external?.name || selectedCard.local.name}
+                      {isDFC && modalFlipped && backName
+                        ? backName
+                        : (selectedCard.external?.printed_name || selectedCard.external?.name || selectedCard.local.name)}
                       {selectedCard.local.foil ? " ✦" : ""}
+                      {isDFC && <span className="dfc-badge-inline" title="Dupla Face">↔</span>}
                     </h2>
-                    {selectedCard.external?.printed_name && (
+                    {selectedCard.external?.printed_name && !modalFlipped && (
                       <p className="modal-en-name">{selectedCard.external.name}</p>
                     )}
                     <p className="modal-subtitle">
@@ -4080,7 +4281,8 @@ export default function App() {
                   )}
                 </div>
               </>
-            )}
+              );
+            })()}
 
             {selectedCard && editMode && (
               <form className="edit-form" onSubmit={(e) => { e.preventDefault(); handleEditSave(); }}>
@@ -4133,6 +4335,7 @@ export default function App() {
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.full_art || false} onChange={(e) => setEditForm({ ...editForm, full_art: e.target.checked })} />Full Art</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
+                  <label className="checkbox-label proxy-checkbox"><input type="checkbox" checked={editForm.proxy || false} onChange={(e) => setEditForm({ ...editForm, proxy: e.target.checked })} />⚠ Proxy</label>
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
                 <label>Observações<textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
