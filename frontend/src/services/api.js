@@ -449,3 +449,18 @@ export async function listProxyCards() {
   if (!res.ok) throw new Error(json.error || "Erro ao buscar proxies");
   return json;
 }
+
+export async function listLoreChapters({ full = false } = {}) {
+  const url = full ? `${BASE_URL}/lore?full=true` : `${BASE_URL}/lore`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar capítulos");
+  return json;
+}
+
+export async function getLoreChapter(slug) {
+  const res = await fetch(`${BASE_URL}/lore/${slug}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Capítulo não encontrado");
+  return json;
+}

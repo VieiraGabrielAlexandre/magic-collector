@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listProxyCards, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
+import LorePage from "./LorePage.jsx";
 import "./App.css";
 
 
@@ -460,13 +461,33 @@ function EvalJSONView({ data }) {
   );
 }
 
+const EVAL_TOP_LEVEL_FIELDS = [
+  "mechanics", "keywords", "tribes", "core_cards", "displaced_cards",
+  "win_condition_cards", "advantage_cards", "acceleration_cards",
+  "protection_cards", "removal_cards", "engine_cards", "never_remove_cards",
+  "optional_cards", "weak_cards", "bracket", "bracket_explanation",
+];
+
+function normalizeEvalData(data) {
+  const result = { ...data };
+  // Quando a IA aninhou listas de cartas dentro de `speed`, eleva para o topo
+  if (data.speed && typeof data.speed === "object") {
+    for (const field of EVAL_TOP_LEVEL_FIELDS) {
+      if (result[field] === undefined && data.speed[field] !== undefined) {
+        result[field] = data.speed[field];
+      }
+    }
+    result.speed = { early: data.speed.early, mid: data.speed.mid, late: data.speed.late };
+  }
+  return result;
+}
+
 function renderEvalContent(text) {
   if (!text) return null;
-  // Tenta interpretar como JSON estruturado (novo formato)
   try {
-    const data = JSON.parse(text);
-    if (data && typeof data === "object" && data.arch_principal) {
-      return <EvalJSONView data={data} />;
+    const raw = JSON.parse(text);
+    if (raw && typeof raw === "object" && raw.arch_principal) {
+      return <EvalJSONView data={normalizeEvalData(raw)} />;
     }
   } catch (_) { /* não é JSON, usa markdown */ }
   return renderEvalMarkdown(text);
@@ -528,6 +549,44 @@ function DropdownMenu({ label, items, open, onToggle }) {
                   {item.label}
                 </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onToggle }) {
+  const isGroupActive = tabs.some(t => t.id === activeTab);
+  const isOpen = openId === groupId;
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) onToggle(null); }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen, onToggle]);
+  const activeItem = tabs.find(t => t.id === activeTab);
+  return (
+    <div className="nav-group" ref={ref}>
+      <button
+        type="button"
+        className={`tab nav-group-btn${isGroupActive ? " active" : ""}${isOpen ? " open" : ""}`}
+        onClick={() => onToggle(isOpen ? null : groupId)}
+      >
+        <span className="tab-icon">{activeItem ? activeItem.icon : icon}</span>
+        <span className="tab-label">{activeItem ? activeItem.label : label}</span>
+        <span className="nav-group-chevron">{isOpen ? "▲" : "▼"}</span>
+      </button>
+      {isOpen && (
+        <div className="nav-group-dropdown">
+          {tabs.map(t => (
+            <button key={t.id} type="button"
+              className={`nav-group-item${activeTab === t.id ? " active" : ""}`}
+              onClick={() => { onSelect(t.id); onToggle(null); }}>
+              <span className="nav-group-item-icon">{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -671,6 +730,7 @@ export default function App() {
   const [propagate, setPropagate] = useState(true);
 
   const [activeTab, setActiveTab] = useState("collection");
+  const [openNavGroup, setOpenNavGroup] = useState(null);
   const [decks, setDecks] = useState([]);
   const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
   const [editDeckModal, setEditDeckModal] = useState(null);
@@ -1671,6 +1731,9 @@ export default function App() {
         </div>
       </div>
 
+      {/* ── LORE: full-screen overlay, outside main app ── */}
+      {activeTab === "lore" && <LorePage onClose={() => setActiveTab("collection")} />}
+
       <main className="app">
       <section className="hero">
         <h1>Magic Collector</h1>
@@ -1678,29 +1741,43 @@ export default function App() {
       </section>
 
       <nav className="tabs" role="tablist" aria-label="Navegação principal">
-        <button role="tab" type="button" aria-selected={activeTab === "collection"} className={`tab${activeTab === "collection" ? " active" : ""}`} onClick={() => setActiveTab("collection")}>
-          <span className="tab-icon" aria-hidden="true">🃏</span><span className="tab-label">Coleção</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "decks"} className={`tab${activeTab === "decks" ? " active" : ""}`} onClick={() => setActiveTab("decks")}>
-          <span className="tab-icon" aria-hidden="true">🗂</span><span className="tab-label">Decks</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "battles"} className={`tab${activeTab === "battles" ? " active" : ""}`} onClick={() => setActiveTab("battles")}>
-          <span className="tab-icon" aria-hidden="true">⚔</span><span className="tab-label">Batalhas</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "wishlist"} className={`tab tab-wishlist${activeTab === "wishlist" ? " active" : ""}`} onClick={() => setActiveTab("wishlist")}>
-          <span className="tab-icon" aria-hidden="true">⭐</span><span className="tab-label">Wishlist</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "tokens"} className={`tab tab-tokens${activeTab === "tokens" ? " active" : ""}`} onClick={() => setActiveTab("tokens")}>
-          <span className="tab-icon" aria-hidden="true">🎭</span><span className="tab-label">Tokens</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "score"} className={`tab tab-score${activeTab === "score" ? " active" : ""}`} onClick={() => setActiveTab("score")}>
-          <span className="tab-icon" aria-hidden="true">🎮</span><span className="tab-label">Pontuação</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "analyze"} className={`tab tab-analyze${activeTab === "analyze" ? " active" : ""}`} onClick={() => setActiveTab("analyze")}>
-          <span className="tab-icon" aria-hidden="true">🧬</span><span className="tab-label">Análise</span>
-        </button>
-        <button role="tab" type="button" aria-selected={activeTab === "proxies"} className={`tab tab-proxies${activeTab === "proxies" ? " active" : ""}`} onClick={() => setActiveTab("proxies")}>
-          <span className="tab-icon" aria-hidden="true">⚠</span><span className="tab-label">Proxies</span>
+        <NavGroup
+          groupId="colecao"
+          icon="🃏"
+          label="Coleção"
+          tabs={[
+            { id: "collection", icon: "🃏", label: "Coleção"    },
+            { id: "decks",      icon: "🗂",  label: "Decks"      },
+            { id: "tokens",     icon: "🎭",  label: "Tokens"     },
+            { id: "proxies",    icon: "⚠",  label: "Proxies"    },
+            { id: "wishlist",   icon: "⭐",  label: "Wishlist"   },
+            { id: "analyze",    icon: "🧬",  label: "Análise IA" },
+          ]}
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          openId={openNavGroup}
+          onToggle={setOpenNavGroup}
+        />
+        <NavGroup
+          groupId="partidas"
+          icon="⚔"
+          label="Partidas"
+          tabs={[
+            { id: "battles", icon: "⚔",  label: "Batalhas"  },
+            { id: "score",   icon: "🎮",  label: "Pontuação" },
+          ]}
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          openId={openNavGroup}
+          onToggle={setOpenNavGroup}
+        />
+        <button
+          type="button"
+          className={`tab lore-standalone-tab${activeTab === "lore" ? " active" : ""}`}
+          onClick={() => setActiveTab("lore")}
+        >
+          <span className="tab-icon">✦</span>
+          <span className="tab-label">Lore</span>
         </button>
       </nav>
 
@@ -3587,6 +3664,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* lore is rendered as a fixed overlay — see below */}
 
       {/* ── TELA DE ANÁLISE DE DECK ─────────────────────────────────────── */}
       {activeTab === "analyze" && (

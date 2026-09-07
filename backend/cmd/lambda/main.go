@@ -19,6 +19,7 @@ import (
 	"magic-collection-api/internal/importer"
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
+	"magic-collection-api/internal/lore"
 	"magic-collection-api/internal/wishlist"
 )
 
@@ -72,7 +73,7 @@ func main() {
 	wishlistHandler := wishlist.NewHandler(wishlistSvc)
 
 	gameSessionRepo := game_sessions.NewRepository(db)
-	gameSessionSvc := game_sessions.NewService(gameSessionRepo)
+	gameSessionSvc := game_sessions.NewService(gameSessionRepo, battleRepo)
 	gameSessionHandler := game_sessions.NewHandler(gameSessionSvc)
 
 	tokenRepo := tokens.NewRepository(db)
@@ -91,6 +92,7 @@ func main() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+	lore.RegisterRoutes(router)
 	router.POST("/auth/login", authHandler.Login)
 	router.POST("/auth/logout", authHandler.Logout)
 	router.GET("/auth/me", authHandler.Me)

@@ -2,15 +2,19 @@ package game_sessions
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+
+	"magic-collection-api/internal/battles"
 )
 
 type Service struct {
-	repo gsRepository
+	repo        gsRepository
+	battleRepo  *battles.Repository
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, battleRepo *battles.Repository) *Service {
+	return &Service{repo: repo, battleRepo: battleRepo}
 }
 
 func (s *Service) List() ([]GameSession, error) {
@@ -125,7 +129,57 @@ func (s *Service) Finish(sessionID int64) (*GameSession, error) {
 	if session.Status == "finished" {
 		return nil, errors.New("sessão já encerrada")
 	}
-	return s.repo.Finish(sessionID)
+	finished, err := s.repo.Finish(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	s.autoCreateBattle(finished)
+	return finished, nil
+}
+
+func (s *Service) autoCreateBattle(session *GameSession) {
+	if s.battleRepo == nil || session == nil {
+		return
+	}
+
+	var survivors []Player
+	for _, p := range session.Players {
+		if !p.IsEliminated {
+			survivors = append(survivors, p)
+		}
+	}
+
+	result := "draw"
+	winnerName := ""
+	var opponents []string
+
+	if len(survivors) == 1 {
+		result = "win"
+		winnerName = survivors[0].Name
+		for _, p := range session.Players {
+			if p.ID != survivors[0].ID {
+				opponents = append(opponents, p.Name)
+			}
+		}
+	} else {
+		for _, p := range session.Players {
+			opponents = append(opponents, p.Name)
+		}
+	}
+
+	notes := fmt.Sprintf("Sessão: %s", session.Name)
+	if winnerName != "" {
+		notes += fmt.Sprintf(" | Vencedor: %s", winnerName)
+	}
+
+	_, _ = s.battleRepo.Create(battles.BattleInput{
+		Result:      result,
+		Opponents:   opponents,
+		PlayerCount: len(session.Players),
+		GameStyle:   session.Format,
+		DeckName:    winnerName,
+		Notes:       notes,
+	})
 }
 
 func (s *Service) Restore(sessionID int64) (*GameSession, error) {
