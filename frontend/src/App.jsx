@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listProxyCards, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
@@ -558,17 +559,50 @@ function DropdownMenu({ label, items, open, onToggle }) {
 function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onToggle }) {
   const isGroupActive = tabs.some(t => t.id === activeTab);
   const isOpen = openId === groupId;
-  const ref = useRef(null);
+  const containerRef = useRef(null);
+  const dropRef     = useRef(null);
+  const btnRef      = useRef(null);
+  const [dropPos, setDropPos] = useState(null);
+
   useEffect(() => {
-    if (!isOpen) return;
-    function handler(e) { if (ref.current && !ref.current.contains(e.target)) onToggle(null); }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    if (!isOpen) {
+      setDropPos(null);
+      return;
+    }
+    // Calculate fixed position from button rect so the dropdown escapes
+    // any overflow:auto ancestor (e.g. .tabs on mobile)
+    if (btnRef.current) {
+      const r            = btnRef.current.getBoundingClientRect();
+      const w            = 180;
+      const estimatedH   = tabs.length * 44 + 12; // ~44px per item + padding
+      const left         = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+      const spaceBelow   = window.innerHeight - r.bottom;
+      const top          = spaceBelow >= estimatedH
+        ? r.bottom + 2          // abre para baixo
+        : r.top - estimatedH - 2; // abre para cima
+      setDropPos({ top, left });
+    }
+
+    function onOutside(e) {
+      if (
+        !containerRef.current?.contains(e.target) &&
+        !dropRef.current?.contains(e.target)
+      ) onToggle(null);
+    }
+    document.addEventListener("mousedown", onOutside);
+    document.addEventListener("touchstart", onOutside);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      document.removeEventListener("touchstart", onOutside);
+    };
   }, [isOpen, onToggle]);
+
   const activeItem = tabs.find(t => t.id === activeTab);
+
   return (
-    <div className="nav-group" ref={ref}>
+    <div className="nav-group" ref={containerRef}>
       <button
+        ref={btnRef}
         type="button"
         className={`tab nav-group-btn${isGroupActive ? " active" : ""}${isOpen ? " open" : ""}`}
         onClick={() => onToggle(isOpen ? null : groupId)}
@@ -577,17 +611,26 @@ function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onT
         <span className="tab-label">{activeItem ? activeItem.label : label}</span>
         <span className="nav-group-chevron">{isOpen ? "▲" : "▼"}</span>
       </button>
-      {isOpen && (
-        <div className="nav-group-dropdown">
+
+      {isOpen && dropPos && createPortal(
+        <div
+          ref={dropRef}
+          className="nav-group-dropdown"
+          style={{ position: "fixed", top: dropPos.top, left: dropPos.left, transform: "none" }}
+        >
           {tabs.map(t => (
-            <button key={t.id} type="button"
+            <button
+              key={t.id}
+              type="button"
               className={`nav-group-item${activeTab === t.id ? " active" : ""}`}
-              onClick={() => { onSelect(t.id); onToggle(null); }}>
+              onClick={() => { onSelect(t.id); onToggle(null); }}
+            >
               <span className="nav-group-item-icon">{t.icon}</span>
               <span>{t.label}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
