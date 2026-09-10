@@ -779,6 +779,7 @@ export default function App() {
   const [editDeckModal, setEditDeckModal] = useState(null);
 
   const [managingDeck, setManagingDeck] = useState(null);
+  const [edhplayCopied, setEdhplayCopied] = useState(false);
   const [deckCards, setDeckCards] = useState([]);
   const [unassignedCards, setUnassignedCards] = useState([]);
   const [unassignedPage, setUnassignedPage] = useState(1);
@@ -793,7 +794,7 @@ export default function App() {
   const [deckAnomalyModal, setDeckAnomalyModal] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
 
-  const EMPTY_IMPORT_FORM = { set_code: "", deck_name: "", language: "PT", colors: "", commander: false, theme_color: "", description: "" };
+  const EMPTY_IMPORT_FORM = { set_code: "", deck_name: "", language: "EN", colors: "", commander: false, theme_color: "", description: "" };
   const [importModal, setImportModal] = useState(false);
   const [importForm, setImportForm] = useState(EMPTY_IMPORT_FORM);
   const [importLoading, setImportLoading] = useState(false);
@@ -831,7 +832,7 @@ export default function App() {
   const playerTimers = useRef({});
   const playerPending = useRef({});
 
-  const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "PT", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
+  const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "EN", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
   const [listForm, setListForm] = useState(EMPTY_LIST_FORM);
   const [listLoading, setListLoading] = useState(false);
@@ -1607,6 +1608,15 @@ export default function App() {
     XLSX.writeFile(wb, `deck-${(managingDeck?.name || "deck").replace(/\s+/g, "_")}.xlsx`);
   }
 
+  async function handleCopyEDHPlay() {
+    const text = deckCards
+      .map(c => `${c.quantity || 1} ${c.name}`)
+      .join("\n");
+    await navigator.clipboard.writeText(text);
+    setEdhplayCopied(true);
+    setTimeout(() => setEdhplayCopied(false), 1800);
+  }
+
   async function handleImportList(e) {
     e.preventDefault();
     setListLoading(true);
@@ -1882,6 +1892,9 @@ export default function App() {
                         </button>
                         <button type="button" className="deck-export-btn deck-export-btn-xlsx" title="Exportar cartas do deck em XLSX" onClick={handleExportDeckXLSX}>
                           ↓ XLSX
+                        </button>
+                        <button type="button" className="deck-export-btn deck-export-btn-edh" title="Copiar lista para EDHPlay" onClick={handleCopyEDHPlay}>
+                          {edhplayCopied ? "✓ Copiado!" : "⎘ EDHPlay"}
                         </button>
                       </div>
                     )}

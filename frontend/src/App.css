@@ -1875,6 +1875,46 @@ input[type="radio"] {
   gap: 8px;
 }
 
+/* ── Deck export buttons ───────────────────────────────────────────────── */
+.deck-export-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.deck-export-btn {
+  background: var(--surface-3);
+  color: var(--gold);
+  border: 1px solid var(--border);
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.deck-export-btn:hover {
+  border-color: var(--gold-dim);
+  color: var(--gold-light);
+}
+.deck-export-btn-xlsx {
+  color: var(--success-text);
+  border-color: var(--success);
+}
+.deck-export-btn-xlsx:hover {
+  border-color: #4a9e68;
+  color: #8aeaaa;
+}
+.deck-export-btn-edh {
+  color: #a48cff;
+  border-color: #5c4a9e;
+}
+.deck-export-btn-edh:hover {
+  border-color: #7a65cc;
+  color: #c4b0ff;
+  background: rgba(92, 74, 158, 0.15);
+}
+
 /* ── Deck badge in card list ───────────────────────────────────────────── */
 .list-item-info .deck-badge {
   display: inline-flex !important;
