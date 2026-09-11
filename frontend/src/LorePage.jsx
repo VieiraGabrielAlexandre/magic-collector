@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { listLoreChapters, getLoreChapter } from "./services/api.js";
+import LoreCards from "./LoreCards.jsx";
 import "./lore.css";
 
 // ── Era metadata ──────────────────────────────────────────────────
@@ -352,6 +353,7 @@ export default function LorePage({ onClose }) {
   const [activeNavSlug, setActiveNavSlug] = useState(null);
   const [charImages, setCharImages]   = useState({});
   const [encFilter, setEncFilter]     = useState("todos");
+  const [activeView, setActiveView]   = useState("lore"); // "lore" | "cards"
 
   useCosmosCanvas(canvasRef, true);
 
@@ -436,6 +438,16 @@ export default function LorePage({ onClose }) {
         <span style={{ fontFamily:"'Cinzel',serif", fontSize:10, letterSpacing:"0.3em", textTransform:"uppercase", color:"#4a4038" }}>
           Carregando Multiverso…
         </span>
+      </div>
+    );
+  }
+
+  // ── Cards view ─────────────────────────────────────────────────
+  if (activeView === "cards") {
+    return (
+      <div className="lore-root">
+        <canvas ref={canvasRef} className="lore-canvas" />
+        <LoreCards onBack={() => setActiveView("lore")} onClose={onClose} />
       </div>
     );
   }
@@ -534,6 +546,22 @@ export default function LorePage({ onClose }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* ── Cards showcase entry ──────────────────── */}
+          <section className="lore-cards-entry">
+            <div className="lore-cards-entry-inner">
+              <div className="lore-cards-entry-text">
+                <p className="lore-chars-eyebrow">Vitrines de Cartas</p>
+                <h2 className="lore-selector-title">Cartas em Destaque</h2>
+                <p className="lore-selector-sub">
+                  Arte oficial do Scryfall, mana costs, curiosidades e lore — em vitrines curáveis por você via <code>.md</code>.
+                </p>
+              </div>
+              <button className="lore-cards-entry-btn" onClick={() => setActiveView("cards")}>
+                <span>✦</span> Explorar Cartas
+              </button>
             </div>
           </section>
 

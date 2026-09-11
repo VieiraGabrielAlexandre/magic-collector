@@ -464,3 +464,17 @@ export async function getLoreChapter(slug) {
   if (!res.ok) throw new Error(json.error || "Capítulo não encontrado");
   return json;
 }
+
+export async function listCardShowcases() {
+  const res = await fetch(`${BASE_URL}/lore-cards`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao carregar showcases");
+  return json;
+}
+
+export async function getCardShowcase(slug) {
+  const res = await fetch(`${BASE_URL}/lore-cards/${slug}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Showcase não encontrado");
+  return json;
+}
