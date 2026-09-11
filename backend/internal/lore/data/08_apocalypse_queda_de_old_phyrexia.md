@@ -1,5 +1,21 @@
 # Volume 08 — Apocalypse: a queda definitiva de Old Phyrexia
 
+> **Nota de fontes.** Cânone primário: romance *Apocalypse* (2000), de J.
+> Robert King, fechamento da Weatherlight Saga. **O texto não está publicado
+> no site oficial da Wizards.** Salvo indicação contrária, o conteúdo abaixo
+> é **reconstrução a partir de fontes secundárias que resumem o cânone**
+> (MTG Wiki, Magic Untapped), e não leitura direta do original.
+>
+> Este capítulo é o que tem **mais divergências entre fontes** de todo o
+> bloco — especialmente na mecânica final da Legacy Weapon, que o próprio
+> romance trata de forma deliberadamente obscura. Tudo o que não pôde ser
+> sustentado está marcado, não preenchido.
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+
+---
+
 ## 1. Onde estamos
 
 No início de *Apocalypse*:

@@ -1,5 +1,29 @@
 # Volume 06 — Os Nine Titans em Old Phyrexia
 
+> **Nota de fontes.** O cânone primário deste capítulo são os romances
+> oficiais *Invasion* (1999), *Planeshift* (2000) e *Apocalypse* (2000), de
+> J. Robert King, além das histórias antigas que estabeleceram cada um dos
+> nove oldwalkers (ciclos de Ice Age, Homelands/Ulgrotha, Corondor, Rabiah,
+> Sarpadia).
+>
+> **Nenhum desses textos está publicado no site oficial da Wizards.** A
+> Magic Story online só começa muito depois. Portanto, salvo indicação
+> contrária, o conteúdo abaixo é **reconstrução a partir de fontes
+> secundárias que resumem o cânone** — sobretudo a MTG Wiki — e não de
+> leitura direta do texto oficial. Isso está declarado aqui de propósito:
+> não é o mesmo grau de certeza que um artigo assinado da Wizards.
+>
+> Marcações usadas no texto:
+>
+> - **⚠️** — as fontes consultadas **divergem** neste ponto. A divergência
+>   é explicada na nota e repetida na seção final.
+> - **🔎** — detalhe que apareceu em **apenas uma** fonte secundária e não
+>   foi corroborado por outra.
+> - *(interpretação)* — leitura temática, não fato histórico.
+>
+> Tudo o que não pôde ser sustentado foi **omitido**, não preenchido.
+
+---
 
 ## 1. Por que Urza atacou Phyrexia
 

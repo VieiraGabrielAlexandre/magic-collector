@@ -1,5 +1,21 @@
 # Volume 11 — Legions e Scourge: os Numena, Karona e a ponte para Mirrodin
 
+> **Nota de fontes.** Cânone primário: romances *Legions* (2003) e *Scourge*
+> (2003), de J. Robert King. **Nenhum está publicado no site oficial da
+> Wizards.** Salvo indicação contrária, o conteúdo é **reconstrução a partir
+> de fontes secundárias que resumem o cânone** (MTG Wiki, Magic Untapped).
+>
+> **Aviso especial.** Este é o arco mais problemático de toda a compilação
+> do ponto de vista de continuidade. As próprias fontes registram que
+> **partes dele têm status canônico disputado**. A seção 16 trata disso
+> explicitamente, em vez de esconder o problema. Nada foi harmonizado à
+> força.
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+
+---
+
 ## 1. Legions: a corrida pelo deus-criança
 
 O romance *Legions* organiza-se em torno de um objetivo que soa absurdo até

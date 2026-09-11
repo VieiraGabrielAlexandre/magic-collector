@@ -1,17 +1,24 @@
 package lore
 
 import (
-	"embed"
-	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed data
-var loreFS embed.FS
+var dataDir string
+
+func init() {
+	if v := os.Getenv("LORE_DATA_PATH"); v != "" {
+		dataDir = v
+	} else {
+		dataDir = "internal/lore/data"
+	}
+}
 
 type Chapter struct {
 	Slug    string `json:"slug"`
@@ -42,7 +49,7 @@ func slugFromName(name string) string {
 }
 
 func listChapters(withContent bool) ([]Chapter, error) {
-	entries, err := fs.ReadDir(loreFS, "data")
+	entries, err := os.ReadDir(dataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +60,6 @@ func listChapters(withContent bool) ([]Chapter, error) {
 			continue
 		}
 		name := e.Name()
-		// skip meta/non-chapter files
 		skip := map[string]bool{
 			"README.md": true, "FONTES_OFICIAIS.md": true,
 			"00_README.md": true, "FONTES.md": true,
@@ -63,7 +69,7 @@ func listChapters(withContent bool) ([]Chapter, error) {
 			continue
 		}
 
-		raw, err := loreFS.ReadFile("data/" + name)
+		raw, err := os.ReadFile(filepath.Join(dataDir, name))
 		if err != nil {
 			continue
 		}
@@ -104,7 +110,7 @@ func GetChapter(c *gin.Context) {
 		return
 	}
 
-	raw, err := loreFS.ReadFile("data/" + slug + ".md")
+	raw, err := os.ReadFile(filepath.Join(dataDir, slug+".md"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "chapter not found"})
 		return
@@ -129,7 +135,8 @@ type CardShowcase struct {
 }
 
 func listShowcaseData(withContent bool) ([]CardShowcase, error) {
-	entries, err := fs.ReadDir(loreFS, "data/cards")
+	cardsDir := filepath.Join(dataDir, "cards")
+	entries, err := os.ReadDir(cardsDir)
 	if err != nil {
 		return []CardShowcase{}, nil
 	}
@@ -138,7 +145,7 @@ func listShowcaseData(withContent bool) ([]CardShowcase, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		raw, err := loreFS.ReadFile("data/cards/" + e.Name())
+		raw, err := os.ReadFile(filepath.Join(cardsDir, e.Name()))
 		if err != nil {
 			continue
 		}
@@ -173,7 +180,7 @@ func GetCardShowcase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slug"})
 		return
 	}
-	raw, err := loreFS.ReadFile("data/cards/" + slug + ".md")
+	raw, err := os.ReadFile(filepath.Join(dataDir, "cards", slug+".md"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "showcase not found"})
 		return

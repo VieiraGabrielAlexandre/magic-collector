@@ -1,5 +1,22 @@
 # Volume 12 — Kamigawa: o crime de Konda e a Kami War
 
+> **Nota de fontes.** Cânone primário: trilogia *Champions of Kamigawa* /
+> *Betrayers of Kamigawa* / *Saviors of Kamigawa* — romances *Outlaw*,
+> *Heretic* e *Guardian*, de Scott McGough (2004–2005). **Não estão
+> publicados no site oficial da Wizards.** Salvo indicação contrária, o
+> conteúdo é **reconstrução a partir de fontes secundárias que resumem o
+> cânone** (MTG Wiki).
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+>
+> Datação: a Kami War termina em **3227 AR**. Ou seja, **é anterior a tudo o
+> que os Volumes 01–11 narram em Dominaria** — mas é contada aqui, na ordem
+> de publicação da compilação, porque só faz sentido depois que o leitor
+> conhece Nicol Bolas e Madara. O elo está na seção 12.
+
+---
+
 ## 1. Os dois mundos
 
 Kamigawa não é um plano com um "reino espiritual" ao lado. É um plano

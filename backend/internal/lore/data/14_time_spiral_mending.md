@@ -1,5 +1,19 @@
 # Volume 14 — Time Spiral: as time rifts e o Mending
 
+> **Nota de fontes.** Cânone primário: trilogia de Scott McGough — *Time
+> Spiral* (2006), *Planar Chaos* (2007) e *Future Sight* (2007). **Não estão
+> publicados no site oficial da Wizards.** Salvo indicação contrária, o
+> conteúdo é **reconstrução a partir de fontes secundárias** (MTG Wiki,
+> Fandom, Magic Untapped).
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+>
+> Datação: a **Rift Era** vai de **4206 AR** — o ano seguinte ao fim da
+> Invasão Phyrexiana — a **4500 AR**, quando ocorre o Mending.
+
+---
+
 ## 1. A conta chegou
 
 Este capítulo é a fatura de tudo o que os treze volumes anteriores narraram.
