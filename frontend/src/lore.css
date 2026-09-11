@@ -146,9 +146,9 @@
 
 /* ── Main content ────────────────────────────────────────────────── */
 .lore-main {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: clamp(40px,5vw,64px) clamp(16px,5vw,40px) clamp(80px,10vw,120px);
+  padding: clamp(40px,5vw,64px) clamp(16px,5vw,48px) clamp(80px,10vw,120px);
 }
 
 /* ── Shared section heading ─────────────────────────────────────── */
@@ -787,6 +787,425 @@
   letter-spacing: 0.22em;
   color: #4a4038;
   text-transform: uppercase;
+}
+
+/* ── Cards showcase entry (in main lore) ──────────────────────────── */
+.lore-cards-entry {
+  margin-bottom: clamp(40px,6vw,64px);
+  padding: clamp(24px,4vw,36px) clamp(20px,4vw,36px);
+  background: linear-gradient(135deg,
+    rgba(196,154,76,0.06) 0%,
+    rgba(124,58,237,0.04) 100%);
+  border: 1px solid rgba(196,154,76,0.18);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.lore-cards-entry::before {
+  content: '✦';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 120px;
+  color: rgba(196,154,76,0.04);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.lore-cards-entry-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.lore-cards-entry-text { flex: 1; min-width: 200px; }
+.lore-cards-entry-text .lore-selector-sub { margin-bottom: 0; }
+.lore-cards-entry-text code {
+  font-family: monospace;
+  font-size: 11px;
+  background: rgba(196,154,76,0.08);
+  border: 1px solid rgba(196,154,76,0.15);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #c49a4c;
+}
+
+.lore-cards-entry-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: rgba(196,154,76,0.1);
+  border: 1px solid rgba(196,154,76,0.4);
+  border-radius: 8px;
+  padding: 14px 28px;
+  color: #c49a4c;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lore-cards-entry-btn:hover {
+  background: rgba(196,154,76,0.18);
+  border-color: rgba(196,154,76,0.7);
+  color: #f0cc6a;
+  transform: translateY(-1px);
+}
+
+/* ── Card showcase full view ───────────────────────────────────────── */
+.lore-cards-view {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.lore-cards-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: rgba(6,4,16,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #1e1030;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.lore-cards-back-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid rgba(196,154,76,0.22);
+  border-radius: 8px;
+  padding: 7px 16px;
+  color: #8a7a68;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.lore-cards-back-btn:hover { color: #c49a4c; border-color: rgba(196,154,76,0.45); }
+
+.lore-cards-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #4a4038;
+}
+
+.lore-cards-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(32px,5vw,56px) clamp(16px,5vw,48px) clamp(60px,8vw,100px);
+  width: 100%;
+}
+
+/* Showcase list */
+.lore-showcase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 48px;
+}
+
+.lore-showcase-entry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  background: #0a0615;
+  border: 1px solid #1e1030;
+  border-left: 3px solid rgba(196,154,76,0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.lore-showcase-entry:hover {
+  background: #0e0920;
+  border-color: rgba(196,154,76,0.6);
+  transform: translateX(3px);
+}
+.lore-showcase-icon {
+  color: #c49a4c;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.lore-showcase-title {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ddd0b8;
+  flex: 1;
+}
+.lore-showcase-entry:hover .lore-showcase-title { color: #f0cc6a; }
+.lore-showcase-arrow {
+  color: #4a4038;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: transform 0.2s, color 0.2s;
+}
+.lore-showcase-entry:hover .lore-showcase-arrow { transform: translateX(4px); color: #c49a4c; }
+
+.lore-showcase-active-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(18px,3vw,28px);
+  color: #f0cc6a;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+/* Format hint */
+.lore-cards-format-hint {
+  margin-top: 40px;
+  border: 1px solid #1e1030;
+  border-radius: 8px;
+  padding: 14px 18px;
+  background: #08060f;
+}
+.lore-cards-format-hint summary {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #4a4038;
+  cursor: pointer;
+  user-select: none;
+}
+.lore-cards-format-hint summary:hover { color: #8a7a68; }
+.lore-cards-format-hint pre {
+  font-family: monospace;
+  font-size: 12px;
+  color: #8a7a68;
+  margin: 14px 0 8px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  background: #060410;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #1a1028;
+}
+.lore-cards-format-hint p {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 13px;
+  color: #4a4038;
+  margin: 8px 0 0;
+}
+.lore-cards-format-hint code {
+  font-family: monospace;
+  font-size: 12px;
+  background: rgba(196,154,76,0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #c49a4c;
+}
+
+/* ── Card grid ─────────────────────────────────────────────────────── */
+.lore-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+/* Flip card container */
+.lore-card-item {
+  perspective: 1200px;
+  cursor: pointer;
+  position: relative;
+}
+.lore-card-inner {
+  position: relative;
+  width: 100%;
+  transition: transform 0.6s cubic-bezier(.4,0,.2,1);
+  transform-style: preserve-3d;
+}
+.lore-card-item.flipped .lore-card-inner {
+  transform: rotateY(180deg);
+}
+.lore-card-front,
+.lore-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.lore-card-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* Front — full MTG card image */
+.lore-card-front {
+  position: relative;
+}
+.lore-card-img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(196,154,76,0.25),
+    0 8px 32px rgba(0,0,0,0.7),
+    0 0 20px rgba(196,154,76,0.08);
+  transition: box-shadow 0.3s;
+}
+.lore-card-item:hover .lore-card-img {
+  box-shadow:
+    0 0 0 2px rgba(196,154,76,0.5),
+    0 12px 48px rgba(0,0,0,0.8),
+    0 0 40px rgba(196,154,76,0.15);
+}
+.lore-card-img-placeholder {
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  background: linear-gradient(160deg, #100820 0%, #080510 100%);
+  border: 1px solid rgba(196,154,76,0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 32px;
+  color: rgba(196,154,76,0.3);
+}
+.lore-card-ph-name {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #4a4038;
+  text-align: center;
+  padding: 0 12px;
+}
+
+/* Back — details */
+.lore-card-back {
+  background: linear-gradient(160deg, #100820 0%, #0a0615 100%);
+  border: 1px solid rgba(196,154,76,0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 14px;
+  min-height: 280px;
+}
+.lore-card-back-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(196,154,76,0.12);
+}
+.lore-card-back-name {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0cc6a;
+  line-height: 1.2;
+}
+.lore-card-back-type {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6a5a48;
+}
+.lore-card-back-set {
+  font-family: 'Cinzel', serif;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  color: #4a4038;
+  text-align: center;
+}
+.lore-card-back-desc {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c4b090;
+  margin: 0;
+  flex: 1;
+}
+.lore-card-back-fact {
+  background: rgba(196,154,76,0.05);
+  border-left: 2px solid rgba(196,154,76,0.25);
+  border-radius: 0 5px 5px 0;
+  padding: 8px 10px;
+}
+.lore-card-fact-label {
+  font-family: 'Cinzel', serif;
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #c49a4c;
+  display: block;
+  margin-bottom: 5px;
+}
+.lore-card-back-fact p {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #8a7a68;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Hint text */
+.lore-card-hover-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Cinzel', serif;
+  font-size: 7.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(196,154,76,0.5);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.lore-card-item:hover .lore-card-hover-hint { opacity: 1; }
+
+/* Mana symbols */
+.lore-card-mana-cost {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lore-card-mana-sym {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.lore-card-mana-text {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  color: #8a7a68;
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */

@@ -120,7 +120,72 @@ func GetChapter(c *gin.Context) {
 	})
 }
 
+// ── Card showcases ────────────────────────────────────────────────
+
+type CardShowcase struct {
+	Slug    string `json:"slug"`
+	Title   string `json:"title"`
+	Content string `json:"content,omitempty"`
+}
+
+func listShowcaseData(withContent bool) ([]CardShowcase, error) {
+	entries, err := fs.ReadDir(loreFS, "data/cards")
+	if err != nil {
+		return []CardShowcase{}, nil
+	}
+	var out []CardShowcase
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		raw, err := loreFS.ReadFile("data/cards/" + e.Name())
+		if err != nil {
+			continue
+		}
+		content := string(raw)
+		_, title := parseTitle(content)
+		if title == "" {
+			title = strings.TrimSuffix(e.Name(), ".md")
+		}
+		cs := CardShowcase{Slug: strings.TrimSuffix(e.Name(), ".md"), Title: title}
+		if withContent {
+			cs.Content = content
+		}
+		out = append(out, cs)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
+	return out, nil
+}
+
+func ListCardShowcases(c *gin.Context) {
+	full := c.Query("full") == "true"
+	showcases, err := listShowcaseData(full)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, showcases)
+}
+
+func GetCardShowcase(c *gin.Context) {
+	slug := c.Param("slug")
+	if strings.Contains(slug, "/") || strings.Contains(slug, "..") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slug"})
+		return
+	}
+	raw, err := loreFS.ReadFile("data/cards/" + slug + ".md")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "showcase not found"})
+		return
+	}
+	content := string(raw)
+	_, title := parseTitle(content)
+	c.JSON(http.StatusOK, CardShowcase{Slug: slug, Title: title, Content: content})
+}
+
 func RegisterRoutes(r gin.IRouter) {
 	r.GET("/lore", ListChapters)
 	r.GET("/lore/:slug", GetChapter)
+	r.GET("/lore-cards", ListCardShowcases)
+	r.GET("/lore-cards/:slug", GetCardShowcase)
 }
