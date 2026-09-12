@@ -1,5 +1,20 @@
 # Volume 13 — Ravnica: as dez guildas e a ruptura do Guildpact
 
+> **Nota de fontes.** Cânone primário: trilogia de Cory J. Herndon —
+> *Ravnica: City of Guilds* (2005), *Guildpact* (2006) e *Dissension*
+> (2006). **Não estão publicados no site oficial da Wizards.** Salvo
+> indicação contrária, o conteúdo é **reconstrução a partir de fontes
+> secundárias** (MTG Wiki, Magic Untapped).
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+>
+> Datação: Ravnica usa seu próprio calendário, **ZC**. O Guildpact foi
+> assinado por volta do ano 0; a trilogia começa em **9999 ZC**, véspera do
+> **Decamillennial** — os dez mil anos do pacto.
+
+---
+
 ## 1. O que é Ravnica
 
 Um plano inteiramente urbanizado: uma cidade que cobre o mundo.

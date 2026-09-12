@@ -5,6 +5,10 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      - LORE_DATA_PATH=/app/lore-data
+    volumes:
+      - ./backend/internal/lore/data:/app/lore-data
 
   frontend:
     build: ./frontend

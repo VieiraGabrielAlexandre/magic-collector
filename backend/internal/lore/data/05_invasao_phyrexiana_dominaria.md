@@ -1,5 +1,29 @@
 # Volume 05 — A Primeira Invasão Phyrexiana: a guerra em Dominaria
 
+> **Nota de fontes.** Este capítulo cobre a guerra travada **no solo de
+> Dominaria** (romances *Prophecy*, *Invasion* e a primeira metade de
+> *Planeshift*). A campanha dos Nine Titans dentro de Old Phyrexia está no
+> Volume 06; Hanna, Barrin e a destruição de Tolaria estão no Volume 07; o
+> desfecho (*Apocalypse*) está no Volume 08.
+>
+> O cânone primário desta era são os romances oficiais da Wizards of the
+> Coast. Esses textos **não estão disponíveis no site oficial** — a Magic
+> Story online começa muito depois. Portanto, salvo onde houver link direto
+> para magic.wizards.com, o material aqui é **reconstrução a partir de
+> resumos secundários derivados do cânone** (principalmente MTG Wiki).
+> Marcações usadas ao longo do texto:
+>
+> - **⚠️** — as fontes consultadas divergem entre si neste ponto.
+> - **🔎** — detalhe que aparece em apenas uma fonte secundária e não foi
+>   corroborado por outra.
+>
+> Este volume é, em sua maior parte, o antigo arquivo
+> `13_invasao_phyrexiana_weatherlight_saga_detalhada.md`, com as seções
+> finais removidas para os volumes 06–08 e alguns pontos corrigidos contra
+> as fontes. As correções estão listadas em `NOTAS_DE_CONTINUIDADE.md`.
+
+---
+
 ## Prophecy: Keld e Jamuraa
 
 Pouco antes da invasão principal, **Keld** entrou em guerra contra regiões

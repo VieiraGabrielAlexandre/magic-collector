@@ -1,5 +1,20 @@
 # Volume 09 — Odyssey: o Mirari, a Cabal e a ruína de Otaria
 
+> **Nota de fontes.** Cânone primário: romances *Odyssey* (2001, Vance
+> Moore), *Chainer's Torment* (2002, Scott McGough), *Judgment* (2002, Will
+> McDermott). **Nenhum está publicado no site oficial da Wizards.** Salvo
+> indicação contrária, o conteúdo abaixo é **reconstrução a partir de fontes
+> secundárias que resumem o cânone** (MTG Wiki, Magic Untapped), e não
+> leitura direta do original.
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+>
+> Datação usada pelas fontes: os eventos de Odyssey ocorrem por volta de
+> **4305–4306 AR**, aproximadamente **cem anos depois** do fim da Invasão
+> Phyrexiana (4205 AR, Volume 08).
+
+---
 
 ## 1. Por que Dominaria mudou tanto
 

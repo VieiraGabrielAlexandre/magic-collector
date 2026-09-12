@@ -7,8 +7,9 @@
   z-index: 9999;
   background: #060410;
   color: #ddd0b8;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .lore-canvas {
@@ -19,31 +20,157 @@
   pointer-events: none;
 }
 
-.lore-wrap { position: relative; z-index: 1; }
+.lore-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
 
-/* ── Close button ──────────────────────────────────────────────── */
-.lore-close {
-  position: fixed;
-  top: 14px; right: 18px;
-  z-index: 10001;
-  background: rgba(14,9,24,0.85);
-  border: 1px solid rgba(196,154,76,0.22);
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-family: 'Cinzel', serif;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #8a7a68;
+/* ── Header ─────────────────────────────────────────────────────── */
+.lore-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  gap: clamp(12px,2vw,24px);
+  padding: 0 clamp(16px,3vw,32px);
+  height: 64px;
+  background: rgba(6,4,16,0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid #1a0f2e;
+  position: relative;
+  z-index: 10;
 }
-.lore-close:hover { color: #c49a4c; border-color: rgba(196,154,76,0.4); background: rgba(20,12,32,0.92); }
+
+.lore-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-right: auto;
+}
+.lore-header-glyph {
+  font-size: 18px;
+  color: #c49a4c;
+  opacity: 0.7;
+  line-height: 1;
+}
+.lore-header-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(11px,1.4vw,15px);
+  font-weight: 700;
+  color: #f0cc6a;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.lore-header-sub {
+  font-family: 'Cinzel', serif;
+  font-size: 8px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #4a4038;
+}
+
+/* ── Top navigation ─────────────────────────────────────────────── */
+.lore-topnav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.lore-nav-tab {
+  font-family: 'Cinzel', serif;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 7px 14px;
+  color: #6a5a48;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.lore-nav-tab:hover {
+  color: #c49a4c;
+  border-color: rgba(196,154,76,0.2);
+  background: rgba(196,154,76,0.04);
+}
+.lore-nav-tab.active {
+  color: #f0cc6a;
+  border-color: rgba(196,154,76,0.35);
+  background: rgba(196,154,76,0.08);
+}
+.lore-nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #c49a4c;
+}
+.lore-nav-cards {
+  color: #a48cff;
+  border-color: rgba(164,140,255,0.18) !important;
+  background: rgba(124,58,237,0.06) !important;
+}
+.lore-nav-cards:hover { color: #c4aaff !important; border-color: rgba(164,140,255,0.4) !important; background: rgba(124,58,237,0.12) !important; }
+.lore-nav-count {
+  background: rgba(196,154,76,0.15);
+  border: 1px solid rgba(196,154,76,0.2);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 8px;
+  color: #c49a4c;
+  font-weight: 700;
+}
+
+/* ── Close button (inline in header) ───────────────────────────── */
+.lore-close,
+.lore-close-inline {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(196,154,76,0.16);
+  border-radius: 7px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #4a4038;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.lore-close:hover,
+.lore-close-inline:hover {
+  color: #8a7a68;
+  border-color: rgba(196,154,76,0.32);
+}
+
+/* ── Section fade animation ─────────────────────────────────────── */
+@keyframes loreFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lore-section-fade {
+  animation: loreFadeIn 0.3s ease both;
+}
 
 /* ── Hero ───────────────────────────────────────────────────────── */
 .lore-hero {
@@ -146,9 +273,14 @@
 
 /* ── Main content ────────────────────────────────────────────────── */
 .lore-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: clamp(40px,5vw,64px) clamp(16px,5vw,48px) clamp(80px,10vw,120px);
+  padding: clamp(32px,4vw,56px) clamp(16px,5vw,48px) clamp(80px,10vw,120px);
 }
 
 /* ── Shared section heading ─────────────────────────────────────── */
@@ -862,12 +994,15 @@
 .lore-cards-view {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .lore-cards-topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -876,9 +1011,6 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid #1e1030;
-  position: sticky;
-  top: 0;
-  z-index: 100;
 }
 
 .lore-cards-back-btn {
@@ -909,6 +1041,10 @@
 }
 
 .lore-cards-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   max-width: 1200px;
   margin: 0 auto;
   padding: clamp(32px,5vw,56px) clamp(16px,5vw,48px) clamp(60px,8vw,100px);
@@ -1018,175 +1154,239 @@
 /* ── Card grid ─────────────────────────────────────────────────────── */
 .lore-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
 }
 
-/* Flip card container */
+/* Card thumbnail — click opens modal */
 .lore-card-item {
-  perspective: 1200px;
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
   position: relative;
-}
-.lore-card-inner {
-  position: relative;
-  width: 100%;
-  transition: transform 0.6s cubic-bezier(.4,0,.2,1);
-  transform-style: preserve-3d;
-}
-.lore-card-item.flipped .lore-card-inner {
-  transform: rotateY(180deg);
-}
-.lore-card-front,
-.lore-card-back {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   border-radius: 10px;
-  overflow: hidden;
+  display: block;
+  width: 100%;
+  transition: transform 0.2s;
 }
-.lore-card-back {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-}
+.lore-card-item:hover { transform: translateY(-3px) scale(1.02); }
+.lore-card-item:focus-visible { outline: 2px solid rgba(196,154,76,0.6); outline-offset: 3px; }
 
-/* Front — full MTG card image */
-.lore-card-front {
-  position: relative;
-}
 .lore-card-img {
   width: 100%;
   display: block;
   border-radius: 10px;
   box-shadow:
-    0 0 0 1px rgba(196,154,76,0.25),
-    0 8px 32px rgba(0,0,0,0.7),
-    0 0 20px rgba(196,154,76,0.08);
-  transition: box-shadow 0.3s;
+    0 0 0 1px rgba(196,154,76,0.2),
+    0 6px 24px rgba(0,0,0,0.7);
+  transition: box-shadow 0.25s;
 }
 .lore-card-item:hover .lore-card-img {
   box-shadow:
-    0 0 0 2px rgba(196,154,76,0.5),
-    0 12px 48px rgba(0,0,0,0.8),
-    0 0 40px rgba(196,154,76,0.15);
+    0 0 0 2px rgba(196,154,76,0.45),
+    0 10px 40px rgba(0,0,0,0.8),
+    0 0 30px rgba(196,154,76,0.12);
 }
 .lore-card-img-placeholder {
   width: 100%;
   aspect-ratio: 488 / 680;
   background: linear-gradient(160deg, #100820 0%, #080510 100%);
-  border: 1px solid rgba(196,154,76,0.2);
+  border: 1px solid rgba(196,154,76,0.18);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-size: 32px;
+  font-size: 28px;
   color: rgba(196,154,76,0.3);
 }
 .lore-card-ph-name {
   font-family: 'Cinzel', serif;
   font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: #4a4038;
   text-align: center;
-  padding: 0 12px;
+  padding: 0 10px;
 }
-
-/* Back — details */
-.lore-card-back {
-  background: linear-gradient(160deg, #100820 0%, #0a0615 100%);
-  border: 1px solid rgba(196,154,76,0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 14px;
-  min-height: 280px;
-}
-.lore-card-back-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(196,154,76,0.12);
-}
-.lore-card-back-name {
-  font-family: 'Cinzel', serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: #f0cc6a;
-  line-height: 1.2;
-}
-.lore-card-back-type {
-  font-family: 'Cinzel', serif;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #6a5a48;
-}
-.lore-card-back-set {
-  font-family: 'Cinzel', serif;
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: #4a4038;
-  text-align: center;
-}
-.lore-card-back-desc {
-  font-family: 'EB Garamond', Georgia, serif;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #c4b090;
-  margin: 0;
-  flex: 1;
-}
-.lore-card-back-fact {
-  background: rgba(196,154,76,0.05);
-  border-left: 2px solid rgba(196,154,76,0.25);
-  border-radius: 0 5px 5px 0;
-  padding: 8px 10px;
-}
-.lore-card-fact-label {
+.lore-card-hover-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: 'Cinzel', serif;
   font-size: 7.5px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  border-radius: 20px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.lore-card-item:hover .lore-card-hover-hint { opacity: 1; }
+
+/* ── Card detail modal ──────────────────────────────────────────── */
+.lore-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10200;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  animation: loreFadeIn 0.2s ease both;
+}
+
+.lore-modal-box {
+  position: relative;
+  background: linear-gradient(145deg, #0e0920 0%, #080510 100%);
+  border: 1px solid rgba(196,154,76,0.22);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(196,154,76,0.08),
+    0 32px 80px rgba(0,0,0,0.9),
+    0 0 60px rgba(124,58,237,0.08);
+  max-width: 720px;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  animation: loreModalIn 0.25s cubic-bezier(.2,.8,.3,1) both;
+}
+
+@keyframes loreModalIn {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.lore-modal-close {
+  position: absolute;
+  top: 12px; right: 14px;
+  background: rgba(196,154,76,0.08);
+  border: 1px solid rgba(196,154,76,0.2);
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  color: #8a7a68;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.lore-modal-close:hover {
+  color: #f0cc6a;
+  background: rgba(196,154,76,0.14);
+  border-color: rgba(196,154,76,0.4);
+}
+
+.lore-modal-inner {
+  display: flex;
+  gap: 28px;
+  padding: 28px 28px 28px 24px;
+  align-items: flex-start;
+}
+
+.lore-modal-art {
+  flex-shrink: 0;
+  width: 220px;
+}
+.lore-modal-img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(196,154,76,0.25),
+    0 12px 40px rgba(0,0,0,0.8);
+}
+.lore-modal-placeholder {
+  width: 220px;
+  border-radius: 10px;
+}
+
+.lore-modal-info {
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lore-modal-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(196,154,76,0.12);
+}
+.lore-modal-name {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(14px,2.5vw,20px);
+  font-weight: 700;
+  color: #f0cc6a;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.lore-modal-type {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6a5a48;
+}
+.lore-modal-set {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: #4a4038;
+}
+.lore-modal-desc {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: clamp(14px,1.8vw,16px);
+  line-height: 1.65;
+  color: #c4b090;
+  margin: 0;
+}
+.lore-modal-fact {
+  background: rgba(196,154,76,0.05);
+  border-left: 2px solid rgba(196,154,76,0.3);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  margin-top: 4px;
+}
+.lore-modal-fact-label {
+  font-family: 'Cinzel', serif;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: #c49a4c;
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
-.lore-card-back-fact p {
+.lore-modal-fact p {
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: clamp(13px,1.6vw,14.5px);
+  line-height: 1.6;
   color: #8a7a68;
   margin: 0;
   font-style: italic;
 }
 
-/* Hint text */
-.lore-card-hover-hint {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Cinzel', serif;
-  font-size: 7.5px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: rgba(196,154,76,0.5);
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.25s;
-  pointer-events: none;
-}
-.lore-card-item:hover .lore-card-hover-hint { opacity: 1; }
-
-/* Mana symbols */
+/* Mana symbols (shared by modal and any inline use) */
 .lore-card-mana-cost {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -1194,18 +1394,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px; height: 20px;
   border-radius: 50%;
   font-family: 'Cinzel', serif;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
 .lore-card-mana-text {
   font-family: 'Cinzel', serif;
-  font-size: 10px;
+  font-size: 11px;
   color: #8a7a68;
+}
+
+/* Modal responsive */
+@media (max-width: 600px) {
+  .lore-modal-inner  { flex-direction: column; padding: 20px 16px; gap: 18px; }
+  .lore-modal-art    { width: 100%; max-width: 240px; margin: 0 auto; }
+  .lore-modal-box    { border-radius: 12px; }
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
@@ -1215,7 +1421,7 @@
   .lore-chars-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .lore-enc-grid   { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
   .lore-ch-grid    { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-  .lore-stat strong { font-size: 22px; }
+  .lore-header-sub { display: none; }
 }
 
 /* Tablet portrait ≤ 720px */
@@ -1231,6 +1437,13 @@
 
 /* Large phone ≤ 560px */
 @media (max-width: 560px) {
+  .lore-header      { height: auto; flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+  .lore-header-brand { width: 100%; }
+  .lore-topnav      { order: 3; width: 100%; overflow-x: auto; padding-bottom: 4px;
+                      -ms-overflow-style: none; scrollbar-width: none; }
+  .lore-topnav::-webkit-scrollbar { display: none; }
+  .lore-close-inline,
+  .lore-close       { order: 2; margin-left: auto; }
   .lore-chars-grid  { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .lore-enc-grid    { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .lore-ch-grid     { grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -1239,12 +1452,6 @@
   .lore-ch-dot      { left: -26px; width: 11px; height: 11px; }
   .lore-ch-head     { padding: 15px 10px 15px 0; gap: 10px; }
   .lore-ch-num      { width: 20px; font-size: 10px; }
-  .lore-stats       { gap: 14px; }
-  .lore-stat strong { font-size: 18px; }
-  .lore-stat-div    { height: 20px; }
-  .lore-mana-bar    { margin-top: 32px; }
-  .lore-mp          { width: 38px; }
-  .lore-close       { padding: 7px 12px; font-size: 9px; letter-spacing: 0.15em; }
   .lore-char-desc   { font-size: 12px; }
   .lore-enc-visual  { height: 72px; }
   .lore-enc-icon    { font-size: 32px; }
@@ -1261,12 +1468,7 @@
   .lore-ch-dot      { left: -22px; width: 10px; height: 10px; }
   .lore-ch-head     { gap: 8px; padding: 14px 8px 14px 0; }
   .lore-ch-num      { width: 18px; font-size: 9.5px; }
-  .lore-stats       { gap: 10px; }
-  .lore-stat-div    { display: none; }
-  .lore-stat strong { font-size: 17px; }
-  .lore-stat        { font-size: 9px; }
-  .lore-mp          { width: 30px; }
-  .lore-close       { top: 10px; right: 12px; padding: 6px 10px; font-size: 8.5px; }
+  .lore-close       { padding: 6px 10px; font-size: 8.5px; }
   .lore-ch-card     { padding: 11px 12px; min-height: 70px; }
   .lore-char-name   { font-size: 12px; }
   .lore-char-desc   { display: none; }
@@ -1276,6 +1478,7 @@
   .lore-enc-sub     { display: none; }
   .lore-enc-filters { gap: 5px; }
   .lore-enc-filter-btn { padding: 6px 12px; font-size: 8.5px; }
+  .lore-nav-tab     { font-size: 9px; padding: 6px 10px; }
 }
 
 /* Small phone ≤ 360px */

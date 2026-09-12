@@ -1,5 +1,17 @@
 # Volume 10 — Onslaught: Ixidor, Akroma e Phage
 
+> **Nota de fontes.** Cânone primário: romance *Onslaught* (2002, J. Robert
+> King). **Não está publicado no site oficial da Wizards.** Salvo indicação
+> contrária, o conteúdo abaixo é **reconstrução a partir de fontes
+> secundárias que resumem o cânone** (MTG Wiki, Magic Untapped).
+>
+> Marcações: **⚠️** divergência entre fontes · **🔎** fonte única, não
+> corroborada · *(interpretação)* leitura temática.
+>
+> Datação: **c. 4306 AR**, aproximadamente um século depois de *Apocalypse*.
+
+---
+
 ## 1. A estrutura do bloco
 
 Onslaught é, na superfície, uma história de vingança dentro de uma arena.
