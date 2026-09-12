@@ -159,6 +159,23 @@ function parseLine(line) {
     .replace(/`(.+?)`/g, "<code>$1</code>");
 }
 
+function isTableRow(line) {
+  return line.trim().startsWith("|") && line.trim().endsWith("|");
+}
+
+function isTableSeparator(line) {
+  if (!isTableRow(line)) return false;
+  return line
+    .trim()
+    .slice(1, -1)
+    .split("|")
+    .every(cell => /^:?-+:?$/.test(cell.trim()));
+}
+
+function parseTableRow(line) {
+  return line.trim().slice(1, -1).split("|").map(cell => parseLine(cell.trim()));
+}
+
 function renderMarkdown(md) {
   if (!md) return [];
   const lines = md.split("\n");
@@ -178,12 +195,55 @@ function renderMarkdown(md) {
   }
   function flushBq() {
     if (!bqLines.length) return;
-    nodes.push(<blockquote key={key++} className="md-blockquote">{bqLines.join(" ")}</blockquote>);
+    nodes.push(
+      <blockquote
+        key={key++}
+        className="md-blockquote"
+        dangerouslySetInnerHTML={{ __html: bqLines.join(" ") }}
+      />
+    );
     bqLines = [];
+  }
+  function flushTable(header, rows) {
+    nodes.push(
+      <div key={key++} className="md-table-wrap">
+        <table className="md-table">
+          <thead>
+            <tr>
+              {header.map((cell, i) => (
+                <th key={i} dangerouslySetInnerHTML={{ __html: cell }} />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} dangerouslySetInnerHTML={{ __html: cell }} />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trimEnd();
+    if (isTableRow(line) && isTableSeparator(lines[i + 1] || "")) {
+      flushList(); flushBq();
+      const header = parseTableRow(line);
+      const rows = [];
+      i += 2;
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(parseTableRow(lines[i]));
+        i++;
+      }
+      i--;
+      flushTable(header, rows);
+      continue;
+    }
     if (line.startsWith("# ")) {
       flushList(); flushBq();
       const text = line.slice(2);

@@ -845,6 +845,38 @@
 .lore-md .md-p { margin: 0 0 14px; }
 .lore-md strong { color: #f0cc6a; font-weight: 600; }
 .lore-md em { font-style: italic; color: #c4b898; }
+.lore-md .md-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 22px 0 26px;
+  border: 1px solid rgba(196,154,76,0.16);
+  border-radius: 6px;
+  background: rgba(196,154,76,0.025);
+}
+.lore-md .md-table {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+.lore-md .md-table th,
+.lore-md .md-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(196,154,76,0.1);
+  text-align: left;
+  vertical-align: top;
+}
+.lore-md .md-table th {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f0cc6a;
+  background: rgba(196,154,76,0.08);
+}
+.lore-md .md-table tr:last-child td { border-bottom: none; }
+.lore-md .md-table tr:nth-child(even) td { background: rgba(196,154,76,0.025); }
 .lore-md .md-blockquote {
   border-left: 2px solid rgba(196,154,76,0.22);
   padding: 9px 16px;

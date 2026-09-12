@@ -6261,10 +6261,114 @@ input[type="radio"] {
 .score-cmd-val.low  { color: #d29922; }
 .score-cmd-val.dead { color: #f85149; }
 
-@media (max-width: 520px) {
-  .score-life-big { font-size: 2.1rem; }
-  .score-prow { padding: 0.7rem 0.8rem; }
-  .score-life-row button { padding: 10px 0; }
+/* ── Score page: mobile responsivo ──────────────────────────────── */
+@media (max-width: 640px) {
+  /* Página geral */
+  .score-play-page { padding: 0.4rem; gap: 0.4rem; }
+
+  /* Header: empilha em 2 linhas limpas */
+  .score-play-header {
+    padding: 0.55rem 0.7rem;
+    gap: 0.4rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  /* Linha 1: voltar + nome (flex:1) + fullscreen */
+  .score-back-btn { order: 0; flex-shrink: 0; padding: 6px 10px; font-size: 0.82rem; }
+  .score-play-meta { order: 1; flex: 1 1 auto; min-width: 0; gap: 4px; }
+  .score-play-name { font-size: 0.88rem; }
+  .score-format-tag, .score-badge { font-size: 0.68rem; padding: 2px 6px; }
+  .score-fullscreen-btn { order: 2; flex-shrink: 0; }
+  /* Linha 2: layout + ações (quebram para segunda linha) */
+  .score-layout-open-btn { order: 3; height: 30px; font-size: 0.78rem; }
+  .score-play-actions { order: 4; gap: 0.3rem; flex-wrap: nowrap; }
+  .score-btn-secondary,
+  .score-btn-danger { font-size: 0.78rem; padding: 5px 10px; }
+
+  /* Arena — mantém colunas do layout mas com gap menor */
+  .score-players-arena { gap: 0.3rem; }
+  .layout-row { gap: 0.3rem; }
+  .score-players-arena .layout-row + .layout-row { padding-top: 0.3rem; }
+
+  /* Cards menores */
+  .score-prow { min-height: 120px; border-left-width: 3px; }
+  .score-prow-content { padding: 0.5rem 0.6rem; gap: 0.3rem; }
+
+  /* Cabeçalho do card */
+  .score-prow-head { gap: 0.35rem; }
+  .score-prow-badge {
+    width: 28px; height: 28px;
+    font-size: 0.72rem; border-radius: 6px;
+  }
+  .score-prow-name { font-size: 0.78rem; }
+  .score-prow-winner-tag,
+  .score-prow-elim-tag { font-size: 0.65rem; }
+
+  /* Vida */
+  .score-life-header { gap: 2px; }
+  .score-life-icon { font-size: 0.7rem; }
+  .score-life-big { font-size: 1.7rem; line-height: 1; }
+  .score-life-big.low, .score-life-big.dead { font-size: 1.7rem; }
+
+  /* Botões de vida — touch targets ok com height */
+  .score-life-row { gap: 4px; }
+  .score-life-row button {
+    padding: 0;
+    min-height: 38px;
+    font-size: 0.82rem;
+    border-radius: 6px;
+  }
+
+  /* Cmd damage: reorganiza em 2 linhas no mobile */
+  .score-cmd-row {
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 4px 6px;
+  }
+  .score-cmd-label {
+    font-size: 9px;
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 1px;
+  }
+  .score-cmd-row button {
+    padding: 5px 6px;
+    font-size: 0.72rem;
+    border-radius: 5px;
+    flex: 1;
+  }
+  .score-cmd-val {
+    font-size: 0.88rem;
+    min-width: 2.5ch;
+    flex: 0;
+  }
+  .score-cmd-val small { font-size: 0.5em; }
+
+  /* Rodapé do comandante no card */
+  .score-prow-cmd-footer { padding-top: 2px; gap: 3px; }
+  .score-prow-cmd-name { font-size: 0.65rem; }
+  .score-prow-cmd-set { font-size: 0.6rem; }
+
+  /* Botão remover jogador */
+  .score-remove-player { width: 22px; height: 22px; font-size: 0.72rem; }
+
+  /* Modal de layout — tela quase cheia */
+  .layout-modal {
+    padding: 16px;
+    gap: 14px;
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+  .layout-modal-title { font-size: 0.95rem; }
+  .layout-modal-type-btn { padding: 7px 8px; font-size: 0.7rem; }
+  .layout-modal-card { height: 72px; }
+  .layout-modal-card-code { font-size: 0.72rem; }
+  .layout-modal-card-name { font-size: 0.65rem; }
+  .layout-modal-card-cmd { font-size: 0.58rem; }
+  .layout-modal-preview { padding: 10px; gap: 8px; }
+  .layout-modal-row-cards { gap: 5px; }
+  .layout-modal-hint { font-size: 0.72rem; }
 }
 
 /* ── Add player area ── */
@@ -6747,6 +6851,288 @@ input[type="radio"] {
   .quick-add-btn-toolbar { font-size: 0.8rem; padding: 0.38rem 0.65rem; }
   .tokens-tab-btn { font-size: 0.8rem; padding: 0.38rem 0.65rem; }
   .token-options-row { gap: 0.6rem; }
+}
+
+/* ── Mobile usability: coleção e pontuação ───────────────────────────── */
+@media (max-width: 640px) {
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app {
+    width: 100%;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .session-bar {
+    min-height: 52px;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .session-info,
+  .session-bar-actions {
+    min-width: 0;
+  }
+
+  .session-name {
+    display: block;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tabs {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .tab {
+    min-width: 0;
+  }
+
+  .tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .collection-full {
+    padding-inline: 12px;
+  }
+
+  .list-header h2 {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    line-height: 1.35;
+  }
+
+  .list-header-top {
+    width: 100%;
+  }
+
+  .toolbar-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toolbar-group > button,
+  .toolbar-group > .toolbar-dropdown {
+    min-width: 0;
+  }
+
+  .toolbar-dropdown {
+    width: 100%;
+  }
+
+  .toolbar-dropdown > .toolbar-menu-btn {
+    width: 100%;
+  }
+
+  .toolbar-menu-items {
+    max-width: calc(100vw - 32px);
+  }
+
+  .search-input,
+  .filter-select,
+  .filter-fullart-btn {
+    min-height: 44px;
+  }
+
+  .filter-bar {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .filter-bar .filter-fullart-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .color-filter-bar {
+    gap: 6px;
+  }
+
+  .color-filter-chip {
+    min-height: 40px;
+  }
+
+  .cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .card-grid-qty .qty-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .score-session-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .score-session-card {
+    min-width: 0;
+    padding: 14px;
+  }
+
+  .score-session-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
+    gap: 6px;
+  }
+
+  .score-session-actions > button {
+    min-width: 0;
+    min-height: 44px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .score-session-actions > .score-btn-danger {
+    grid-column: auto;
+    padding-inline: 6px;
+  }
+
+  .score-create-page {
+    width: 100%;
+  }
+
+  .score-create-page .card.form {
+    padding: 16px 14px;
+  }
+
+  .score-form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .score-players-header {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .score-players-header .score-btn-secondary {
+    min-height: 44px;
+  }
+
+  .score-player-row {
+    min-width: 0;
+  }
+
+  .score-player-row .score-short-input {
+    flex: 0 0 64px !important;
+  }
+
+  .score-player-block {
+    padding: 10px;
+  }
+
+  .score-form-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .score-form-actions button {
+    min-height: 44px;
+  }
+
+  .score-play-page {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .score-play-meta {
+    overflow: hidden;
+  }
+
+  .score-play-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .score-play-actions {
+    min-width: 0;
+  }
+
+  .score-play-actions > button {
+    min-height: 44px;
+  }
+
+  .layout-row {
+    flex-wrap: wrap;
+  }
+
+  .layout-row .score-prow {
+    flex: 0 0 calc((100% - 0.3rem) / 2);
+    max-width: calc((100% - 0.3rem) / 2);
+  }
+
+  .layout-row .score-prow:only-child {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  .score-prow {
+    min-height: 150px;
+  }
+
+  .score-life-row button,
+  .score-cmd-row button {
+    min-height: 44px;
+  }
+
+  .score-cmd-row {
+    min-width: 0;
+  }
+
+  .score-cmd-row button {
+    padding-inline: 4px;
+  }
+}
+
+@media (max-width: 360px) {
+  .app {
+    padding-inline: 8px;
+  }
+
+  .collection-full {
+    padding-inline: 10px;
+  }
+
+  .cards-grid {
+    gap: 6px;
+  }
+
+  .toolbar-group {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .score-session-actions {
+    grid-template-columns: 1fr 44px;
+  }
+
+  .score-session-actions .score-btn-secondary {
+    grid-column: 1;
+  }
+
+  .score-session-actions .score-btn-danger {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .score-session-actions .score-btn-primary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 /* ── Tela de Proxies ────────────────────────────────────────────────────── */
