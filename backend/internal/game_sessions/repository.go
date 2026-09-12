@@ -48,7 +48,10 @@ func (r *Repository) List() ([]GameSession, error) {
 	}
 
 	playerRows, err := r.db.Query(`
-		SELECT id, session_id, name, short_code, life, poison, commander_damage_received,
+		SELECT id, session_id, name, short_code,
+			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
+			COALESCE(commander_image_url,''),
+			life, poison, commander_damage_received,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
@@ -62,6 +65,8 @@ func (r *Repository) List() ([]GameSession, error) {
 	for playerRows.Next() {
 		var p Player
 		if err := playerRows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
+			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
+			&p.CommanderImageURL,
 			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
 			&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
@@ -96,7 +101,10 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 	}
 
 	rows, err := r.db.Query(`
-		SELECT id, session_id, name, short_code, life, poison, commander_damage_received,
+		SELECT id, session_id, name, short_code,
+			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
+			COALESCE(commander_image_url,''),
+			life, poison, commander_damage_received,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
@@ -111,6 +119,8 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 	for rows.Next() {
 		var p Player
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
+			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
+			&p.CommanderImageURL,
 			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
 			&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
@@ -134,9 +144,10 @@ func (r *Repository) Create(input CreateSessionInput) (*GameSession, error) {
 	for _, pi := range input.Players {
 		_, err := r.db.Exec(`
 			INSERT INTO game_session_players
-				(session_id, name, short_code, life, poison, commander_damage_received, is_eliminated)
-			VALUES (?, ?, ?, ?, 0, 0, 0)
-		`, sessionID, pi.Name, pi.ShortCode, input.StartingLife)
+				(session_id, name, short_code, commander_name, commander_set_code, commander_collection_number,
+				 commander_image_url, life, poison, commander_damage_received, is_eliminated)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0)
+		`, sessionID, pi.Name, pi.ShortCode, pi.CommanderName, pi.CommanderSetCode, pi.CommanderCollectionNumber, pi.CommanderImageURL, input.StartingLife)
 		if err != nil {
 			return nil, err
 		}
@@ -156,12 +167,17 @@ func (r *Repository) Delete(id int64) error {
 func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 	var p Player
 	err := r.db.QueryRow(`
-		SELECT id, session_id, name, short_code, life, poison, commander_damage_received,
+		SELECT id, session_id, name, short_code,
+			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
+			COALESCE(commander_image_url,''),
+			life, poison, commander_damage_received,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
 		FROM game_session_players WHERE id = ?
 	`, id).Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
+		&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
+		&p.CommanderImageURL,
 		&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
 		&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
@@ -173,9 +189,10 @@ func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 func (r *Repository) AddPlayer(sessionID int64, input PlayerInput, startingLife int) (*Player, error) {
 	res, err := r.db.Exec(`
 		INSERT INTO game_session_players
-			(session_id, name, short_code, life, poison, commander_damage_received, is_eliminated)
-		VALUES (?, ?, ?, ?, 0, 0, 0)
-	`, sessionID, input.Name, input.ShortCode, startingLife)
+			(session_id, name, short_code, commander_name, commander_set_code, commander_collection_number,
+			 commander_image_url, life, poison, commander_damage_received, is_eliminated)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0)
+	`, sessionID, input.Name, input.ShortCode, input.CommanderName, input.CommanderSetCode, input.CommanderCollectionNumber, input.CommanderImageURL, startingLife)
 	if err != nil {
 		return nil, err
 	}

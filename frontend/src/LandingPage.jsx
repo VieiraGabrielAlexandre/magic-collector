@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { login } from "./services/api.js";
+import LorePage from "./LorePage.jsx";
 
 const API_ROUTES = [
   { method: "GET",    path: "/cards",                    desc: "Listar cartas (filtros, paginação, ordenação)" },
@@ -49,6 +50,7 @@ export default function LandingPage({ onEnter, onBack = null }) {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [showRoutes, setShowRoutes] = useState(false);
+  const [showLore, setShowLore] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -126,6 +128,61 @@ export default function LandingPage({ onEnter, onBack = null }) {
               <p>{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── LORE ── */}
+      <section className="landing-lore-section">
+        {/* Stars */}
+        <div className="landing-lore-stars" aria-hidden="true">
+          {[...Array(60)].map((_, i) => (
+            <span key={i} className="landing-lore-star" style={{
+              '--x': `${Math.round((i * 137.5) % 100)}%`,
+              '--y': `${Math.round((i * 97.3 + 11) % 100)}%`,
+              '--s': `${0.5 + (i % 5) * 0.35}px`,
+              '--d': `${(i * 0.41) % 4}s`,
+              '--o': `${0.25 + (i % 7) * 0.1}`,
+            }} />
+          ))}
+        </div>
+
+        {/* Orb */}
+        <div className="landing-lore-orb" aria-hidden="true">
+          <div className="landing-lore-orb-ring landing-lore-orb-ring-1" />
+          <div className="landing-lore-orb-ring landing-lore-orb-ring-2" />
+          <div className="landing-lore-orb-ring landing-lore-orb-ring-3" />
+          <div className="landing-lore-orb-core">
+            <span>✦</span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="landing-lore-content">
+          <div className="landing-lore-eyebrow">
+            <span className="landing-lore-eyebrow-dot" />
+            Multiverso · Lore Canônica
+            <span className="landing-lore-eyebrow-dot" />
+          </div>
+          <h2 className="landing-lore-title">
+            Bilhões de anos de história<br />
+            <em>num único arquivo</em>
+          </h2>
+          <p className="landing-lore-body">
+            De Yawgmoth na Phyrexia Antiga às crises do Gatewatch — cada arco,
+            cada sacrifício, cada Planeswalker documentado com riqueza de detalhes.
+            Da Era dos Irmãos ao Mending, da Invasão Phyrexiana ao surgimento de
+            Ravnica. Explore o Multiverso de MTG sem precisar de conta.
+          </p>
+          <div className="landing-lore-pills">
+            {["Old Phyrexia","Weatherlight Saga","Nine Titans","Kamigawa","Ravnica","Time Spiral"].map(n => (
+              <span key={n} className="landing-lore-pill">{n}</span>
+            ))}
+          </div>
+          <button className="landing-lore-cta" onClick={() => setShowLore(true)}>
+            <span className="landing-lore-cta-icon">✦</span>
+            Explorar o Multiverso
+            <span className="landing-lore-cta-arrow">→</span>
+          </button>
         </div>
       </section>
 
@@ -223,6 +280,9 @@ export default function LandingPage({ onEnter, onBack = null }) {
         <span>⚔ Magic Collector · magic-collector.site</span>
         <span>Feito com ❤️ · Não afiliado à Wizards of the Coast</span>
       </footer>
+
+      {/* ── LORE OVERLAY ── */}
+      {showLore && <LorePage onClose={() => setShowLore(false)} />}
 
       {/* ── MODAL LOGIN ── */}
       {showLogin && (

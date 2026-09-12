@@ -994,12 +994,15 @@
 .lore-cards-view {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .lore-cards-topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1008,9 +1011,6 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid #1e1030;
-  position: sticky;
-  top: 0;
-  z-index: 100;
 }
 
 .lore-cards-back-btn {
@@ -1041,6 +1041,10 @@
 }
 
 .lore-cards-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   max-width: 1200px;
   margin: 0 auto;
   padding: clamp(32px,5vw,56px) clamp(16px,5vw,48px) clamp(60px,8vw,100px);
@@ -1150,175 +1154,239 @@
 /* ── Card grid ─────────────────────────────────────────────────────── */
 .lore-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
 }
 
-/* Flip card container */
+/* Card thumbnail — click opens modal */
 .lore-card-item {
-  perspective: 1200px;
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
   position: relative;
-}
-.lore-card-inner {
-  position: relative;
-  width: 100%;
-  transition: transform 0.6s cubic-bezier(.4,0,.2,1);
-  transform-style: preserve-3d;
-}
-.lore-card-item.flipped .lore-card-inner {
-  transform: rotateY(180deg);
-}
-.lore-card-front,
-.lore-card-back {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   border-radius: 10px;
-  overflow: hidden;
+  display: block;
+  width: 100%;
+  transition: transform 0.2s;
 }
-.lore-card-back {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-}
+.lore-card-item:hover { transform: translateY(-3px) scale(1.02); }
+.lore-card-item:focus-visible { outline: 2px solid rgba(196,154,76,0.6); outline-offset: 3px; }
 
-/* Front — full MTG card image */
-.lore-card-front {
-  position: relative;
-}
 .lore-card-img {
   width: 100%;
   display: block;
   border-radius: 10px;
   box-shadow:
-    0 0 0 1px rgba(196,154,76,0.25),
-    0 8px 32px rgba(0,0,0,0.7),
-    0 0 20px rgba(196,154,76,0.08);
-  transition: box-shadow 0.3s;
+    0 0 0 1px rgba(196,154,76,0.2),
+    0 6px 24px rgba(0,0,0,0.7);
+  transition: box-shadow 0.25s;
 }
 .lore-card-item:hover .lore-card-img {
   box-shadow:
-    0 0 0 2px rgba(196,154,76,0.5),
-    0 12px 48px rgba(0,0,0,0.8),
-    0 0 40px rgba(196,154,76,0.15);
+    0 0 0 2px rgba(196,154,76,0.45),
+    0 10px 40px rgba(0,0,0,0.8),
+    0 0 30px rgba(196,154,76,0.12);
 }
 .lore-card-img-placeholder {
   width: 100%;
   aspect-ratio: 488 / 680;
   background: linear-gradient(160deg, #100820 0%, #080510 100%);
-  border: 1px solid rgba(196,154,76,0.2);
+  border: 1px solid rgba(196,154,76,0.18);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-size: 32px;
+  font-size: 28px;
   color: rgba(196,154,76,0.3);
 }
 .lore-card-ph-name {
   font-family: 'Cinzel', serif;
   font-size: 11px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: #4a4038;
   text-align: center;
-  padding: 0 12px;
+  padding: 0 10px;
 }
-
-/* Back — details */
-.lore-card-back {
-  background: linear-gradient(160deg, #100820 0%, #0a0615 100%);
-  border: 1px solid rgba(196,154,76,0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 14px;
-  min-height: 280px;
-}
-.lore-card-back-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(196,154,76,0.12);
-}
-.lore-card-back-name {
-  font-family: 'Cinzel', serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: #f0cc6a;
-  line-height: 1.2;
-}
-.lore-card-back-type {
-  font-family: 'Cinzel', serif;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #6a5a48;
-}
-.lore-card-back-set {
-  font-family: 'Cinzel', serif;
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: #4a4038;
-  text-align: center;
-}
-.lore-card-back-desc {
-  font-family: 'EB Garamond', Georgia, serif;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #c4b090;
-  margin: 0;
-  flex: 1;
-}
-.lore-card-back-fact {
-  background: rgba(196,154,76,0.05);
-  border-left: 2px solid rgba(196,154,76,0.25);
-  border-radius: 0 5px 5px 0;
-  padding: 8px 10px;
-}
-.lore-card-fact-label {
+.lore-card-hover-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: 'Cinzel', serif;
   font-size: 7.5px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  border-radius: 20px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.lore-card-item:hover .lore-card-hover-hint { opacity: 1; }
+
+/* ── Card detail modal ──────────────────────────────────────────── */
+.lore-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10200;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  animation: loreFadeIn 0.2s ease both;
+}
+
+.lore-modal-box {
+  position: relative;
+  background: linear-gradient(145deg, #0e0920 0%, #080510 100%);
+  border: 1px solid rgba(196,154,76,0.22);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(196,154,76,0.08),
+    0 32px 80px rgba(0,0,0,0.9),
+    0 0 60px rgba(124,58,237,0.08);
+  max-width: 720px;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  animation: loreModalIn 0.25s cubic-bezier(.2,.8,.3,1) both;
+}
+
+@keyframes loreModalIn {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.lore-modal-close {
+  position: absolute;
+  top: 12px; right: 14px;
+  background: rgba(196,154,76,0.08);
+  border: 1px solid rgba(196,154,76,0.2);
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  color: #8a7a68;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.lore-modal-close:hover {
+  color: #f0cc6a;
+  background: rgba(196,154,76,0.14);
+  border-color: rgba(196,154,76,0.4);
+}
+
+.lore-modal-inner {
+  display: flex;
+  gap: 28px;
+  padding: 28px 28px 28px 24px;
+  align-items: flex-start;
+}
+
+.lore-modal-art {
+  flex-shrink: 0;
+  width: 220px;
+}
+.lore-modal-img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(196,154,76,0.25),
+    0 12px 40px rgba(0,0,0,0.8);
+}
+.lore-modal-placeholder {
+  width: 220px;
+  border-radius: 10px;
+}
+
+.lore-modal-info {
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lore-modal-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(196,154,76,0.12);
+}
+.lore-modal-name {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(14px,2.5vw,20px);
+  font-weight: 700;
+  color: #f0cc6a;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.lore-modal-type {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6a5a48;
+}
+.lore-modal-set {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: #4a4038;
+}
+.lore-modal-desc {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: clamp(14px,1.8vw,16px);
+  line-height: 1.65;
+  color: #c4b090;
+  margin: 0;
+}
+.lore-modal-fact {
+  background: rgba(196,154,76,0.05);
+  border-left: 2px solid rgba(196,154,76,0.3);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  margin-top: 4px;
+}
+.lore-modal-fact-label {
+  font-family: 'Cinzel', serif;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: #c49a4c;
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
-.lore-card-back-fact p {
+.lore-modal-fact p {
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: clamp(13px,1.6vw,14.5px);
+  line-height: 1.6;
   color: #8a7a68;
   margin: 0;
   font-style: italic;
 }
 
-/* Hint text */
-.lore-card-hover-hint {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Cinzel', serif;
-  font-size: 7.5px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: rgba(196,154,76,0.5);
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.25s;
-  pointer-events: none;
-}
-.lore-card-item:hover .lore-card-hover-hint { opacity: 1; }
-
-/* Mana symbols */
+/* Mana symbols (shared by modal and any inline use) */
 .lore-card-mana-cost {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -1326,18 +1394,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px; height: 20px;
   border-radius: 50%;
   font-family: 'Cinzel', serif;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
 }
 .lore-card-mana-text {
   font-family: 'Cinzel', serif;
-  font-size: 10px;
+  font-size: 11px;
   color: #8a7a68;
+}
+
+/* Modal responsive */
+@media (max-width: 600px) {
+  .lore-modal-inner  { flex-direction: column; padding: 20px 16px; gap: 18px; }
+  .lore-modal-art    { width: 100%; max-width: 240px; margin: 0 auto; }
+  .lore-modal-box    { border-radius: 12px; }
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */

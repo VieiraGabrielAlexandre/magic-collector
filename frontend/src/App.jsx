@@ -819,7 +819,7 @@ export default function App() {
 
   // ── Pontuação / Life Counter ─────────────────────────────────────────────────
   const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
-  const EMPTY_PLAYER_ROW = { name: "", short_code: "" };
+  const EMPTY_PLAYER_ROW = { name: "", short_code: "", commander_set_code: "", commander_collection_number: "" };
   const [gameSessions, setGameSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [sessionView, setSessionView] = useState("list");
@@ -829,6 +829,13 @@ export default function App() {
   const [sessionError, setSessionError] = useState("");
   const [addPlayerForm, setAddPlayerForm] = useState(EMPTY_PLAYER_ROW);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [playLayout, setPlayLayout] = useState(() => localStorage.getItem("playLayout") || "mesa");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const playPageRef = useRef(null);
+  const [playerDisplayOrder, setPlayerDisplayOrder] = useState([]); // [playerId, ...]
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [layoutModalDraft, setLayoutModalDraft] = useState({ layout: "mesa", slots: [] });
+  const [layoutSelectedSlot, setLayoutSelectedSlot] = useState(null); // índice do slot selecionado no modal
   const playerTimers = useRef({});
   const playerPending = useRef({});
 
@@ -1043,6 +1050,8 @@ export default function App() {
       setGameSessions(prev => [session, ...prev]);
       setActiveSession(session);
       setSessionView("play");
+      setPlayerDisplayOrder(session.players.map(p => p.id));
+      openLayoutModal(session);
       setSessionForm(EMPTY_SESSION_FORM);
       setSessionPlayers([{ ...EMPTY_PLAYER_ROW }, { ...EMPTY_PLAYER_ROW }]);
     } catch (err) {
@@ -1056,6 +1065,8 @@ export default function App() {
     const session = await getGameSession(id);
     setActiveSession(session);
     setSessionView("play");
+    setPlayerDisplayOrder(session.players.map(p => p.id));
+    openLayoutModal(session);
   }
 
   function handleUpdatePlayer(playerId, field, delta) {
@@ -1154,6 +1165,8 @@ export default function App() {
     const session = await restoreGameSession(sessionId);
     setActiveSession(session);
     setSessionView("play");
+    setPlayerDisplayOrder(session.players.map(p => p.id));
+    openLayoutModal(session);
     await loadGameSessions();
   }
 
@@ -1199,6 +1212,83 @@ export default function App() {
     if (activeTab === "proxies") loadProxies();
   }, [activeTab]);
   useEffect(() => { loadGameSessions(); }, []);
+
+  useEffect(() => {
+    function onFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      playPageRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  function changePlayLayout(mode) {
+    setPlayLayout(mode);
+    localStorage.setItem("playLayout", mode);
+  }
+
+  // Abre o modal de configuração de layout para uma sessão
+  function openLayoutModal(session) {
+    const n = session.players.length;
+    const currentLayout = localStorage.getItem("playLayout") || "mesa";
+    const currentOrder = (playerDisplayOrder.length === n && playerDisplayOrder.every(id => session.players.some(p => p.id === id)))
+      ? playerDisplayOrder
+      : session.players.map(p => p.id);
+    setLayoutModalDraft({ layout: currentLayout, slots: [...currentOrder] });
+    setShowLayoutModal(true);
+  }
+
+  function confirmLayout() {
+    const { layout, slots } = layoutModalDraft;
+    const usedIds = new Set(slots.filter(Boolean));
+    const missing = (activeSession?.players || []).map(p => p.id).filter(id => !usedIds.has(id));
+    let mi = 0;
+    const finalSlots = slots.map(s => s || (missing[mi++] ?? null));
+    setPlayLayout(layout);
+    localStorage.setItem("playLayout", layout);
+    setPlayerDisplayOrder(finalSlots.filter(Boolean));
+    setShowLayoutModal(false);
+  }
+
+  // Retorna grupos de índices de slot para o preview do modal
+  // Todos os layouts: linha de cima sempre virada (mesa universal)
+  function getSlotGroups(layout, n) {
+    if (n <= 1) return [{ indices: [0], flipped: false }];
+    switch (layout) {
+      case "mesa": {
+        const h = Math.ceil(n / 2);
+        return [
+          { indices: Array.from({ length: h }, (_, i) => i), flipped: true },
+          { indices: Array.from({ length: n - h }, (_, i) => h + i), flipped: false },
+        ];
+      }
+      case "l-1x":
+        return [
+          { indices: [0], flipped: true },
+          { indices: Array.from({ length: n - 1 }, (_, i) => 1 + i), flipped: false },
+        ];
+      case "l-x1":
+        return [
+          { indices: Array.from({ length: n - 1 }, (_, i) => i), flipped: true },
+          { indices: [n - 1], flipped: false },
+        ];
+      case "l-1-1": {
+        const h2 = Math.ceil(n / 2);
+        return [
+          { indices: Array.from({ length: h2 }, (_, i) => i), flipped: true },
+          { indices: Array.from({ length: n - h2 }, (_, i) => h2 + i), flipped: false },
+        ];
+      }
+      default:
+        return [{ indices: Array.from({ length: n }, (_, i) => i), flipped: false }];
+    }
+  }
+
   useEffect(() => { loadTokensList(); }, []);
   useEffect(() => {
     listColorCombos().then(data => setAvailableColors(data ?? []));
@@ -3019,36 +3109,63 @@ export default function App() {
                 </div>
 
                 {sessionPlayers.map((p, i) => (
-                  <div key={i} className="score-player-row">
-                    <input
-                      placeholder="Nome do jogador"
-                      value={p.name}
-                      required
-                      onChange={e => {
-                        const ps = [...sessionPlayers];
-                        ps[i] = { ...ps[i], name: e.target.value };
-                        setSessionPlayers(ps);
-                      }}
-                    />
-                    <input
-                      className="score-short-input"
-                      placeholder="Sigla"
-                      maxLength={3}
-                      value={p.short_code}
-                      required
-                      onChange={e => {
-                        const ps = [...sessionPlayers];
-                        ps[i] = { ...ps[i], short_code: e.target.value.toUpperCase() };
-                        setSessionPlayers(ps);
-                      }}
-                    />
-                    {sessionPlayers.length > 2 && (
-                      <button
-                        type="button"
-                        className="score-remove-row"
-                        onClick={() => setSessionPlayers(sessionPlayers.filter((_, j) => j !== i))}
-                      >✕</button>
-                    )}
+                  <div key={i} className="score-player-block">
+                    <div className="score-player-row">
+                      <input
+                        placeholder="Nome do jogador"
+                        value={p.name}
+                        required
+                        onChange={e => {
+                          const ps = [...sessionPlayers];
+                          ps[i] = { ...ps[i], name: e.target.value };
+                          setSessionPlayers(ps);
+                        }}
+                      />
+                      <input
+                        className="score-short-input"
+                        placeholder="Sigla"
+                        maxLength={3}
+                        value={p.short_code}
+                        required
+                        onChange={e => {
+                          const ps = [...sessionPlayers];
+                          ps[i] = { ...ps[i], short_code: e.target.value.toUpperCase() };
+                          setSessionPlayers(ps);
+                        }}
+                      />
+                      {sessionPlayers.length > 2 && (
+                        <button
+                          type="button"
+                          className="score-remove-row"
+                          onClick={() => setSessionPlayers(sessionPlayers.filter((_, j) => j !== i))}
+                        >✕</button>
+                      )}
+                    </div>
+                    <div className="score-commander-row">
+                      <span className="score-commander-label">👑</span>
+                      <input
+                        className="score-set-input"
+                        placeholder="Sigla set"
+                        maxLength={6}
+                        value={p.commander_set_code}
+                        onChange={e => {
+                          const ps = [...sessionPlayers];
+                          ps[i] = { ...ps[i], commander_set_code: e.target.value.toUpperCase() };
+                          setSessionPlayers(ps);
+                        }}
+                      />
+                      <input
+                        className="score-num-input"
+                        placeholder="Nº carta"
+                        maxLength={6}
+                        value={p.commander_collection_number}
+                        onChange={e => {
+                          const ps = [...sessionPlayers];
+                          ps[i] = { ...ps[i], commander_collection_number: e.target.value };
+                          setSessionPlayers(ps);
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
 
@@ -3063,13 +3180,129 @@ export default function App() {
             </div>
           )}
 
+          {/* Modal de Layout */}
+          {showLayoutModal && activeSession && (() => {
+            const LAYOUT_OPTIONS = [
+              { id: "mesa",  title: "Mesa",
+                svg: <svg viewBox="0 0 22 16" fill="currentColor" width="18" height="13"><rect x="0" y="0" width="9" height="6" rx="1.5" opacity="0.4"/><rect x="13" y="0" width="9" height="6" rx="1.5" opacity="0.4"/><rect x="0" y="10" width="9" height="6" rx="1.5"/><rect x="13" y="10" width="9" height="6" rx="1.5"/></svg> },
+              { id: "l-1x",  title: "1 em cima",
+                svg: <svg viewBox="0 0 22 16" fill="currentColor" width="18" height="13"><rect x="0" y="0" width="22" height="6" rx="1.5" opacity="0.4"/><rect x="0" y="10" width="9" height="6" rx="1.5"/><rect x="13" y="10" width="9" height="6" rx="1.5"/></svg> },
+              { id: "l-x1",  title: "1 embaixo",
+                svg: <svg viewBox="0 0 22 16" fill="currentColor" width="18" height="13"><rect x="0" y="0" width="9" height="6" rx="1.5" opacity="0.4"/><rect x="13" y="0" width="9" height="6" rx="1.5" opacity="0.4"/><rect x="0" y="10" width="22" height="6" rx="1.5"/></svg> },
+              { id: "l-1-1", title: "Meio a meio",
+                svg: <svg viewBox="0 0 22 16" fill="currentColor" width="18" height="13"><rect x="0" y="0" width="22" height="6" rx="1.5" opacity="0.4"/><rect x="0" y="10" width="22" height="6" rx="1.5"/></svg> },
+            ];
+            const { layout, slots } = layoutModalDraft;
+            const n = activeSession.players.length;
+            const slotGroups = getSlotGroups(layout, n);
+            const maxModalCols = slotGroups.reduce((m, g) => Math.max(m, g.indices.length), 1);
+
+            // Click-to-swap: clica num slot, depois em outro → troca de posição
+            function handleSlotClick(slotIdx) {
+              if (layoutSelectedSlot === null) {
+                setLayoutSelectedSlot(slotIdx);
+              } else if (layoutSelectedSlot === slotIdx) {
+                setLayoutSelectedSlot(null);
+              } else {
+                const newSlots = [...slots];
+                [newSlots[layoutSelectedSlot], newSlots[slotIdx]] = [newSlots[slotIdx], newSlots[layoutSelectedSlot]];
+                setLayoutModalDraft(d => ({ ...d, slots: newSlots }));
+                setLayoutSelectedSlot(null);
+              }
+            }
+
+            return (
+              <div className="layout-modal-overlay" onClick={() => { setShowLayoutModal(false); setLayoutSelectedSlot(null); }}>
+                <div className="layout-modal" onClick={e => e.stopPropagation()}>
+                  <h3 className="layout-modal-title">Configurar Layout</h3>
+
+                  {/* Seletor de tipo */}
+                  <div className="layout-modal-type-row">
+                    {LAYOUT_OPTIONS.map(opt => (
+                      <button key={opt.id} type="button"
+                        className={`layout-modal-type-btn${layout === opt.id ? " active" : ""}`}
+                        onClick={() => {
+                          setLayoutModalDraft({ layout: opt.id, slots: activeSession.players.map(p => p.id) });
+                          setLayoutSelectedSlot(null);
+                        }}
+                      >
+                        {opt.svg}
+                        <span>{opt.title}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Instrução */}
+                  <p className="layout-modal-hint">
+                    {layoutSelectedSlot !== null
+                      ? "Clique em outro jogador para trocar de posição"
+                      : "Clique em um jogador para selecionar e trocar de posição"}
+                  </p>
+
+                  {/* Grid de slots com card visual */}
+                  <div className="layout-modal-preview">
+                    {slotGroups.map((group, gi) => (
+                      <div key={gi} className={`layout-modal-row${group.flipped ? " flipped" : ""}`}
+                        style={{ '--mcols': maxModalCols }}>
+                        {group.flipped && group.indices.length > 0 && (
+                          <div className="layout-modal-row-label">↻ Sentado do lado oposto</div>
+                        )}
+                        <div className="layout-modal-row-cards">
+                          {group.indices.map(slotIdx => {
+                            const pid = slots[slotIdx];
+                            const player = pid ? activeSession.players.find(p => p.id === pid) : null;
+                            const isSelected = layoutSelectedSlot === slotIdx;
+                            return (
+                              <button key={slotIdx} type="button"
+                                className={`layout-modal-card${isSelected ? " selected" : ""}${group.flipped ? " flipped" : ""}`}
+                                onClick={() => handleSlotClick(slotIdx)}
+                                style={{ '--mcols': maxModalCols }}
+                              >
+                                {player?.commander_image_url && (
+                                  <div className="layout-modal-card-bg">
+                                    <img src={player.commander_image_url} alt="" />
+                                    <div className="layout-modal-card-fade" />
+                                  </div>
+                                )}
+                                <div className="layout-modal-card-body">
+                                  <span className="layout-modal-card-code">{player?.short_code ?? "?"}</span>
+                                  <span className="layout-modal-card-name">{player?.name ?? `Posição ${slotIdx + 1}`}</span>
+                                  {player?.commander_name && (
+                                    <span className="layout-modal-card-cmd">{player.commander_name}</span>
+                                  )}
+                                </div>
+                                {isSelected && <div className="layout-modal-card-glow" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="layout-modal-footer">
+                    <button type="button" className="layout-modal-cancel"
+                      onClick={() => { setShowLayoutModal(false); setLayoutSelectedSlot(null); }}>
+                      Cancelar
+                    </button>
+                    <button type="button" className="layout-modal-confirm" onClick={confirmLayout}>
+                      Confirmar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Vista: Jogar */}
           {sessionView === "play" && activeSession && (
-            <div className="score-play-page">
+            <div className="score-play-page" ref={playPageRef} data-layout={playLayout}>
               <div className="score-play-header">
-                <button type="button" className="score-back-btn" onClick={() => { setSessionView("list"); setActiveSession(null); }}>
-                  ← Sessões
-                </button>
+                {!isFullscreen && (
+                  <button type="button" className="score-back-btn" onClick={() => { setSessionView("list"); setActiveSession(null); }}>
+                    ← Sessões
+                  </button>
+                )}
                 <div className="score-play-meta">
                   <span className="score-play-name">{activeSession.name}</span>
                   <span className="score-format-tag">{activeSession.format}</span>
@@ -3077,6 +3310,10 @@ export default function App() {
                     {activeSession.status === "active" ? "Ativo" : "Encerrado"}
                   </span>
                 </div>
+                <button type="button" className="score-layout-open-btn" onClick={() => openLayoutModal(activeSession)}>
+                  <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><rect x="0" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="9" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="0" y="10" width="7" height="6" rx="1"/><rect x="9" y="10" width="7" height="6" rx="1"/></svg>
+                  Layout
+                </button>
                 <div className="score-play-actions">
                   {activeSession.status === "active" && (
                     <>
@@ -3087,6 +3324,9 @@ export default function App() {
                   {activeSession.status === "finished" && (
                     <button type="button" className="score-btn-secondary" onClick={() => handleRestoreSession(activeSession.id)}>↩ Restaurar</button>
                   )}
+                  <button type="button" className="score-fullscreen-btn" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={toggleFullscreen}>
+                    {isFullscreen ? "⛶" : "⛶"}
+                  </button>
                 </div>
               </div>
 
@@ -3098,65 +3338,137 @@ export default function App() {
                 const winnerId = activeSession.status === "active" && activeSession.players.length > 1 && alivePlayers.length === 1
                   ? alivePlayers[0].id : null;
                 const isFinished = activeSession.status === "finished";
-                return (
-                  <div className="score-players-list">
-                    {activeSession.players.map((player, idx) => {
-                      const color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
-                      const isWinner = player.id === winnerId;
-                      const isElim = player.is_eliminated;
-                      return (
-                        <div
-                          key={player.id}
-                          className={`score-prow${isElim ? " prow-elim" : ""}${isWinner ? " prow-winner" : ""}`}
-                          style={{ '--pcolor': color }}
-                        >
-                          <div className="score-prow-head">
-                            <div className="score-prow-badge">
-                              {isElim ? '💀' : isWinner ? '👑' : player.short_code}
-                            </div>
-                            <div className="score-prow-nameblock">
-                              <span className="score-prow-name">{player.name}</span>
-                              {isElim && (
-                                <span className="score-prow-elim-tag">
-                                  {player.eliminated_reason === "life" && "☠ Sem vida"}
-                                  {player.eliminated_reason === "commander_damage" && "⚔ Cmd damage"}
-                                </span>
-                              )}
-                              {isWinner && <span className="score-prow-winner-tag">🏆 Vencedor!</span>}
-                            </div>
-                            {!isElim && (
-                              <div className="score-life-header">
-                                <span className="score-life-icon">❤️</span>
-                                <span className={`score-life-big${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>
-                                  {player.life}
-                                </span>
-                              </div>
-                            )}
-                            {!isFinished && activeSession.players.length > 2 && (
-                              <button type="button" className="score-remove-player" title="Remover" onClick={() => handleRemoveSessionPlayer(player.id)}>✕</button>
-                            )}
-                          </div>
+                const rawPlayers = activeSession.players;
+                // Reordena jogadores conforme a ordem escolhida no modal de layout
+                const players = playerDisplayOrder.length === rawPlayers.length
+                  ? playerDisplayOrder.map(id => rawPlayers.find(p => p.id === id)).filter(Boolean)
+                  : rawPlayers;
+                const n = players.length;
 
+                // Distribui jogadores em grupos de linhas — linha de cima sempre virada
+                function getGroups() {
+                  if (n <= 1) return [{ ps: players, flipped: false }];
+                  switch (playLayout) {
+                    case "mesa": {
+                      const h = Math.ceil(n / 2);
+                      return [
+                        { ps: players.slice(0, h), flipped: true },
+                        { ps: players.slice(h),    flipped: false },
+                      ];
+                    }
+                    case "l-1x":
+                      return [
+                        { ps: players.slice(0, 1), flipped: true },
+                        { ps: players.slice(1),    flipped: false },
+                      ];
+                    case "l-x1":
+                      return [
+                        { ps: players.slice(0, n - 1), flipped: true },
+                        { ps: players.slice(n - 1),    flipped: false },
+                      ];
+                    case "l-1-1": {
+                      const h2 = Math.ceil(n / 2);
+                      return [
+                        { ps: players.slice(0, h2), flipped: true },
+                        { ps: players.slice(h2),    flipped: false },
+                      ];
+                    }
+                    default:
+                      return [{ ps: players, flipped: false }];
+                  }
+                }
+
+                function renderCard(player, globalIdx, flipped) {
+                  const color = PLAYER_COLORS[globalIdx % PLAYER_COLORS.length];
+                  const isWinner = player.id === winnerId;
+                  const isElim = player.is_eliminated;
+                  return (
+                    <div
+                      key={player.id}
+                      className={`score-prow${isElim ? " prow-elim" : ""}${isWinner ? " prow-winner" : ""}${flipped ? " prow-flipped" : ""}${player.commander_image_url ? " has-bg" : ""}`}
+                      style={{ '--pcolor': color }}
+                    >
+                      {/* Imagem do comandante como fundo total */}
+                      {player.commander_image_url && (
+                        <div className="score-prow-bg">
+                          <img src={player.commander_image_url} alt="" />
+                          <div className="score-prow-bg-fade" />
+                        </div>
+                      )}
+
+                      <div className="score-prow-content">
+                        <div className="score-prow-head">
+                          <div className="score-prow-badge">{isElim ? '💀' : isWinner ? '👑' : player.short_code}</div>
+                          <div className="score-prow-nameblock">
+                            <span className="score-prow-name">{player.name}</span>
+                            {isElim && (
+                              <span className="score-prow-elim-tag">
+                                {player.eliminated_reason === "life" && "☠ Sem vida"}
+                                {player.eliminated_reason === "commander_damage" && "⚔ Cmd damage"}
+                              </span>
+                            )}
+                            {isWinner && <span className="score-prow-winner-tag">🏆 Vencedor!</span>}
+                          </div>
                           {!isElim && (
-                            <div className="score-controls">
-                              <div className="score-life-row">
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
-                              </div>
-                              <div className="score-cmd-row">
-                                <span className="score-cmd-label">⚔️ Cmd</span>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
-                                <span className={`score-cmd-val${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
-                                  {player.commander_damage_received}<small>/21</small>
-                                </span>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
-                                <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
-                              </div>
+                            <div className="score-life-header">
+                              <span className="score-life-icon">❤️</span>
+                              <span className={`score-life-big${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>{player.life}</span>
                             </div>
                           )}
+                          {!isFinished && n > 2 && (
+                            <button type="button" className="score-remove-player" title="Remover" onClick={() => handleRemoveSessionPlayer(player.id)}>✕</button>
+                          )}
+                        </div>
+                        {!isElim && (
+                          <div className="score-controls">
+                            <div className="score-life-row">
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
+                            </div>
+                            <div className="score-cmd-row">
+                              <span className="score-cmd-label">⚔️ Cmd</span>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
+                              <span className={`score-cmd-val${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
+                                {player.commander_damage_received}<small>/21</small>
+                              </span>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
+                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
+                            </div>
+                          </div>
+                        )}
+                        {/* Nome do comandante no rodapé */}
+                        {player.commander_name && (
+                          <div className="score-prow-cmd-footer">
+                            <span className="score-prow-cmd-name">{player.commander_name}</span>
+                            {player.commander_set_code && (
+                              <span className="score-prow-cmd-set">{player.commander_set_code} #{player.commander_collection_number}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const groups = getGroups();
+                const maxCols = groups.reduce((m, g) => Math.max(m, g.ps.length), 1);
+
+                let cursor = 0;
+                return (
+                  <div className="score-players-arena">
+                    {groups.map((group, gi) => {
+                      const start = cursor;
+                      cursor += group.ps.length;
+                      return (
+                        <div
+                          key={gi}
+                          className={`layout-row${group.flipped ? " row-flipped" : ""}`}
+                          style={{ '--cols': maxCols }}
+                        >
+                          {group.ps.map((p, i) => renderCard(p, start + i, group.flipped))}
                         </div>
                       );
                     })}
@@ -3169,22 +3481,43 @@ export default function App() {
                 <div className="score-add-player-area">
                   {showAddPlayer ? (
                     <form className="score-add-player-form" onSubmit={handleAddSessionPlayer}>
-                      <input
-                        placeholder="Nome"
-                        value={addPlayerForm.name}
-                        required
-                        onChange={e => setAddPlayerForm({ ...addPlayerForm, name: e.target.value })}
-                      />
-                      <input
-                        className="score-short-input"
-                        placeholder="Sigla"
-                        maxLength={3}
-                        value={addPlayerForm.short_code}
-                        required
-                        onChange={e => setAddPlayerForm({ ...addPlayerForm, short_code: e.target.value.toUpperCase() })}
-                      />
-                      <button type="submit" className="score-btn-primary">Adicionar</button>
-                      <button type="button" className="score-btn-secondary" onClick={() => setShowAddPlayer(false)}>Cancelar</button>
+                      <div className="score-player-row">
+                        <input
+                          placeholder="Nome"
+                          value={addPlayerForm.name}
+                          required
+                          onChange={e => setAddPlayerForm({ ...addPlayerForm, name: e.target.value })}
+                        />
+                        <input
+                          className="score-short-input"
+                          placeholder="Sigla"
+                          maxLength={3}
+                          value={addPlayerForm.short_code}
+                          required
+                          onChange={e => setAddPlayerForm({ ...addPlayerForm, short_code: e.target.value.toUpperCase() })}
+                        />
+                      </div>
+                      <div className="score-commander-row">
+                        <span className="score-commander-label">👑</span>
+                        <input
+                          className="score-set-input"
+                          placeholder="Sigla set"
+                          maxLength={6}
+                          value={addPlayerForm.commander_set_code}
+                          onChange={e => setAddPlayerForm({ ...addPlayerForm, commander_set_code: e.target.value.toUpperCase() })}
+                        />
+                        <input
+                          className="score-num-input"
+                          placeholder="Nº carta"
+                          maxLength={6}
+                          value={addPlayerForm.commander_collection_number}
+                          onChange={e => setAddPlayerForm({ ...addPlayerForm, commander_collection_number: e.target.value })}
+                        />
+                      </div>
+                      <div className="score-player-row">
+                        <button type="submit" className="score-btn-primary">Adicionar</button>
+                        <button type="button" className="score-btn-secondary" onClick={() => setShowAddPlayer(false)}>Cancelar</button>
+                      </div>
                     </form>
                   ) : (
                     activeSession.players.length < 8 && (

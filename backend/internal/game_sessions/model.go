@@ -13,22 +13,31 @@ type GameSession struct {
 }
 
 type Player struct {
-	ID                      int64  `json:"id"`
-	SessionID               int64  `json:"session_id"`
-	Name                    string `json:"name"`
-	ShortCode               string `json:"short_code"`
-	Life                    int    `json:"life"`
-	Poison                  int    `json:"poison"`
-	CommanderDamageReceived int    `json:"commander_damage_received"`
-	IsEliminated            bool   `json:"is_eliminated"`
-	EliminatedReason        string `json:"eliminated_reason"`
-	CreatedAt               string `json:"created_at"`
-	UpdatedAt               string `json:"updated_at"`
+	ID                          int64  `json:"id"`
+	SessionID                   int64  `json:"session_id"`
+	Name                        string `json:"name"`
+	ShortCode                   string `json:"short_code"`
+	CommanderName               string `json:"commander_name"`
+	CommanderSetCode            string `json:"commander_set_code"`
+	CommanderCollectionNumber   string `json:"commander_collection_number"`
+	CommanderImageURL           string `json:"commander_image_url"`
+	Life                        int    `json:"life"`
+	Poison                      int    `json:"poison"`
+	CommanderDamageReceived     int    `json:"commander_damage_received"`
+	IsEliminated                bool   `json:"is_eliminated"`
+	EliminatedReason            string `json:"eliminated_reason"`
+	CreatedAt                   string `json:"created_at"`
+	UpdatedAt                   string `json:"updated_at"`
 }
 
 type PlayerInput struct {
-	Name      string `json:"name" binding:"required"`
-	ShortCode string `json:"short_code" binding:"required"`
+	Name                      string `json:"name" binding:"required"`
+	ShortCode                 string `json:"short_code" binding:"required"`
+	CommanderSetCode          string `json:"commander_set_code"`
+	CommanderCollectionNumber string `json:"commander_collection_number"`
+	// Filled by service after Scryfall lookup — not sent by client
+	CommanderName     string `json:"-"`
+	CommanderImageURL string `json:"-"`
 }
 
 type CreateSessionInput struct {

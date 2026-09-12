@@ -1,9 +1,12 @@
 package game_sessions
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"magic-collection-api/internal/battles"
 )
@@ -11,10 +14,69 @@ import (
 type Service struct {
 	repo        gsRepository
 	battleRepo  *battles.Repository
+	httpClient  *http.Client
 }
 
 func NewService(repo *Repository, battleRepo *battles.Repository) *Service {
-	return &Service{repo: repo, battleRepo: battleRepo}
+	return &Service{
+		repo:       repo,
+		battleRepo: battleRepo,
+		httpClient: &http.Client{Timeout: 8 * time.Second},
+	}
+}
+
+// fetchCommanderData calls Scryfall to get the commander name + art_crop URL.
+// Returns empty strings if set/number are blank or the lookup fails.
+func (s *Service) fetchCommanderData(setCode, number string) (name, imageURL string) {
+	if setCode == "" || number == "" {
+		return "", ""
+	}
+	reqURL := fmt.Sprintf("https://api.scryfall.com/cards/%s/%s",
+		strings.ToLower(setCode), strings.ToLower(number))
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", ""
+	}
+	req.Header.Set("User-Agent", "magic-collector/1.0")
+	req.Header.Set("Accept", "application/json")
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", ""
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return "", ""
+	}
+	defer resp.Body.Close()
+
+	var card struct {
+		Name      string            `json:"name"`
+		ImageURIs map[string]string `json:"image_uris"`
+		CardFaces []struct {
+			Name      string            `json:"name"`
+			ImageURIs map[string]string `json:"image_uris"`
+		} `json:"card_faces"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&card); err != nil {
+		return "", ""
+	}
+	name = card.Name
+
+	if card.ImageURIs != nil {
+		if u, ok := card.ImageURIs["art_crop"]; ok {
+			imageURL = u
+		} else if u, ok := card.ImageURIs["normal"]; ok {
+			imageURL = u
+		}
+	} else if len(card.CardFaces) > 0 && card.CardFaces[0].ImageURIs != nil {
+		if u, ok := card.CardFaces[0].ImageURIs["art_crop"]; ok {
+			imageURL = u
+		}
+		if name == "" {
+			name = card.CardFaces[0].Name
+		}
+	}
+	return name, imageURL
 }
 
 func (s *Service) List() ([]GameSession, error) {
@@ -55,6 +117,14 @@ func (s *Service) Create(input CreateSessionInput) (*GameSession, error) {
 		}
 	}
 
+	// Enrich each player with commander data from Scryfall
+	for i := range input.Players {
+		p := &input.Players[i]
+		name, imgURL := s.fetchCommanderData(p.CommanderSetCode, p.CommanderCollectionNumber)
+		p.CommanderName = name
+		p.CommanderImageURL = imgURL
+	}
+
 	return s.repo.Create(input)
 }
 
@@ -76,6 +146,9 @@ func (s *Service) AddPlayer(sessionID int64, input PlayerInput) (*Player, error)
 	if len([]rune(strings.TrimSpace(input.ShortCode))) > 3 {
 		return nil, errors.New("sigla deve ter no máximo 3 caracteres")
 	}
+	input.CommanderName, input.CommanderImageURL = s.fetchCommanderData(
+		input.CommanderSetCode, input.CommanderCollectionNumber,
+	)
 	return s.repo.AddPlayer(sessionID, input, session.StartingLife)
 }
 
