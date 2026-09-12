@@ -1214,16 +1214,44 @@ export default function App() {
   useEffect(() => { loadGameSessions(); }, []);
 
   useEffect(() => {
-    function onFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    function onFsChange() {
+      const nativeFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(nativeFs);
+    }
     document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
   }, []);
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      playPageRef.current?.requestFullscreen();
+    const el = playPageRef.current;
+    if (!el) return;
+
+    const isNativeFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const isCssFs = isFullscreen && !isNativeFs;
+
+    if (isCssFs) {
+      // Sai do modo CSS fullscreen
+      setIsFullscreen(false);
+      return;
+    }
+    if (isNativeFs) {
+      // Sai do fullscreen nativo
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+      return;
+    }
+
+    // Tenta fullscreen nativo (desktop + Android Chrome)
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => setIsFullscreen(true));
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
     } else {
-      document.exitFullscreen();
+      // iOS Safari e outros sem suporte — fallback CSS
+      setIsFullscreen(true);
     }
   }
 
@@ -3296,7 +3324,7 @@ export default function App() {
 
           {/* Vista: Jogar */}
           {sessionView === "play" && activeSession && (
-            <div className="score-play-page" ref={playPageRef} data-layout={playLayout}>
+            <div className={`score-play-page${isFullscreen && !document.fullscreenElement && !document.webkitFullscreenElement ? " css-fullscreen" : ""}`} ref={playPageRef} data-layout={playLayout}>
               <div className="score-play-header">
                 {!isFullscreen && (
                   <button type="button" className="score-back-btn" onClick={() => { setSessionView("list"); setActiveSession(null); }}>

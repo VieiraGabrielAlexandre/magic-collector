@@ -5907,8 +5907,10 @@ input[type="radio"] {
 }
 
 /* ── Fullscreen: cards expandem para preencher a tela ── */
+/* Fullscreen nativo (desktop/Android) + CSS fallback (iOS/mobile) */
 .score-play-page:fullscreen,
-.score-play-page:-webkit-full-screen {
+.score-play-page:-webkit-full-screen,
+.score-play-page.css-fullscreen {
   background: #0d1117;
   padding: 0.75rem;
   display: flex;
@@ -5918,33 +5920,52 @@ input[type="radio"] {
   height: 100vh;
   box-sizing: border-box;
 }
+/* CSS fullscreen no mobile: cobre a viewport inteira por cima de tudo */
+.score-play-page.css-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  /* dvh para iOS Safari respeitar a área segura */
+  height: 100dvh;
+  overflow-y: auto;
+  padding: env(safe-area-inset-top, 0.75rem)
+           env(safe-area-inset-right, 0.75rem)
+           env(safe-area-inset-bottom, 0.75rem)
+           env(safe-area-inset-left, 0.75rem);
+}
+
 .score-play-page:fullscreen .score-players-arena,
-.score-play-page:-webkit-full-screen .score-players-arena {
+.score-play-page:-webkit-full-screen .score-players-arena,
+.score-play-page.css-fullscreen .score-players-arena {
   flex: 1;
   min-height: 0;
 }
 .score-play-page:fullscreen .layout-row,
-.score-play-page:-webkit-full-screen .layout-row {
+.score-play-page:-webkit-full-screen .layout-row,
+.score-play-page.css-fullscreen .layout-row {
   flex: 1;
   min-height: 0;
   align-items: stretch;
 }
 .score-play-page:fullscreen .score-prow,
-.score-play-page:-webkit-full-screen .score-prow {
+.score-play-page:-webkit-full-screen .score-prow,
+.score-play-page.css-fullscreen .score-prow {
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .score-play-page:fullscreen .score-prow-content,
-.score-play-page:-webkit-full-screen .score-prow-content {
+.score-play-page:-webkit-full-screen .score-prow-content,
+.score-play-page.css-fullscreen .score-prow-content {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .score-play-page:fullscreen .score-controls,
-.score-play-page:-webkit-full-screen .score-controls {
+.score-play-page:-webkit-full-screen .score-controls,
+.score-play-page.css-fullscreen .score-controls {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -5954,19 +5975,24 @@ input[type="radio"] {
 .score-play-page:fullscreen .score-life-row,
 .score-play-page:fullscreen .score-cmd-row,
 .score-play-page:-webkit-full-screen .score-life-row,
-.score-play-page:-webkit-full-screen .score-cmd-row {
+.score-play-page:-webkit-full-screen .score-cmd-row,
+.score-play-page.css-fullscreen .score-life-row,
+.score-play-page.css-fullscreen .score-cmd-row {
   justify-content: center;
 }
 .score-play-page:fullscreen .score-life-big,
-.score-play-page:-webkit-full-screen .score-life-big {
+.score-play-page:-webkit-full-screen .score-life-big,
+.score-play-page.css-fullscreen .score-life-big {
   font-size: 3rem;
 }
 .score-play-page:fullscreen .score-prow-name,
-.score-play-page:-webkit-full-screen .score-prow-name {
+.score-play-page:-webkit-full-screen .score-prow-name,
+.score-play-page.css-fullscreen .score-prow-name {
   font-size: 1.3rem;
 }
 .score-play-page:fullscreen .score-prow-badge,
-.score-play-page:-webkit-full-screen .score-prow-badge {
+.score-play-page:-webkit-full-screen .score-prow-badge,
+.score-play-page.css-fullscreen .score-prow-badge {
   width: 48px;
   height: 48px;
   font-size: 1.3rem;

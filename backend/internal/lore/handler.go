@@ -1,24 +1,17 @@
 package lore
 
 import (
+	"embed"
+	"io/fs"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-var dataDir string
-
-func init() {
-	if v := os.Getenv("LORE_DATA_PATH"); v != "" {
-		dataDir = v
-	} else {
-		dataDir = "internal/lore/data"
-	}
-}
+//go:embed data
+var loreFS embed.FS
 
 type Chapter struct {
 	Slug    string `json:"slug"`
@@ -32,7 +25,6 @@ func parseTitle(content string) (volume, title string) {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "# ") {
 			raw := strings.TrimPrefix(line, "# ")
-			// handles both " --- " and " — " (em dash) separators
 			for _, sep := range []string{" --- ", " — ", " – "} {
 				if idx := strings.Index(raw, sep); idx >= 0 {
 					return strings.TrimSpace(raw[:idx]), strings.TrimSpace(raw[idx+len(sep):])
@@ -48,48 +40,37 @@ func slugFromName(name string) string {
 	return strings.TrimSuffix(name, ".md")
 }
 
+var skipFiles = map[string]bool{
+	"README.md": true, "FONTES_OFICIAIS.md": true,
+	"00_README.md": true, "FONTES.md": true,
+	"NOTAS_DE_CONTINUIDADE.md": true,
+}
+
 func listChapters(withContent bool) ([]Chapter, error) {
-	entries, err := os.ReadDir(dataDir)
+	entries, err := loreFS.ReadDir("data")
 	if err != nil {
 		return nil, err
 	}
 
 	var chapters []Chapter
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") || skipFiles[e.Name()] {
 			continue
 		}
-		name := e.Name()
-		skip := map[string]bool{
-			"README.md": true, "FONTES_OFICIAIS.md": true,
-			"00_README.md": true, "FONTES.md": true,
-			"NOTAS_DE_CONTINUIDADE.md": true,
-		}
-		if skip[name] {
-			continue
-		}
-
-		raw, err := os.ReadFile(filepath.Join(dataDir, name))
+		raw, err := loreFS.ReadFile("data/" + e.Name())
 		if err != nil {
 			continue
 		}
 		content := string(raw)
 		volume, title := parseTitle(content)
-
-		ch := Chapter{
-			Slug:   slugFromName(name),
-			Volume: volume,
-			Title:  title,
-		}
+		ch := Chapter{Slug: slugFromName(e.Name()), Volume: volume, Title: title}
 		if withContent {
 			ch.Content = content
 		}
 		chapters = append(chapters, ch)
 	}
 
-	sort.Slice(chapters, func(i, j int) bool {
-		return chapters[i].Slug < chapters[j].Slug
-	})
+	sort.Slice(chapters, func(i, j int) bool { return chapters[i].Slug < chapters[j].Slug })
 	return chapters, nil
 }
 
@@ -109,21 +90,14 @@ func GetChapter(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slug"})
 		return
 	}
-
-	raw, err := os.ReadFile(filepath.Join(dataDir, slug+".md"))
+	raw, err := loreFS.ReadFile("data/" + slug + ".md")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "chapter not found"})
 		return
 	}
 	content := string(raw)
 	volume, title := parseTitle(content)
-
-	c.JSON(http.StatusOK, Chapter{
-		Slug:    slug,
-		Volume:  volume,
-		Title:   title,
-		Content: content,
-	})
+	c.JSON(http.StatusOK, Chapter{Slug: slug, Volume: volume, Title: title, Content: content})
 }
 
 // ── Card showcases ────────────────────────────────────────────────
@@ -135,8 +109,7 @@ type CardShowcase struct {
 }
 
 func listShowcaseData(withContent bool) ([]CardShowcase, error) {
-	cardsDir := filepath.Join(dataDir, "cards")
-	entries, err := os.ReadDir(cardsDir)
+	entries, err := fs.ReadDir(loreFS, "data/cards")
 	if err != nil {
 		return []CardShowcase{}, nil
 	}
@@ -145,7 +118,7 @@ func listShowcaseData(withContent bool) ([]CardShowcase, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		raw, err := os.ReadFile(filepath.Join(cardsDir, e.Name()))
+		raw, err := loreFS.ReadFile("data/cards/" + e.Name())
 		if err != nil {
 			continue
 		}
@@ -180,7 +153,7 @@ func GetCardShowcase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid slug"})
 		return
 	}
-	raw, err := os.ReadFile(filepath.Join(dataDir, "cards", slug+".md"))
+	raw, err := loreFS.ReadFile("data/cards/" + slug + ".md")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "showcase not found"})
 		return
