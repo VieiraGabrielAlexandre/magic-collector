@@ -657,6 +657,8 @@ function DeckColorSelect({ value, onChange }) {
   );
 }
 
+const PLAYER_COLORS = ['#3b82f6','#a855f7','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16'];
+
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────────────
   const [authUser, setAuthUser] = useState(null);
@@ -838,6 +840,10 @@ export default function App() {
   const [layoutSelectedSlot, setLayoutSelectedSlot] = useState(null); // índice do slot selecionado no modal
   const playerTimers = useRef({});
   const playerPending = useRef({});
+  // null = fechado, number = player.id cujo modal de contadores está aberto
+  const [counterModalPlayerId, setCounterModalPlayerId] = useState(null);
+  // { [playerId]: { [opponentId]: number } } — dano por comandante, local only
+  const [localCmdByOpponent, setLocalCmdByOpponent] = useState({});
 
   const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "EN", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
@@ -1079,6 +1085,8 @@ export default function App() {
       life: currentPlayer.life,
       poison: currentPlayer.poison,
       commander_damage_received: currentPlayer.commander_damage_received,
+      experience: currentPlayer.experience ?? 0,
+      energy: currentPlayer.energy ?? 0,
     };
 
     const oldCmdDmg = pending.commander_damage_received;
@@ -1086,14 +1094,19 @@ export default function App() {
     const cmdDmgDelta = newCmdDmg - oldCmdDmg;
     const newLife = field === "life" ? pending.life + delta : pending.life - cmdDmgDelta;
     const newPoison = field === "poison" ? Math.max(0, pending.poison + delta) : pending.poison;
+    const newExp = field === "experience" ? Math.max(0, pending.experience + delta) : pending.experience;
+    const newEnergy = field === "energy" ? Math.max(0, pending.energy + delta) : pending.energy;
 
-    playerPending.current[playerId] = { life: newLife, poison: newPoison, commander_damage_received: newCmdDmg };
+    playerPending.current[playerId] = {
+      life: newLife, poison: newPoison, commander_damage_received: newCmdDmg,
+      experience: newExp, energy: newEnergy,
+    };
 
     // Atualiza UI imediatamente
     setActiveSession(prev => prev ? ({
       ...prev,
       players: prev.players.map(p => p.id === playerId
-        ? { ...p, life: newLife, poison: newPoison, commander_damage_received: newCmdDmg }
+        ? { ...p, life: newLife, poison: newPoison, commander_damage_received: newCmdDmg, experience: newExp, energy: newEnergy }
         : p),
     }) : prev);
 
@@ -1116,6 +1129,16 @@ export default function App() {
         // Falha silenciosa: os valores exibidos estão corretos, sincroniza na próxima ação
       }
     }, 800);
+  }
+
+  function adjustCmdByOpponent(playerId, opponentId, delta) {
+    setLocalCmdByOpponent(prev => {
+      const playerMap = prev[playerId] ?? {};
+      const current = playerMap[opponentId] ?? 0;
+      const next = Math.max(0, current + delta);
+      return { ...prev, [playerId]: { ...playerMap, [opponentId]: next } };
+    });
+    handleUpdatePlayer(playerId, "commander_damage_received", delta);
   }
 
   async function handleAddSessionPlayer(e) {
@@ -3361,7 +3384,7 @@ export default function App() {
               {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
 
               {(() => {
-                const PLAYER_COLORS = ['#3b82f6','#a855f7','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16'];
+
                 const alivePlayers = activeSession.players.filter(p => !p.is_eliminated);
                 const winnerId = activeSession.status === "active" && activeSession.players.length > 1 && alivePlayers.length === 1
                   ? alivePlayers[0].id : null;
@@ -3405,6 +3428,7 @@ export default function App() {
                       return [{ ps: players, flipped: false }];
                   }
                 }
+
 
                 function renderCard(player, globalIdx, flipped) {
                   const color = PLAYER_COLORS[globalIdx % PLAYER_COLORS.length];
@@ -3455,16 +3479,21 @@ export default function App() {
                               <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
                               <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
                             </div>
-                            <div className="score-cmd-row">
-                              <span className="score-cmd-label">⚔️ Cmd</span>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -5)}>−5</button>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", -1)}>−1</button>
-                              <span className={`score-cmd-val${player.commander_damage_received >= 21 ? " dead" : player.commander_damage_received >= 15 ? " low" : ""}`}>
-                                {player.commander_damage_received}<small>/21</small>
+                            {/* Botão que abre o modal de contadores deste jogador */}
+                            <button
+                              type="button"
+                              className={`score-counters-toggle${counterModalPlayerId === player.id ? " open" : ""}`}
+                              onClick={() => setCounterModalPlayerId(player.id)}
+                            >
+                              <span className="score-counters-toggle-label">Contadores</span>
+                              <span className="score-counters-toggle-summary">
+                                {player.commander_damage_received > 0 && <span title="Dano de comandante">⚔{player.commander_damage_received}</span>}
+                                {player.poison > 0 && <span title="Veneno">☠{player.poison}</span>}
+                                {(player.experience ?? 0) > 0 && <span title="Experiência">✨{player.experience}</span>}
+                                {(player.energy ?? 0) > 0 && <span title="Energia">⚡{player.energy}</span>}
                               </span>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +1)}>+1</button>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "commander_damage_received", +5)}>+5</button>
-                            </div>
+                              <span className="score-counters-toggle-chevron">▾</span>
+                            </button>
                           </div>
                         )}
                         {/* Nome do comandante no rodapé */}
@@ -3500,6 +3529,85 @@ export default function App() {
                         </div>
                       );
                     })}
+                  </div>
+                );
+              })()}
+
+              {/* Modal de contadores — abre fora do layout de cards para não esticar vizinhos */}
+              {counterModalPlayerId !== null && (() => {
+                const cPlayer = activeSession.players.find(p => p.id === counterModalPlayerId);
+                if (!cPlayer) return null;
+                const rawPlayers2 = activeSession.players;
+                const allPlayers2 = playerDisplayOrder.length === rawPlayers2.length
+                  ? playerDisplayOrder.map(id => rawPlayers2.find(p => p.id === id)).filter(Boolean)
+                  : rawPlayers2;
+                const opponents2 = allPlayers2.filter(p => p.id !== counterModalPlayerId);
+                const cmdMap = localCmdByOpponent[counterModalPlayerId] ?? {};
+                const cColor = PLAYER_COLORS[allPlayers2.findIndex(p => p.id === counterModalPlayerId) % PLAYER_COLORS.length];
+                const cIsFinished = activeSession.status === "finished";
+                return (
+                  <div className="score-counters-modal-overlay" onClick={() => setCounterModalPlayerId(null)}>
+                    <div className="score-counters-modal" onClick={e => e.stopPropagation()}>
+                      {/* Cabeçalho */}
+                      <div className="score-counters-modal-head">
+                        <div className="score-counters-modal-title">
+                          <span className="score-counters-modal-badge" style={{ background: cColor }}>{cPlayer.short_code}</span>
+                          <span>{cPlayer.name}</span>
+                        </div>
+                        <button type="button" className="score-counters-modal-close" onClick={() => setCounterModalPlayerId(null)}>✕</button>
+                      </div>
+
+                      {/* Dano por comandante */}
+                      <div className="score-counters-section-title">⚔ Dano por Comandante <span className="score-counters-total">(total {cPlayer.commander_damage_received}/21)</span></div>
+                      {opponents2.map((opp, oi) => {
+                        const dmg = cmdMap[opp.id] ?? 0;
+                        return (
+                          <div key={opp.id} className="score-counter-row">
+                            <span className="score-counter-label">
+                              <span className="score-counter-badge" style={{ background: PLAYER_COLORS[allPlayers2.findIndex(p => p.id === opp.id) % PLAYER_COLORS.length] }}>{opp.short_code}</span>
+                              {opp.commander_name || opp.name}
+                            </span>
+                            <div className="score-counter-controls">
+                              <button type="button" disabled={cIsFinished} onClick={() => adjustCmdByOpponent(cPlayer.id, opp.id, -1)}>−</button>
+                              <span className={`score-counter-val${dmg >= 21 ? " dead" : dmg >= 15 ? " low" : ""}`}>{dmg}</span>
+                              <button type="button" disabled={cIsFinished} onClick={() => adjustCmdByOpponent(cPlayer.id, opp.id, +1)}>+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      <div className="score-counters-divider" />
+
+                      {/* Veneno */}
+                      <div className="score-counter-row">
+                        <span className="score-counter-label">☠ Veneno <small className="score-counter-tip">(10 = morte)</small></span>
+                        <div className="score-counter-controls">
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "poison", -1)}>−</button>
+                          <span className={`score-counter-val${cPlayer.poison >= 10 ? " dead" : cPlayer.poison >= 7 ? " low" : ""}`}>{cPlayer.poison}</span>
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "poison", +1)}>+</button>
+                        </div>
+                      </div>
+
+                      {/* Experiência */}
+                      <div className="score-counter-row">
+                        <span className="score-counter-label">✨ Experiência</span>
+                        <div className="score-counter-controls">
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "experience", -1)}>−</button>
+                          <span className="score-counter-val">{cPlayer.experience ?? 0}</span>
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "experience", +1)}>+</button>
+                        </div>
+                      </div>
+
+                      {/* Energia */}
+                      <div className="score-counter-row">
+                        <span className="score-counter-label">⚡ Energia</span>
+                        <div className="score-counter-controls">
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "energy", -1)}>−</button>
+                          <span className="score-counter-val">{cPlayer.energy ?? 0}</span>
+                          <button type="button" disabled={cIsFinished} onClick={() => handleUpdatePlayer(cPlayer.id, "energy", +1)}>+</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}

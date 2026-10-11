@@ -111,6 +111,8 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE game_session_players ADD COLUMN commander_set_code          VARCHAR(20)  NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE game_session_players ADD COLUMN commander_collection_number VARCHAR(20)  NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE game_session_players ADD COLUMN commander_image_url         VARCHAR(500) NOT NULL DEFAULT ''`)
+	db.Exec(`ALTER TABLE game_session_players ADD COLUMN experience                  INT          NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE game_session_players ADD COLUMN energy                      INT          NOT NULL DEFAULT 0`)
 	if err != nil {
 		return nil, err
 	}

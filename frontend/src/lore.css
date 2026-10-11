@@ -1528,6 +1528,36 @@
   .lore-enc-icon    { font-size: 24px; }
 }
 
+/* ── Landscape phone (altura ≤ 500px) ─────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Header ultra-compacto */
+  .lore-header {
+    height: 44px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .lore-header-glyph { font-size: 16px; }
+  .lore-header-title { font-size: 13px; }
+  .lore-header-sub { display: none; }
+  .lore-nav-tab { font-size: 9px; padding: 5px 8px; }
+  .lore-close, .lore-close-inline { padding: 5px 10px; font-size: 8px; }
+
+  /* Main com menos padding vertical */
+  .lore-main { padding: 16px clamp(12px, 3vw, 32px) 40px; }
+
+  /* Timeline mais compacta */
+  .lore-timeline { padding-left: 28px; }
+  .lore-timeline::before { left: 6px; }
+  .lore-ch-dot { left: -24px; width: 10px; height: 10px; }
+  .lore-ch-head { padding: 10px 8px 10px 0; gap: 8px; }
+  .lore-ch-num { width: 18px; font-size: 9px; }
+
+  /* Grids mais compactos */
+  .lore-chars-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .lore-enc-grid   { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .lore-enc-visual { height: 60px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lore-root * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

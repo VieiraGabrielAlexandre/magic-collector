@@ -24,6 +24,8 @@ type Player struct {
 	Life                        int    `json:"life"`
 	Poison                      int    `json:"poison"`
 	CommanderDamageReceived     int    `json:"commander_damage_received"`
+	Experience                  int    `json:"experience"`
+	Energy                      int    `json:"energy"`
 	IsEliminated                bool   `json:"is_eliminated"`
 	EliminatedReason            string `json:"eliminated_reason"`
 	CreatedAt                   string `json:"created_at"`
@@ -51,4 +53,6 @@ type UpdatePlayerInput struct {
 	Life                    int `json:"life"`
 	Poison                  int `json:"poison"`
 	CommanderDamageReceived int `json:"commander_damage_received"`
+	Experience              int `json:"experience"`
+	Energy                  int `json:"energy"`
 }

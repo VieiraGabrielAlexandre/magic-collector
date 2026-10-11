@@ -51,7 +51,7 @@ func (r *Repository) List() ([]GameSession, error) {
 		SELECT id, session_id, name, short_code,
 			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
 			COALESCE(commander_image_url,''),
-			life, poison, commander_damage_received,
+			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
@@ -67,8 +67,8 @@ func (r *Repository) List() ([]GameSession, error) {
 		if err := playerRows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
 			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 			&p.CommanderImageURL,
-			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
-			&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
+			&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if idx, ok := sessionMap[p.SessionID]; ok {
@@ -104,7 +104,7 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 		SELECT id, session_id, name, short_code,
 			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
 			COALESCE(commander_image_url,''),
-			life, poison, commander_damage_received,
+			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
@@ -121,8 +121,8 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
 			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 			&p.CommanderImageURL,
-			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
-			&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
+			&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		s.Players = append(s.Players, p)
@@ -170,7 +170,7 @@ func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 		SELECT id, session_id, name, short_code,
 			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
 			COALESCE(commander_image_url,''),
-			life, poison, commander_damage_received,
+			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
@@ -178,8 +178,8 @@ func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 	`, id).Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
 		&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 		&p.CommanderImageURL,
-		&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.IsEliminated,
-		&p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt)
+		&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
+		&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -223,9 +223,11 @@ func (r *Repository) UpdatePlayer(sessionID, playerID int64, input UpdatePlayerI
 	_, err := r.db.Exec(`
 		UPDATE game_session_players
 		SET life = ?, poison = ?, commander_damage_received = ?,
+			experience = ?, energy = ?,
 			is_eliminated = ?, eliminated_reason = ?
 		WHERE id = ? AND session_id = ?
 	`, input.Life, input.Poison, input.CommanderDamageReceived,
+		input.Experience, input.Energy,
 		isEliminated, eliminatedReasonVal, playerID, sessionID)
 	if err != nil {
 		return nil, err
@@ -248,7 +250,9 @@ func (r *Repository) Reset(sessionID int64) (*GameSession, error) {
 
 	_, err = r.db.Exec(`
 		UPDATE game_session_players
-		SET life = ?, poison = 0, commander_damage_received = 0, is_eliminated = 0, eliminated_reason = NULL
+		SET life = ?, poison = 0, commander_damage_received = 0,
+			experience = 0, energy = 0,
+			is_eliminated = 0, eliminated_reason = NULL
 		WHERE session_id = ?
 	`, startingLife, sessionID)
 	if err != nil {
