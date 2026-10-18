@@ -17,6 +17,7 @@ import (
 	"magic-collection-api/internal/tokens"
 	"magic-collection-api/internal/lore"
 	"magic-collection-api/internal/wishlist"
+	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 
 	"github.com/gin-gonic/gin"
 )
@@ -63,6 +64,9 @@ func main() {
 	wishlistRepo := wishlist.NewRepository(db)
 	wishlistSvc := wishlist.NewService(wishlistRepo, mtgClient)
 	wishlistHandler := wishlist.NewHandler(wishlistSvc)
+
+	wishlistDeckRepo := wishlist_decks.NewRepository(db)
+	wishlistDeckHandler := wishlist_decks.NewHandler(wishlistDeckRepo, mtgClient)
 
 	gameSessionRepo := game_sessions.NewRepository(db)
 	gameSessionSvc := game_sessions.NewService(gameSessionRepo, battleRepo)
@@ -129,6 +133,14 @@ func main() {
 	api.PUT("/wishlist/:id", wishlistHandler.Update)
 	api.DELETE("/wishlist/:id", wishlistHandler.Delete)
 	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
+
+	api.GET("/wishlist-decks", wishlistDeckHandler.List)
+	api.POST("/wishlist-decks", wishlistDeckHandler.Create)
+	api.PATCH("/wishlist-decks/:id/acquire", wishlistDeckHandler.Acquire)
+	api.DELETE("/wishlist-decks/:id", wishlistDeckHandler.Delete)
+	api.GET("/wishlist-decks/:id/cards", wishlistDeckHandler.ListCards)
+	api.POST("/wishlist-decks/:id/cards", wishlistDeckHandler.AddCard)
+	api.DELETE("/wishlist-decks/:id/cards/:card_id", wishlistDeckHandler.DeleteCard)
 
 	api.GET("/tokens", tokenHandler.List)
 	api.POST("/tokens/preview", tokenHandler.Preview)

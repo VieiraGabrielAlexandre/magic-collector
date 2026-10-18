@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistItem, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listGameSessions, listProxyCards, listTokens, listWishlist, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -807,17 +807,37 @@ export default function App() {
   const EMPTY_BATTLE_FORM = { result: "win", opponents: ["", "", ""], player_count: 4, game_style: "Commander", deck_id: 0, deck_name: "", deck_is_mine: true, notes: "" };
   const [battleForm, setBattleForm] = useState(EMPTY_BATTLE_FORM);
 
-  // ── Wishlist ─────────────────────────────────────────────────────────────
+  // ── Decks Desejados ───────────────────────────────────────────────────────
   const EMPTY_WISHLIST_FORM = { set_code: "", collection_number: "", foil: false, reason: "" };
   const EMPTY_ACQUIRE_FORM = { deck_id: 0, condition: "near_mint", commander: false, prerelease: false };
+  const EMPTY_DECK_WISH_FORM = { name: "", format: "Commander", colors: "", note: "" };
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistForm, setWishlistForm] = useState(EMPTY_WISHLIST_FORM);
+  const [showWishlistAdd, setShowWishlistAdd] = useState(false);
   const [wishlistSubmitting, setWishlistSubmitting] = useState(false);
   const [wishlistError, setWishlistError] = useState("");
   const [wishlistDetail, setWishlistDetail] = useState(null);
   const [wishlistAcquireFor, setWishlistAcquireFor] = useState(null);
   const [wishlistAcquireForm, setWishlistAcquireForm] = useState(EMPTY_ACQUIRE_FORM);
   const [wishlistAcquiring, setWishlistAcquiring] = useState(false);
+  const [wishlistShowAcquired, setWishlistShowAcquired] = useState(true);
+  // deck-wish states
+  const [deckWishList, setDeckWishList] = useState([]);
+  const [showDeckWishAdd, setShowDeckWishAdd] = useState(false);
+  const [deckWishForm, setDeckWishForm] = useState(EMPTY_DECK_WISH_FORM);
+  const [deckWishSubmitting, setDeckWishSubmitting] = useState(false);
+  const [deckWishError, setDeckWishError] = useState("");
+  const [deckWishShowAcquired, setDeckWishShowAcquired] = useState(true);
+  const [wishlistSubTab, setWishlistSubTab] = useState("cards");
+  // página de cartas de um deck desejado
+  const [deckWishCardsFor, setDeckWishCardsFor] = useState(null); // deck object
+  const [deckWishCards, setDeckWishCards] = useState([]);
+  const [deckWishCardsLoading, setDeckWishCardsLoading] = useState(false);
+  const EMPTY_DECK_CARD_FORM = { set_code: "", collection_number: "", foil: false, note: "" };
+  const [deckCardForm, setDeckCardForm] = useState(EMPTY_DECK_CARD_FORM);
+  const [deckCardSubmitting, setDeckCardSubmitting] = useState(false);
+  const [deckCardError, setDeckCardError] = useState("");
+  const [deckCardDetail, setDeckCardDetail] = useState(null); // card detail overlay
 
   // ── Pontuação / Life Counter ─────────────────────────────────────────────────
   const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
@@ -1005,6 +1025,7 @@ export default function App() {
     try {
       await createWishlistItem(wishlistForm);
       setWishlistForm(EMPTY_WISHLIST_FORM);
+      setShowWishlistAdd(false);
       await loadWishlist();
     } catch (err) {
       setWishlistError(err.message || "Erro ao adicionar à wishlist");
@@ -1034,6 +1055,75 @@ export default function App() {
     } finally {
       setWishlistAcquiring(false);
     }
+  }
+
+  // ── Deck Wish handlers ────────────────────────────────────────────────────
+  async function handleDeckWishCreate(e) {
+    e.preventDefault();
+    setDeckWishSubmitting(true);
+    setDeckWishError("");
+    try {
+      await createWishlistDeck(deckWishForm);
+      setDeckWishForm(EMPTY_DECK_WISH_FORM);
+      setShowDeckWishAdd(false);
+      await loadDeckWishList();
+    } catch (err) {
+      setDeckWishError(err.message || "Erro ao criar deck desejado");
+    } finally {
+      setDeckWishSubmitting(false);
+    }
+  }
+
+  async function handleDeckWishAcquire(id) {
+    await acquireWishlistDeck(id);
+    await loadDeckWishList();
+  }
+
+  async function handleDeckWishDelete(id) {
+    await deleteWishlistDeck(id);
+    await loadDeckWishList();
+  }
+
+  async function openDeckWishCards(deck) {
+    setDeckWishCardsFor(deck);
+    setDeckCardForm(EMPTY_DECK_CARD_FORM);
+    setDeckCardError("");
+    setDeckCardDetail(null);
+    setDeckWishCardsLoading(true);
+    try {
+      const data = await listDeckWishCards(deck.id);
+      setDeckWishCards(data ?? []);
+    } finally {
+      setDeckWishCardsLoading(false);
+    }
+  }
+
+  function closeDeckWishCards() {
+    setDeckWishCardsFor(null);
+    setDeckWishCards([]);
+    setDeckCardDetail(null);
+  }
+
+  async function handleAddDeckCard(e) {
+    e.preventDefault();
+    if (!deckWishCardsFor) return;
+    setDeckCardSubmitting(true);
+    setDeckCardError("");
+    try {
+      const card = await addDeckWishCard(deckWishCardsFor.id, deckCardForm);
+      setDeckWishCards(prev => [...prev, card]);
+      setDeckCardForm(EMPTY_DECK_CARD_FORM);
+    } catch (err) {
+      setDeckCardError(err.message || "Carta não encontrada");
+    } finally {
+      setDeckCardSubmitting(false);
+    }
+  }
+
+  async function handleDeleteDeckCard(cardId) {
+    if (!deckWishCardsFor) return;
+    await deleteDeckWishCard(deckWishCardsFor.id, cardId);
+    setDeckWishCards(prev => prev.filter(c => c.id !== cardId));
   }
 
   // ── Game Session handlers ─────────────────────────────────────────────────
@@ -1220,6 +1310,12 @@ export default function App() {
   useEffect(() => { loadDecks(); }, []);
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
+  useEffect(() => { loadDeckWishList(); }, []);
+
+  async function loadDeckWishList() {
+    const data = await listWishlistDecks();
+    setDeckWishList(data ?? []);
+  }
 
   async function loadProxies() {
     setProxyLoading(true);
@@ -1944,7 +2040,7 @@ export default function App() {
             { id: "decks",      icon: "🗂",  label: "Decks"      },
             { id: "tokens",     icon: "🎭",  label: "Tokens"     },
             { id: "proxies",    icon: "⚠",  label: "Proxies"    },
-            { id: "wishlist",   icon: "⭐",  label: "Wishlist"   },
+            { id: "wishlist",   icon: "🎯",  label: "Desejados"  },
             { id: "analyze",    icon: "🧬",  label: "Análise IA" },
           ]}
           activeTab={activeTab}
@@ -2498,230 +2594,406 @@ export default function App() {
         );
       })()}
 
-      {/* ── ABA WISHLIST ── */}
+      {/* ── ABA DESEJADOS ── */}
       {activeTab === "wishlist" && (
         <>
-          <section className="grid">
-
-            {/* Formulário */}
-            <form className="card form wishlist-form-panel" onSubmit={handleWishlistCreate}>
-                <h2>Adicionar à Wishlist</h2>
-                <div className="qa-row-2col">
-                  <label>
-                    Sigla *
-                    <input
-                      required
-                      placeholder="KLD, BRO…"
-                      value={wishlistForm.set_code}
-                      style={{ textTransform: "uppercase" }}
-                      onChange={e => setWishlistForm({ ...wishlistForm, set_code: e.target.value.toUpperCase().trim() })}
-                    />
-                  </label>
-                  <label>
-                    Número *
-                    <input
-                      required
-                      placeholder="017, 253a"
-                      value={wishlistForm.collection_number}
-                      onChange={e => setWishlistForm({ ...wishlistForm, collection_number: e.target.value.trim() })}
-                    />
-                  </label>
-                </div>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={wishlistForm.foil}
-                    onChange={e => setWishlistForm({ ...wishlistForm, foil: e.target.checked })}
-                  />
-                  Versão Foil
-                </label>
-                <label>
-                  Motivo
-                  <textarea
-                    placeholder="Por que você quer essa carta?"
-                    value={wishlistForm.reason}
-                    onChange={e => setWishlistForm({ ...wishlistForm, reason: e.target.value })}
-                  />
-                </label>
-                {wishlistError && <p className="form-error">{wishlistError}</p>}
-                <button type="submit" className="wishlist-submit-btn" disabled={wishlistSubmitting}>
-                  {wishlistSubmitting ? "Buscando na Scryfall…" : "＋ Adicionar à Wishlist"}
-                </button>
-            </form>
-
-            {/* Lista */}
-            <section className="card list-section">
-              <div className="list-header">
-                <h2>
-                  Cartas Desejadas
-                  <span className="total-badge">{wishlistItems.length}</span>
-                  {wishlistItems.filter(i => i.acquired).length > 0 && (
-                    <span className="unique-badge">
-                      {wishlistItems.filter(i => i.acquired).length} adquiridas
-                    </span>
-                  )}
-                </h2>
-              </div>
-
-              {wishlistItems.length === 0 ? (
-                <p className="empty">Sua wishlist está vazia. Adicione cartas que deseja adquirir!</p>
-              ) : (
-                <div className="wishlist-grid">
-                  {wishlistItems.map(item => (
-                    <div key={item.id} className={`wishlist-card${item.acquired ? " wishlist-acquired" : ""}`}>
-                      {item.image_uri ? (
-                        <div className="wishlist-card-img-wrap">
-                          <img
-                            src={item.image_uri}
-                            alt={item.name || item.set_code}
-                            className="wishlist-card-img"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : (
-                        <div className="wishlist-card-img-placeholder">
-                          <span>{item.set_code || "?"}</span>
+          <div className="wishlist-page">
+            {/* ── Página de cartas de um deck desejado ── */}
+            {deckWishCardsFor && (
+              <>
+                {/* Header com volta */}
+                <div className="deck-detail-header">
+                  <button type="button" className="deck-detail-back" onClick={closeDeckWishCards}>
+                    ← Voltar
+                  </button>
+                  <div className="deck-detail-title">
+                    <div className="deck-detail-title-row">
+                      <h2>{deckWishCardsFor.name}</h2>
+                      {deckWishCardsFor.colors && (
+                        <div className="deck-detail-colors">
+                          {deckWishCardsFor.colors.split(",").filter(Boolean).map(c => (
+                            <img key={c} src={`/mana-icons/${MTG_CODE_TO_ICON[c] || "incolour"}.svg`} alt={c} className="deck-detail-color-icon" />
+                          ))}
                         </div>
                       )}
-                      <div className="wishlist-card-body">
-                        <div className="wishlist-card-name">
-                          <span className="wishlist-card-name-text">
-                            {item.printed_name || item.name || `${item.set_code} #${item.collection_number}`}
-                          </span>
-                          <div className="wishlist-card-badges">
-                            {item.foil && <span className="wishlist-badge-foil">Foil</span>}
-                            {item.acquired && <span className="wishlist-badge-acquired">✓</span>}
-                          </div>
-                        </div>
-                        <div className="wishlist-card-meta">
-                          <span className="wishlist-meta-set">{item.set_code} #{item.collection_number}</span>
-                          {item.rarity && (
-                            <span className={`rarity r-${item.rarity.toLowerCase()}`}>{item.rarity}</span>
-                          )}
-                        </div>
-                        {item.artist && <div className="wishlist-card-artist">🎨 {item.artist}</div>}
-                        {(item.price_usd > 0 || item.price_usd_foil > 0) && (
-                          <div className="wishlist-card-price">
-                            {item.price_usd > 0 && <span>${item.price_usd.toFixed(2)}</span>}
-                            {item.price_usd_foil > 0 && (
-                              <span className="wishlist-price-foil">Foil: ${item.price_usd_foil.toFixed(2)}</span>
-                            )}
-                          </div>
+                    </div>
+                    <span className="deck-wish-format">{deckWishCardsFor.format}</span>
+                    {deckWishCardsFor.note && <span className="deck-detail-note">"{deckWishCardsFor.note}"</span>}
+                  </div>
+                  <div className="deck-detail-count">
+                    <span className="total-badge">{deckWishCards.length} carta{deckWishCards.length !== 1 ? "s" : ""}</span>
+                  </div>
+                </div>
+
+                {/* Formulário de adição */}
+                <form className="deck-cards-add-form" onSubmit={handleAddDeckCard}>
+                  <div className="qa-row-2col">
+                    <label>
+                      Sigla *
+                      <input required autoFocus placeholder="KLD, BRO…"
+                        value={deckCardForm.set_code} style={{ textTransform: "uppercase" }}
+                        onChange={e => setDeckCardForm({ ...deckCardForm, set_code: e.target.value.toUpperCase().trim() })}
+                      />
+                    </label>
+                    <label>
+                      Número *
+                      <input required placeholder="017, 253a"
+                        value={deckCardForm.collection_number}
+                        onChange={e => setDeckCardForm({ ...deckCardForm, collection_number: e.target.value.trim() })}
+                      />
+                    </label>
+                  </div>
+                  <div className="deck-cards-add-row">
+                    <label className="checkbox-label" style={{ flex: 1 }}>
+                      <input type="checkbox" checked={deckCardForm.foil} onChange={e => setDeckCardForm({ ...deckCardForm, foil: e.target.checked })} />
+                      ✦ Foil
+                    </label>
+                    <button type="submit" className="wishlist-submit-btn deck-cards-add-btn" disabled={deckCardSubmitting}>
+                      {deckCardSubmitting ? "Buscando…" : "+ Adicionar Carta"}
+                    </button>
+                  </div>
+                  {deckCardError && <p className="form-error">{deckCardError}</p>}
+                </form>
+
+                {/* Grid de cartas */}
+                {deckWishCardsLoading ? (
+                  <p className="empty">Carregando…</p>
+                ) : deckWishCards.length === 0 ? (
+                  <div className="wishlist-empty">
+                    <span className="wishlist-empty-icon">🃏</span>
+                    <p>Nenhuma carta adicionada ainda.</p>
+                    <p className="wishlist-empty-sub">Use o formulário acima para buscar cartas na Scryfall.</p>
+                  </div>
+                ) : (
+                  <div className="deck-detail-grid">
+                    {deckWishCards.map(card => (
+                      <div
+                        key={card.id}
+                        className="deck-detail-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setDeckCardDetail(card)}
+                        onKeyDown={e => e.key === "Enter" && setDeckCardDetail(card)}
+                      >
+                        {card.image_uri ? (
+                          <img src={card.image_uri} alt={card.name} className="deck-detail-card-img" loading="lazy" />
+                        ) : (
+                          <div className="deck-detail-card-placeholder">{card.set_code}</div>
                         )}
-                        {item.reason && (
-                          <div className="wishlist-card-reason">"{item.reason}"</div>
-                        )}
-                        <div className="wishlist-card-actions">
-                          <button
-                            type="button"
-                            className="wishlist-btn-detail"
-                            onClick={() => setWishlistDetail(item)}
-                          >
-                            Detalhes
-                          </button>
-                          {!item.acquired && (
-                            <button
-                              type="button"
-                              className="wishlist-btn-acquire"
-                              onClick={() => {
-                                setWishlistAcquireFor(item);
-                                setWishlistAcquireForm(EMPTY_ACQUIRE_FORM);
-                              }}
-                            >
-                              Adquirir
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="danger wishlist-btn-remove"
-                            aria-label="Remover da wishlist"
-                            onClick={() => handleWishlistDelete(item.id)}
-                          >
-                            ✕
-                          </button>
+                        <div className="deck-detail-card-footer">
+                          <span className="deck-detail-card-name">{card.printed_name || card.name}</span>
+                          <span className="deck-detail-card-set">{card.set_code} #{card.collection_number}{card.foil ? " ✦" : ""}</span>
                         </div>
+                        <button
+                          type="button"
+                          className="deck-detail-card-del"
+                          aria-label="Remover"
+                          onClick={e => { e.stopPropagation(); handleDeleteDeckCard(card.id); }}
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Overlay de detalhe da carta */}
+                {deckCardDetail && (
+                  <div className="modal-overlay" onClick={() => setDeckCardDetail(null)}>
+                    <div className="modal wishlist-modal" onClick={e => e.stopPropagation()}>
+                      <button className="modal-close" onClick={() => setDeckCardDetail(null)}>✕</button>
+                      {deckCardDetail.image_uri && (
+                        <img src={deckCardDetail.image_uri} alt={deckCardDetail.name} className="wishlist-modal-img" />
+                      )}
+                      <div className="wishlist-modal-body">
+                        <h2 className="wishlist-modal-name">
+                          {deckCardDetail.printed_name || deckCardDetail.name}
+                          {deckCardDetail.foil && <span className="wishlist-badge-foil">✦ Foil</span>}
+                        </h2>
+                        {deckCardDetail.printed_name && deckCardDetail.printed_name !== deckCardDetail.name && (
+                          <p className="wishlist-modal-en-name">{deckCardDetail.name}</p>
+                        )}
+                        <div className="wishlist-modal-meta">
+                          <span>{deckCardDetail.set_code} #{deckCardDetail.collection_number}</span>
+                        </div>
+                        {deckCardDetail.note && (
+                          <blockquote className="wishlist-modal-reason">"{deckCardDetail.note}"</blockquote>
+                        )}
+                      </div>
+                      <div className="modal-actions">
+                        <button type="button" className="danger" onClick={() => { handleDeleteDeckCard(deckCardDetail.id); setDeckCardDetail(null); }}>
+                          Remover
+                        </button>
+                        <button type="button" onClick={() => setDeckCardDetail(null)}>Fechar</button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </section>
+                  </div>
+                )}
+              </>
+            )}
 
-          {/* Modal de Detalhes */}
+            {/* ── Vista normal: sub-navegação + listas ── */}
+            {!deckWishCardsFor && (
+            <>
+            <div className="wish-subnav">
+              <button
+                type="button"
+                className={`wish-subnav-btn${wishlistSubTab === "cards" ? " active" : ""}`}
+                onClick={() => setWishlistSubTab("cards")}
+              >
+                🃏 Cartas
+                <span className="wish-subnav-count">{wishlistItems.filter(i => !i.acquired).length}</span>
+              </button>
+              <button
+                type="button"
+                className={`wish-subnav-btn${wishlistSubTab === "decks" ? " active" : ""}`}
+                onClick={() => setWishlistSubTab("decks")}
+              >
+                🎯 Decks
+                <span className="wish-subnav-count">{deckWishList.filter(d => !d.acquired).length}</span>
+              </button>
+            </div>
+
+            {/* ── Sub-aba: Cartas Desejadas ── */}
+            {wishlistSubTab === "cards" && (
+              <>
+                <div className="wishlist-page-header">
+                  <div className="wishlist-page-title">
+                    <h2>
+                      Cartas Desejadas
+                      <span className="total-badge">{wishlistItems.filter(i => !i.acquired).length}</span>
+                      {wishlistItems.filter(i => i.acquired).length > 0 && (
+                        <span className="unique-badge">{wishlistItems.filter(i => i.acquired).length} adquiridas</span>
+                      )}
+                    </h2>
+                  </div>
+                  <div className="wishlist-page-actions">
+                    {wishlistItems.some(i => i.acquired) && (
+                      <button type="button" className="wishlist-toggle-acquired" onClick={() => setWishlistShowAcquired(v => !v)}>
+                        {wishlistShowAcquired ? "Ocultar adquiridas" : "Mostrar adquiridas"}
+                      </button>
+                    )}
+                    <button type="button" className="wishlist-add-btn" onClick={() => { setWishlistForm(EMPTY_WISHLIST_FORM); setWishlistError(""); setShowWishlistAdd(true); }}>
+                      + Adicionar Carta
+                    </button>
+                  </div>
+                </div>
+
+                {wishlistItems.filter(i => wishlistShowAcquired || !i.acquired).length === 0 ? (
+                  <div className="wishlist-empty">
+                    <span className="wishlist-empty-icon">🃏</span>
+                    <p>Nenhuma carta desejada ainda.</p>
+                    <p className="wishlist-empty-sub">Clique em <strong>+ Adicionar Carta</strong> para buscar na Scryfall.</p>
+                  </div>
+                ) : (
+                  <div className="wishlist-grid">
+                    {wishlistItems.filter(i => wishlistShowAcquired || !i.acquired).map(item => (
+                      <div
+                        key={item.id}
+                        className={`wishlist-card${item.acquired ? " wishlist-acquired" : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setWishlistDetail(item)}
+                        onKeyDown={e => e.key === "Enter" && setWishlistDetail(item)}
+                      >
+                        {item.image_uri ? (
+                          <div className="wishlist-card-img-wrap">
+                            <img src={item.image_uri} alt={item.name || item.set_code} className="wishlist-card-img" loading="lazy" />
+                          </div>
+                        ) : (
+                          <div className="wishlist-card-img-placeholder"><span>{item.set_code || "?"}</span></div>
+                        )}
+                        <div className="wishlist-card-body">
+                          <div className="wishlist-card-name">
+                            <span className="wishlist-card-name-text">
+                              {item.printed_name || item.name || `${item.set_code} #${item.collection_number}`}
+                            </span>
+                            <div className="wishlist-card-badges">
+                              {item.foil && <span className="wishlist-badge-foil">✦ Foil</span>}
+                              {item.acquired && <span className="wishlist-badge-acquired">✓</span>}
+                            </div>
+                          </div>
+                          <div className="wishlist-card-meta">
+                            <span className="wishlist-meta-set">{item.set_code} #{item.collection_number}</span>
+                            {item.rarity && <span className={`rarity r-${item.rarity.toLowerCase()}`}>{item.rarity}</span>}
+                          </div>
+                          {item.artist && <div className="wishlist-card-artist">🎨 {item.artist}</div>}
+                          {(item.price_usd > 0 || item.price_usd_foil > 0) && (
+                            <div className="wishlist-card-price">
+                              {item.price_usd > 0 && <span>${item.price_usd.toFixed(2)}</span>}
+                              {item.price_usd_foil > 0 && <span className="wishlist-price-foil">Foil ${item.price_usd_foil.toFixed(2)}</span>}
+                            </div>
+                          )}
+                          {item.reason && <div className="wishlist-card-reason">"{item.reason}"</div>}
+                          <div className="wishlist-card-actions" onClick={e => e.stopPropagation()}>
+                            {!item.acquired && (
+                              <button type="button" className="wishlist-btn-acquire" onClick={() => { setWishlistAcquireFor(item); setWishlistAcquireForm(EMPTY_ACQUIRE_FORM); }}>
+                                Adquirir
+                              </button>
+                            )}
+                            <button type="button" className="danger wishlist-btn-remove" aria-label="Remover" onClick={() => handleWishlistDelete(item.id)}>✕</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Sub-aba: Decks Desejados ── */}
+            {wishlistSubTab === "decks" && (
+              <>
+                <div className="wishlist-page-header">
+                  <div className="wishlist-page-title">
+                    <h2>
+                      Decks Desejados
+                      <span className="total-badge">{deckWishList.filter(d => !d.acquired).length}</span>
+                      {deckWishList.filter(d => d.acquired).length > 0 && (
+                        <span className="unique-badge">{deckWishList.filter(d => d.acquired).length} montados</span>
+                      )}
+                    </h2>
+                  </div>
+                  <div className="wishlist-page-actions">
+                    {deckWishList.some(d => d.acquired) && (
+                      <button type="button" className="wishlist-toggle-acquired" onClick={() => setDeckWishShowAcquired(v => !v)}>
+                        {deckWishShowAcquired ? "Ocultar montados" : "Mostrar montados"}
+                      </button>
+                    )}
+                    <button type="button" className="wishlist-add-btn" onClick={() => { setDeckWishForm(EMPTY_DECK_WISH_FORM); setDeckWishError(""); setShowDeckWishAdd(true); }}>
+                      + Novo Deck
+                    </button>
+                  </div>
+                </div>
+
+                {deckWishList.filter(d => deckWishShowAcquired || !d.acquired).length === 0 ? (
+                  <div className="wishlist-empty">
+                    <span className="wishlist-empty-icon">🎯</span>
+                    <p>Nenhum deck desejado ainda.</p>
+                    <p className="wishlist-empty-sub">Clique em <strong>+ Novo Deck</strong> para adicionar um deck que você quer montar.</p>
+                  </div>
+                ) : (
+                  <div className="deck-wish-list">
+                    {deckWishList.filter(d => deckWishShowAcquired || !d.acquired).map(deck => (
+                      <div key={deck.id} className={`deck-wish-item${deck.acquired ? " deck-wish-acquired" : ""}`}>
+                        <div className="deck-wish-colors">
+                          {deck.colors ? deck.colors.split(",").filter(Boolean).map(c => (
+                            <img key={c} src={`/mana-icons/${MTG_CODE_TO_ICON[c] || "incolour"}.svg`} alt={c} className="color-icon" />
+                          )) : <span className="deck-wish-no-color">—</span>}
+                        </div>
+                        <div className="deck-wish-info">
+                          <div className="deck-wish-name">
+                            {deck.name}
+                            {deck.acquired && <span className="deck-wish-badge-done">✓ Montado</span>}
+                          </div>
+                          <div className="deck-wish-meta">
+                            <span className="deck-wish-format">{deck.format}</span>
+                          </div>
+                          {deck.note && <div className="deck-wish-note">"{deck.note}"</div>}
+                        </div>
+                        <div className="deck-wish-actions">
+                          <button type="button" className="deck-wish-cards-btn" onClick={() => openDeckWishCards(deck)}>
+                            🃏 Cartas
+                          </button>
+                          {!deck.acquired && (
+                            <button type="button" className="wishlist-btn-acquire" onClick={() => handleDeckWishAcquire(deck.id)}>
+                              ✓ Montei
+                            </button>
+                          )}
+                          <button type="button" className="danger" aria-label="Remover" onClick={() => handleDeckWishDelete(deck.id)}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            </>
+            )}
+          </div>
+
+          {/* Modal — Adicionar Carta */}
+          {showWishlistAdd && (
+            <div className="modal-overlay" onClick={() => setShowWishlistAdd(false)}>
+              <div className="modal quick-add-modal wishlist-add-modal" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" aria-label="Fechar" onClick={() => setShowWishlistAdd(false)}>✕</button>
+                <h2>🃏 Adicionar Carta</h2>
+                <p className="quick-add-hint">Informe a sigla e o número para buscar na Scryfall.</p>
+                <form className="quick-add-form" onSubmit={handleWishlistCreate}>
+                  <div className="qa-row-2col">
+                    <label>
+                      Sigla *
+                      <input required autoFocus placeholder="KLD, BRO…" value={wishlistForm.set_code}
+                        style={{ textTransform: "uppercase" }}
+                        onChange={e => setWishlistForm({ ...wishlistForm, set_code: e.target.value.toUpperCase().trim() })}
+                      />
+                    </label>
+                    <label>
+                      Número *
+                      <input required placeholder="017, 253a" value={wishlistForm.collection_number}
+                        onChange={e => setWishlistForm({ ...wishlistForm, collection_number: e.target.value.trim() })}
+                      />
+                    </label>
+                  </div>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={wishlistForm.foil} onChange={e => setWishlistForm({ ...wishlistForm, foil: e.target.checked })} />
+                    ✦ Foil
+                  </label>
+                  <label>
+                    Motivo <span className="field-optional">(opcional)</span>
+                    <textarea rows={2} placeholder="Por que você quer essa carta?" value={wishlistForm.reason}
+                      onChange={e => setWishlistForm({ ...wishlistForm, reason: e.target.value })}
+                    />
+                  </label>
+                  {wishlistError && <p className="form-error">{wishlistError}</p>}
+                  <button type="submit" className="wishlist-submit-btn" disabled={wishlistSubmitting}>
+                    {wishlistSubmitting ? "Buscando na Scryfall…" : "Buscar e Adicionar →"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal — Detalhes da carta */}
           {wishlistDetail && (
             <div className="modal-overlay" onClick={() => setWishlistDetail(null)}>
               <div className="modal wishlist-modal" onClick={e => e.stopPropagation()}>
                 <button className="modal-close" aria-label="Fechar" onClick={() => setWishlistDetail(null)}>✕</button>
-                {wishlistDetail.image_uri && (
-                  <img
-                    src={wishlistDetail.image_uri}
-                    alt={wishlistDetail.name}
-                    className="wishlist-modal-img"
-                  />
-                )}
+                {wishlistDetail.image_uri && <img src={wishlistDetail.image_uri} alt={wishlistDetail.name} className="wishlist-modal-img" />}
                 <div className="wishlist-modal-body">
                   <h2 className="wishlist-modal-name">
                     {wishlistDetail.printed_name || wishlistDetail.name || `${wishlistDetail.set_code} #${wishlistDetail.collection_number}`}
-                    {wishlistDetail.foil && <span className="wishlist-badge-foil">Foil</span>}
+                    {wishlistDetail.foil && <span className="wishlist-badge-foil">✦ Foil</span>}
                   </h2>
                   {wishlistDetail.printed_name && wishlistDetail.name && wishlistDetail.printed_name !== wishlistDetail.name && (
                     <p className="wishlist-modal-en-name">{wishlistDetail.name}</p>
                   )}
                   <div className="wishlist-modal-meta">
                     <span>{wishlistDetail.set_code} #{wishlistDetail.collection_number}</span>
-                    {wishlistDetail.rarity && (
-                      <span className={`rarity r-${wishlistDetail.rarity.toLowerCase()}`}>{wishlistDetail.rarity}</span>
-                    )}
+                    {wishlistDetail.rarity && <span className={`rarity r-${wishlistDetail.rarity.toLowerCase()}`}>{wishlistDetail.rarity}</span>}
                   </div>
-                  {wishlistDetail.artist && (
-                    <p className="wishlist-modal-artist">🎨 {wishlistDetail.artist}</p>
-                  )}
+                  {wishlistDetail.artist && <p className="wishlist-modal-artist">🎨 {wishlistDetail.artist}</p>}
                   {(wishlistDetail.price_usd > 0 || wishlistDetail.price_usd_foil > 0) && (
                     <div className="wishlist-modal-prices">
-                      {wishlistDetail.price_usd > 0 && (
-                        <span>Normal: <strong>${wishlistDetail.price_usd.toFixed(2)}</strong></span>
-                      )}
-                      {wishlistDetail.price_usd_foil > 0 && (
-                        <span>Foil: <strong>${wishlistDetail.price_usd_foil.toFixed(2)}</strong></span>
-                      )}
+                      {wishlistDetail.price_usd > 0 && <span>Normal: <strong>${wishlistDetail.price_usd.toFixed(2)}</strong></span>}
+                      {wishlistDetail.price_usd_foil > 0 && <span>Foil: <strong>${wishlistDetail.price_usd_foil.toFixed(2)}</strong></span>}
                     </div>
                   )}
-                  {wishlistDetail.reason && (
-                    <blockquote className="wishlist-modal-reason">"{wishlistDetail.reason}"</blockquote>
-                  )}
-                  {wishlistDetail.acquired && (
-                    <p className="wishlist-acquired-label">✓ Carta já adquirida e na coleção</p>
-                  )}
+                  {wishlistDetail.reason && <blockquote className="wishlist-modal-reason">"{wishlistDetail.reason}"</blockquote>}
+                  {wishlistDetail.acquired && <p className="wishlist-acquired-label">✓ Carta já adquirida e na coleção</p>}
                 </div>
                 <div className="modal-actions">
                   {!wishlistDetail.acquired && (
-                    <button
-                      type="button"
-                      className="wishlist-btn-acquire"
-                      onClick={() => {
-                        setWishlistAcquireFor(wishlistDetail);
-                        setWishlistAcquireForm(EMPTY_ACQUIRE_FORM);
-                        setWishlistDetail(null);
-                      }}
-                    >
+                    <button type="button" className="wishlist-btn-acquire" onClick={() => { setWishlistAcquireFor(wishlistDetail); setWishlistAcquireForm(EMPTY_ACQUIRE_FORM); setWishlistDetail(null); }}>
                       + Adquirir
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="danger"
-                    onClick={() => handleWishlistDelete(wishlistDetail.id)}
-                  >
-                    Remover
-                  </button>
+                  <button type="button" className="danger" onClick={() => handleWishlistDelete(wishlistDetail.id)}>Remover</button>
                   <button type="button" onClick={() => setWishlistDetail(null)}>Fechar</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Modal de Aquisição */}
+          {/* Modal — Aquisição de carta */}
           {wishlistAcquireFor && (
             <div className="modal-overlay" onClick={() => setWishlistAcquireFor(null)}>
               <div className="modal wishlist-acquire-modal" onClick={e => e.stopPropagation()}>
@@ -2729,25 +3001,19 @@ export default function App() {
                 <h2>Adquirir Carta</h2>
                 <p className="wishlist-acquire-card-name">
                   {wishlistAcquireFor.printed_name || wishlistAcquireFor.name || `${wishlistAcquireFor.set_code} #${wishlistAcquireFor.collection_number}`}
-                  {wishlistAcquireFor.foil && <span className="wishlist-badge-foil">Foil</span>}
+                  {wishlistAcquireFor.foil && <span className="wishlist-badge-foil">✦ Foil</span>}
                 </p>
                 <form className="form" onSubmit={handleWishlistAcquire}>
                   <label>
                     Deck
-                    <select
-                      value={wishlistAcquireForm.deck_id}
-                      onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, deck_id: +e.target.value })}
-                    >
-                      <option value={0}>Sem deck</option>
+                    <select value={wishlistAcquireForm.deck_id} onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, deck_id: +e.target.value })}>
+                      <option value={0}>— Sem deck —</option>
                       {decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </label>
                   <label>
                     Condição
-                    <select
-                      value={wishlistAcquireForm.condition}
-                      onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, condition: e.target.value })}
-                    >
+                    <select value={wishlistAcquireForm.condition} onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, condition: e.target.value })}>
                       <option value="mint">Mint</option>
                       <option value="near_mint">Near Mint</option>
                       <option value="played">Played</option>
@@ -2755,22 +3021,74 @@ export default function App() {
                     </select>
                   </label>
                   <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={wishlistAcquireForm.commander}
-                      onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, commander: e.target.checked })}
-                    />
+                    <input type="checkbox" checked={wishlistAcquireForm.commander} onChange={e => setWishlistAcquireForm({ ...wishlistAcquireForm, commander: e.target.checked })} />
                     É comandante do deck
                   </label>
                   {wishlistError && <p className="form-error">{wishlistError}</p>}
                   <div className="modal-actions">
-                    <button type="button" onClick={() => setWishlistAcquireFor(null)} disabled={wishlistAcquiring}>
-                      Cancelar
-                    </button>
+                    <button type="button" onClick={() => setWishlistAcquireFor(null)} disabled={wishlistAcquiring}>Cancelar</button>
                     <button type="submit" className="wishlist-btn-acquire" disabled={wishlistAcquiring}>
                       {wishlistAcquiring ? "Salvando…" : "Confirmar Aquisição"}
                     </button>
                   </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal — Novo Deck Desejado */}
+          {showDeckWishAdd && (
+            <div className="modal-overlay" onClick={() => setShowDeckWishAdd(false)}>
+              <div className="modal deck-wish-modal" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" aria-label="Fechar" onClick={() => setShowDeckWishAdd(false)}>✕</button>
+                <h2>🎯 Novo Deck Desejado</h2>
+                <form className="form" onSubmit={handleDeckWishCreate}>
+                  <label>
+                    Nome do Deck *
+                    <input required autoFocus placeholder="ex: Gruul Aggro, Azorius Control…"
+                      value={deckWishForm.name} onChange={e => setDeckWishForm({ ...deckWishForm, name: e.target.value })} />
+                  </label>
+                  <label>
+                    Formato
+                    <select value={deckWishForm.format} onChange={e => setDeckWishForm({ ...deckWishForm, format: e.target.value })}>
+                      <option value="Commander">Commander</option>
+                      <option value="Standard">Standard</option>
+                      <option value="Modern">Modern</option>
+                      <option value="Pioneer">Pioneer</option>
+                      <option value="Legacy">Legacy</option>
+                      <option value="Pauper">Pauper</option>
+                      <option value="Draft">Draft</option>
+                    </select>
+                  </label>
+                  <div>
+                    <span className="form-label-text">Cores</span>
+                    <div className="deck-wish-color-picker">
+                      {[["W","Branco"],["U","Azul"],["B","Preto"],["R","Vermelho"],["G","Verde"],["C","Incolor"]].map(([code, label]) => {
+                        const selected = deckWishForm.colors.split(",").filter(Boolean).includes(code);
+                        return (
+                          <button key={code} type="button" title={label}
+                            className={`deck-wish-color-btn${selected ? " selected" : ""}`}
+                            onClick={() => {
+                              const cur = deckWishForm.colors.split(",").filter(Boolean);
+                              const next = selected ? cur.filter(c => c !== code) : [...cur, code];
+                              setDeckWishForm({ ...deckWishForm, colors: next.join(",") });
+                            }}
+                          >
+                            <img src={`/mana-icons/${MTG_CODE_TO_ICON[code] || "incolour"}.svg`} alt={code} className="color-icon" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <label>
+                    Observação <span className="field-optional">(opcional)</span>
+                    <textarea rows={2} placeholder="Por que você quer montar esse deck?" value={deckWishForm.note}
+                      onChange={e => setDeckWishForm({ ...deckWishForm, note: e.target.value })} />
+                  </label>
+                  {deckWishError && <p className="form-error">{deckWishError}</p>}
+                  <button type="submit" className="wishlist-submit-btn" disabled={deckWishSubmitting}>
+                    {deckWishSubmitting ? "Salvando…" : "Adicionar à Lista →"}
+                  </button>
                 </form>
               </div>
             </div>

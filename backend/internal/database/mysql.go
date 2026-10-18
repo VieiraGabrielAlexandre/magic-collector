@@ -241,6 +241,42 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS wishlist_deck_cards (
+			id               INT           NOT NULL AUTO_INCREMENT,
+			wishlist_deck_id INT           NOT NULL,
+			set_code         VARCHAR(10)   NOT NULL,
+			collection_number VARCHAR(20)  NOT NULL,
+			name             VARCHAR(255)  NOT NULL DEFAULT '',
+			printed_name     VARCHAR(255)  NOT NULL DEFAULT '',
+			image_uri        TEXT,
+			foil             TINYINT(1)    NOT NULL DEFAULT 0,
+			note             TEXT,
+			created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			INDEX idx_wdc_deck_id (wishlist_deck_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS wishlist_decks (
+			id         INT          NOT NULL AUTO_INCREMENT,
+			name       VARCHAR(200) NOT NULL,
+			format     VARCHAR(50)  NOT NULL DEFAULT 'Commander',
+			colors     VARCHAR(20)  NOT NULL DEFAULT '',
+			note       TEXT,
+			acquired   TINYINT(1)   NOT NULL DEFAULT 0,
+			created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+	if err != nil {
+		return nil, err
+	}
+
 	seedUsers(db)
 
 	return db, nil

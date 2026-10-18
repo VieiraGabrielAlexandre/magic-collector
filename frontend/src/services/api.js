@@ -317,6 +317,62 @@ export async function acquireWishlistItem(id, data) {
   return json;
 }
 
+// ── Wishlist Decks ────────────────────────────────────────────────────────────
+
+export async function listWishlistDecks() {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function createWishlistDeck(data) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao criar deck desejado");
+  return json;
+}
+
+export async function acquireWishlistDeck(id) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${id}/acquire`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao marcar deck como montado");
+  return json;
+}
+
+export async function deleteWishlistDeck(id) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover deck desejado");
+}
+
+export async function listDeckWishCards(deckId) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/cards`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function addDeckWishCard(deckId, data) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/cards`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao adicionar carta");
+  return json;
+}
+
+export async function deleteDeckWishCard(deckId, cardId) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/cards/${cardId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao remover carta");
+}
+
 // ── Tokens ───────────────────────────────────────────────────────────────────
 
 export async function listTokens() {

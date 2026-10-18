@@ -4823,21 +4823,164 @@ input[type="radio"] {
   background: rgba(125, 211, 252, 0.03) !important;
 }
 
-/* Layout de dois painéis */
+/* Página de largura total */
 .wishlist-page {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 20px;
 }
 
-.wishlist-layout {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 28px;
-  align-items: start;
+/* Sub-navegação dentro da aba Desejados */
+.wish-subnav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--wishlist-border);
+  padding-bottom: 0;
 }
 
-/* Painel do formulário */
+.wish-subnav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+  box-shadow: none !important;
+}
+.wish-subnav-btn:hover {
+  color: var(--text) !important;
+  border-bottom-color: var(--border) !important;
+}
+.wish-subnav-btn.active {
+  color: var(--wishlist-primary) !important;
+  border-bottom-color: var(--wishlist-primary) !important;
+}
+
+.wish-subnav-count {
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+}
+.wish-subnav-btn.active .wish-subnav-count {
+  background: rgba(125,211,252,0.15);
+  border-color: var(--wishlist-border);
+  color: var(--wishlist-primary);
+}
+
+.wishlist-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--wishlist-border);
+}
+
+.wishlist-page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wishlist-page-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.wishlist-page-title h2 {
+  color: var(--wishlist-primary) !important;
+  text-shadow: 0 0 20px rgba(125, 211, 252, 0.25) !important;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wishlist-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wishlist-add-btn {
+  background: linear-gradient(160deg, rgba(125,211,252,0.22) 0%, rgba(125,211,252,0.08) 100%) !important;
+  color: var(--wishlist-primary) !important;
+  border-color: var(--wishlist-border) !important;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 18px;
+}
+.wishlist-add-btn:hover:not(:disabled) {
+  background: linear-gradient(160deg, rgba(125,211,252,0.38) 0%, rgba(125,211,252,0.18) 100%) !important;
+  border-color: var(--wishlist-primary) !important;
+  box-shadow: 0 0 18px var(--wishlist-glow), 0 2px 8px rgba(0,0,0,0.3) !important;
+  color: #fff !important;
+}
+
+.wishlist-toggle-acquired {
+  background: var(--surface-2) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-dim) !important;
+  font-size: 13px;
+  padding: 9px 14px;
+}
+.wishlist-toggle-acquired:hover:not(:disabled) {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.wishlist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 64px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.wishlist-empty-icon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+.wishlist-empty p { margin: 0; font-size: 15px; }
+.wishlist-empty-sub { font-size: 13px; opacity: 0.7; }
+
+/* Modal de adição rápida (mesmo visual do quick-add-modal) */
+.wishlist-add-modal {
+  border-color: var(--wishlist-border) !important;
+  background: linear-gradient(170deg, #0b192a 0%, var(--surface) 50%, #070f1a 100%) !important;
+  box-shadow:
+    0 0 0 1px rgba(125,211,252,0.10),
+    0 24px 64px rgba(0,0,0,0.75) !important;
+}
+.wishlist-add-modal h2 {
+  color: var(--wishlist-primary) !important;
+}
+.wishlist-add-modal .quick-add-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Painel do formulário (legado — pode ser removido quando não mais referenciado) */
 .wishlist-form-panel h2 {
   color: var(--wishlist-primary) !important;
   text-shadow: 0 0 20px rgba(125, 211, 252, 0.25) !important;
@@ -4899,6 +5042,7 @@ input[type="radio"] {
 .wishlist-card:hover {
   border-color: var(--wishlist-primary);
   box-shadow: 0 0 0 1px rgba(125,211,252,0.18), 0 4px 24px rgba(0,0,0,0.45);
+  cursor: pointer;
 }
 
 .wishlist-acquired {
@@ -5201,10 +5345,445 @@ input[type="radio"] {
   gap: 8px;
 }
 
+/* ── Lista de Decks Desejados ─────────────────────────────────────────── */
+.deck-wish-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deck-wish-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--wishlist-border);
+  border-radius: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.deck-wish-item:hover {
+  border-color: var(--wishlist-primary);
+  box-shadow: 0 0 0 1px rgba(125,211,252,0.12), 0 4px 20px rgba(0,0,0,0.4);
+}
+.deck-wish-acquired {
+  opacity: 0.55;
+}
+.deck-wish-acquired:hover { opacity: 0.75; }
+
+.deck-wish-colors {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+  min-width: 60px;
+}
+
+.deck-wish-colors .color-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.deck-wish-no-color {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.deck-wish-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.deck-wish-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: 'Cinzel', serif;
+}
+
+.deck-wish-badge-done {
+  background: rgba(125,211,252,0.15);
+  color: var(--wishlist-primary);
+  border: 1px solid var(--wishlist-border);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: inherit;
+}
+
+.deck-wish-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.deck-wish-format {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.deck-wish-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  border-left: 2px solid var(--wishlist-border);
+  padding-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-wish-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Modal de criação de deck desejado */
+.deck-wish-modal {
+  border-color: var(--wishlist-border) !important;
+  background: linear-gradient(170deg, #0b192a 0%, var(--surface) 50%, #070f1a 100%) !important;
+  box-shadow:
+    0 0 0 1px rgba(125,211,252,0.10),
+    0 24px 64px rgba(0,0,0,0.75) !important;
+  max-width: 460px;
+}
+.deck-wish-modal h2 {
+  color: var(--wishlist-primary) !important;
+}
+
+/* Seletor de cores */
+.form-label-text {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.deck-wish-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.deck-wish-color-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2) !important;
+  border: 2px solid var(--border-dim) !important;
+  border-radius: 50% !important;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  box-shadow: none !important;
+}
+.deck-wish-color-btn:hover {
+  border-color: var(--border) !important;
+  transform: scale(1.1);
+}
+.deck-wish-color-btn.selected {
+  border-color: var(--wishlist-primary) !important;
+  box-shadow: 0 0 8px var(--wishlist-glow) !important;
+  background: rgba(125,211,252,0.12) !important;
+}
+.deck-wish-color-btn .color-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Modal de cartas de deck desejado ────────────────────────────────────── */
+.deck-wish-cards-btn {
+  background: var(--surface-2) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-dim) !important;
+  font-size: 12px;
+  padding: 7px 12px;
+}
+.deck-wish-cards-btn:hover {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.deck-cards-modal {
+  border-color: var(--wishlist-border) !important;
+  background: linear-gradient(170deg, #0b192a 0%, var(--surface) 50%, #070f1a 100%) !important;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.deck-cards-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.deck-cards-modal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deck-cards-modal-title h2 {
+  margin: 0;
+  font-family: 'Cinzel', serif;
+  color: var(--wishlist-primary) !important;
+  font-size: 17px;
+}
+.deck-cards-modal-colors {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.deck-cards-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--wishlist-border);
+  border-radius: 10px;
+}
+
+.deck-cards-add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.deck-cards-add-btn {
+  flex-shrink: 0;
+  padding: 9px 16px !important;
+  font-size: 13px !important;
+}
+
+.deck-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.deck-cards-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+}
+
+.deck-cards-item-img {
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.deck-cards-item-placeholder {
+  width: 40px;
+  height: 56px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.deck-cards-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deck-cards-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-cards-item-set {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.deck-cards-item-del {
+  flex-shrink: 0;
+  padding: 5px 9px !important;
+  font-size: 12px !important;
+}
+
+/* ── Deck Detail Page ───────────────────────────────────────────────────── */
+.deck-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--wishlist-border);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.deck-detail-back {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  transition: border-color 0.15s, color 0.15s;
+}
+.deck-detail-back:hover { border-color: var(--wishlist-primary); color: var(--wishlist-primary); }
+
+.deck-detail-title { flex: 1; min-width: 0; }
+.deck-detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.deck-detail-title-row h2 { margin: 0; font-size: 20px; }
+
+.deck-detail-colors {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.deck-detail-color-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.deck-detail-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
+}
+.deck-detail-count { flex-shrink: 0; align-self: center; }
+
+.deck-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.deck-detail-card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--wishlist-border);
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  background: var(--surface);
+}
+.deck-detail-card:hover { transform: translateY(-3px); border-color: var(--wishlist-primary); }
+
+.deck-detail-card-img {
+  width: 100%;
+  display: block;
+  border-radius: 8px 8px 0 0;
+}
+.deck-detail-card-placeholder {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+}
+.deck-detail-card-footer {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.deck-detail-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deck-detail-card-set { font-size: 11px; color: var(--text-muted); }
+
+.deck-detail-card-del {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.deck-detail-card:hover .deck-detail-card-del { display: flex; }
+
 /* ── Responsivo Wishlist ────────────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .wishlist-layout {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .wishlist-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .wishlist-page-actions {
+    width: 100%;
+  }
+  .wishlist-add-btn {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .deck-wish-item {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .deck-wish-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 
