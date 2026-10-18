@@ -598,6 +598,27 @@ func (c *Client) SearchToken(setCode, number string) (*ExternalToken, error) {
 	return tok, nil
 }
 
+// SearchPrintings busca todas as impressões de uma carta pelo nome (parcial ou exato).
+// Retorna apenas a primeira página (até 175 resultados).
+func (c *Client) SearchPrintings(name string) ([]*ExternalCard, error) {
+	if name == "" {
+		return nil, nil
+	}
+	searchURL := fmt.Sprintf(
+		"https://api.scryfall.com/cards/search?q=%s&unique=prints&order=released",
+		url.QueryEscape(name),
+	)
+	page, err := c.fetchPage(searchURL)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ExternalCard, 0, len(page.Data))
+	for i := range page.Data {
+		result = append(result, page.Data[i].toExternal())
+	}
+	return result, nil
+}
+
 // artistsMatch retorna true quando os nomes de artista são compatíveis.
 // Aceita correspondência parcial para cobrir variações como
 // "Dan Scott" ↔ "Dan Murayama Scott".

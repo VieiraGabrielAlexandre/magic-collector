@@ -3,6 +3,7 @@ package wishlist_decks
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"magic-collection-api/internal/mtgapi"
 
@@ -75,6 +76,23 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": id})
 }
 
+func (h *Handler) SearchCards(c *gin.Context) {
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "parâmetro q é obrigatório"})
+		return
+	}
+	cards, err := h.mtgClient.SearchPrintings(q)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if cards == nil {
+		cards = []*mtgapi.ExternalCard{}
+	}
+	c.JSON(http.StatusOK, cards)
+}
+
 func (h *Handler) ListCards(c *gin.Context) {
 	deckID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -118,7 +136,7 @@ func (h *Handler) AddCard(c *gin.Context) {
 		printedName = card.Name
 	}
 
-	result, err := h.repo.AddCard(deckID, input, card.Name, printedName, imageURI)
+	result, err := h.repo.AddCard(deckID, input, card.Name, printedName, card.Type, imageURI)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -351,6 +351,13 @@ export async function deleteWishlistDeck(id) {
   if (!res.ok) throw new Error("Erro ao remover deck desejado");
 }
 
+export async function searchDeckWishCards(q) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/search-cards?q=${encodeURIComponent(q)}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar cartas");
+  return json;
+}
+
 export async function listDeckWishCards(deckId) {
   const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/cards`);
   if (!res.ok) return [];

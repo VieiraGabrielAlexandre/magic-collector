@@ -24,6 +24,7 @@ type DeckCard struct {
 	CollectionNumber string `json:"collection_number"`
 	Name             string `json:"name"`
 	PrintedName      string `json:"printed_name"`
+	TypeLine         string `json:"type_line"`
 	ImageURI         string `json:"image_uri"`
 	Foil             bool   `json:"foil"`
 	Note             string `json:"note"`

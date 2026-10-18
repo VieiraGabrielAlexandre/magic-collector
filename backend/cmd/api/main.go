@@ -135,6 +135,7 @@ func main() {
 	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
 
 	api.GET("/wishlist-decks", wishlistDeckHandler.List)
+	api.GET("/wishlist-decks/search-cards", wishlistDeckHandler.SearchCards)
 	api.POST("/wishlist-decks", wishlistDeckHandler.Create)
 	api.PATCH("/wishlist-decks/:id/acquire", wishlistDeckHandler.Acquire)
 	api.DELETE("/wishlist-decks/:id", wishlistDeckHandler.Delete)

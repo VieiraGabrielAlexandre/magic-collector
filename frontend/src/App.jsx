@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -61,6 +61,29 @@ const ICON_TO_PTBR = {
   white: "Branco", blue: "Azul", black: "Preto", red: "Vermelho", green: "Verde", incolour: "Incolor",
 };
 const MTG_CODE_TO_ICON = { W: "white", U: "blue", B: "black", R: "red", G: "green", C: "incolour" };
+
+const WISH_CARD_TYPE_ORDER = ["Criaturas", "Planeswalkers", "Instantâneos", "Feitiços", "Encantamentos", "Artefatos", "Terrenos", "Outros"];
+function getWishCardCategory(typeLine) {
+  if (!typeLine) return "Outros";
+  const t = typeLine.toLowerCase();
+  if (t.includes("creature")) return "Criaturas";
+  if (t.includes("planeswalker")) return "Planeswalkers";
+  if (t.includes("instant")) return "Instantâneos";
+  if (t.includes("sorcery")) return "Feitiços";
+  if (t.includes("enchantment")) return "Encantamentos";
+  if (t.includes("artifact")) return "Artefatos";
+  if (t.includes("land")) return "Terrenos";
+  return "Outros";
+}
+function buildWishCardGroups(cards) {
+  const groups = {};
+  for (const card of cards) {
+    const cat = getWishCardCategory(card.type_line);
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(card);
+  }
+  return groups;
+}
 
 function colorStrToIconSet(colorStr) {
   const parts = (colorStr || "").split(/[,/]+/).map((s) => s.trim().toLowerCase());
@@ -833,11 +856,17 @@ export default function App() {
   const [deckWishCardsFor, setDeckWishCardsFor] = useState(null); // deck object
   const [deckWishCards, setDeckWishCards] = useState([]);
   const [deckWishCardsLoading, setDeckWishCardsLoading] = useState(false);
-  const EMPTY_DECK_CARD_FORM = { set_code: "", collection_number: "", foil: false, note: "" };
-  const [deckCardForm, setDeckCardForm] = useState(EMPTY_DECK_CARD_FORM);
   const [deckCardSubmitting, setDeckCardSubmitting] = useState(false);
   const [deckCardError, setDeckCardError] = useState("");
-  const [deckCardDetail, setDeckCardDetail] = useState(null); // card detail overlay
+  const [deckCardDetail, setDeckCardDetail] = useState(null);
+  const [deckListCopied, setDeckListCopied] = useState(false);
+  // busca por nome
+  const [deckCardSearchQuery, setDeckCardSearchQuery] = useState("");
+  const [deckCardSearchResults, setDeckCardSearchResults] = useState([]);
+  const [deckCardSearchLoading, setDeckCardSearchLoading] = useState(false);
+  const [deckCardSearchDone, setDeckCardSearchDone] = useState(false);
+  const [deckCardSelectedCard, setDeckCardSelectedCard] = useState(null);
+  const [deckCardFoil, setDeckCardFoil] = useState(false);
 
   // ── Pontuação / Life Counter ─────────────────────────────────────────────────
   const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
@@ -1084,11 +1113,20 @@ export default function App() {
     await loadDeckWishList();
   }
 
+  function resetDeckCardSearch() {
+    setDeckCardSearchQuery("");
+    setDeckCardSearchResults([]);
+    setDeckCardSearchLoading(false);
+    setDeckCardSearchDone(false);
+    setDeckCardSelectedCard(null);
+    setDeckCardFoil(false);
+    setDeckCardError("");
+  }
+
   async function openDeckWishCards(deck) {
     setDeckWishCardsFor(deck);
-    setDeckCardForm(EMPTY_DECK_CARD_FORM);
-    setDeckCardError("");
     setDeckCardDetail(null);
+    resetDeckCardSearch();
     setDeckWishCardsLoading(true);
     try {
       const data = await listDeckWishCards(deck.id);
@@ -1102,17 +1140,40 @@ export default function App() {
     setDeckWishCardsFor(null);
     setDeckWishCards([]);
     setDeckCardDetail(null);
+    resetDeckCardSearch();
   }
 
-  async function handleAddDeckCard(e) {
+  async function handleDeckCardSearch(e) {
     e.preventDefault();
-    if (!deckWishCardsFor) return;
+    if (!deckCardSearchQuery.trim()) return;
+    setDeckCardSearchLoading(true);
+    setDeckCardSearchResults([]);
+    setDeckCardSearchDone(false);
+    setDeckCardSelectedCard(null);
+    setDeckCardError("");
+    try {
+      const results = await searchDeckWishCards(deckCardSearchQuery.trim());
+      setDeckCardSearchResults(results ?? []);
+      setDeckCardSearchDone(true);
+    } catch (err) {
+      setDeckCardError(err.message || "Erro ao buscar na Scryfall");
+    } finally {
+      setDeckCardSearchLoading(false);
+    }
+  }
+
+  async function handleAddSelectedDeckCard() {
+    if (!deckCardSelectedCard || !deckWishCardsFor) return;
     setDeckCardSubmitting(true);
     setDeckCardError("");
     try {
-      const card = await addDeckWishCard(deckWishCardsFor.id, deckCardForm);
+      const card = await addDeckWishCard(deckWishCardsFor.id, {
+        set_code: deckCardSelectedCard.set,
+        collection_number: deckCardSelectedCard.number,
+        foil: deckCardFoil,
+      });
       setDeckWishCards(prev => [...prev, card]);
-      setDeckCardForm(EMPTY_DECK_CARD_FORM);
+      resetDeckCardSearch();
     } catch (err) {
       setDeckCardError(err.message || "Carta não encontrada");
     } finally {
@@ -1124,6 +1185,26 @@ export default function App() {
     if (!deckWishCardsFor) return;
     await deleteDeckWishCard(deckWishCardsFor.id, cardId);
     setDeckWishCards(prev => prev.filter(c => c.id !== cardId));
+  }
+
+  function copyDeckList() {
+    if (!deckWishCardsFor || deckWishCards.length === 0) return;
+    const groups = buildWishCardGroups(deckWishCards);
+    let text = `// ${deckWishCardsFor.name} (${deckWishCardsFor.format})\n`;
+    text += `// ${deckWishCards.length} carta${deckWishCards.length !== 1 ? "s" : ""}\n\n`;
+    for (const type of WISH_CARD_TYPE_ORDER) {
+      const group = groups[type];
+      if (!group || group.length === 0) continue;
+      text += `// ${type} (${group.length})\n`;
+      for (const card of group) {
+        text += `1 ${card.name}${card.foil ? " *F*" : ""}\n`;
+      }
+      text += "\n";
+    }
+    navigator.clipboard.writeText(text.trim()).then(() => {
+      setDeckListCopied(true);
+      setTimeout(() => setDeckListCopied(false), 2000);
+    });
   }
 
   // ── Game Session handlers ─────────────────────────────────────────────────
@@ -2622,40 +2703,83 @@ export default function App() {
                   </div>
                   <div className="deck-detail-count">
                     <span className="total-badge">{deckWishCards.length} carta{deckWishCards.length !== 1 ? "s" : ""}</span>
+                    {deckWishCards.length > 0 && (
+                      <button type="button" className="deck-list-copy-btn" onClick={copyDeckList}>
+                        {deckListCopied ? "✓ Copiado!" : "📋 Copiar lista"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Formulário de adição */}
-                <form className="deck-cards-add-form" onSubmit={handleAddDeckCard}>
-                  <div className="qa-row-2col">
-                    <label>
-                      Sigla *
-                      <input required autoFocus placeholder="KLD, BRO…"
-                        value={deckCardForm.set_code} style={{ textTransform: "uppercase" }}
-                        onChange={e => setDeckCardForm({ ...deckCardForm, set_code: e.target.value.toUpperCase().trim() })}
-                      />
-                    </label>
-                    <label>
-                      Número *
-                      <input required placeholder="017, 253a"
-                        value={deckCardForm.collection_number}
-                        onChange={e => setDeckCardForm({ ...deckCardForm, collection_number: e.target.value.trim() })}
-                      />
-                    </label>
-                  </div>
-                  <div className="deck-cards-add-row">
-                    <label className="checkbox-label" style={{ flex: 1 }}>
-                      <input type="checkbox" checked={deckCardForm.foil} onChange={e => setDeckCardForm({ ...deckCardForm, foil: e.target.checked })} />
-                      ✦ Foil
-                    </label>
-                    <button type="submit" className="wishlist-submit-btn deck-cards-add-btn" disabled={deckCardSubmitting}>
-                      {deckCardSubmitting ? "Buscando…" : "+ Adicionar Carta"}
+                {/* Busca por nome */}
+                <form className="deck-card-search-form" onSubmit={handleDeckCardSearch}>
+                  <div className="deck-card-search-row">
+                    <input
+                      autoFocus
+                      placeholder="Nome da carta (ex: Lightning Bolt, Counterspell…)"
+                      value={deckCardSearchQuery}
+                      onChange={e => { setDeckCardSearchQuery(e.target.value); setDeckCardSearchDone(false); setDeckCardSearchResults([]); setDeckCardSelectedCard(null); }}
+                    />
+                    <button type="submit" className="deck-card-search-btn" disabled={deckCardSearchLoading || !deckCardSearchQuery.trim()}>
+                      {deckCardSearchLoading ? "Buscando…" : "Buscar"}
                     </button>
                   </div>
                   {deckCardError && <p className="form-error">{deckCardError}</p>}
                 </form>
 
-                {/* Grid de cartas */}
+                {/* Resultados da busca */}
+                {deckCardSearchDone && deckCardSearchResults.length === 0 && (
+                  <p className="empty" style={{ textAlign: "center", marginTop: 16 }}>Nenhuma carta encontrada para "{deckCardSearchQuery}".</p>
+                )}
+
+                {deckCardSearchResults.length > 0 && (
+                  <div className="deck-card-search-results">
+                    <p className="deck-card-search-count">{deckCardSearchResults.length} versão{deckCardSearchResults.length !== 1 ? "ões" : ""} encontrada{deckCardSearchResults.length !== 1 ? "s" : ""}</p>
+                    <div className="deck-card-search-grid">
+                      {deckCardSearchResults.map(card => {
+                        const isSelected = deckCardSelectedCard?.id === card.id;
+                        return (
+                          <div
+                            key={card.id}
+                            className={`deck-card-result${isSelected ? " selected" : ""}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => { setDeckCardSelectedCard(isSelected ? null : card); setDeckCardFoil(false); setDeckCardError(""); }}
+                            onKeyDown={e => e.key === "Enter" && (setDeckCardSelectedCard(isSelected ? null : card))}
+                          >
+                            {card.image_url ? (
+                              <img src={card.image_url} alt={card.name} className="deck-card-result-img" loading="lazy" />
+                            ) : (
+                              <div className="deck-card-result-placeholder">{card.set}</div>
+                            )}
+                            <div className="deck-card-result-info">
+                              <span className="deck-card-result-set">{card.set_name}</span>
+                              <span className="deck-card-result-num">#{card.number}</span>
+                            </div>
+                            {isSelected && (
+                              <div className="deck-card-result-action" onClick={e => e.stopPropagation()}>
+                                <label className="checkbox-label">
+                                  <input type="checkbox" checked={deckCardFoil} onChange={e => setDeckCardFoil(e.target.checked)} />
+                                  ✦ Foil
+                                </label>
+                                <button
+                                  type="button"
+                                  className="wishlist-btn-acquire"
+                                  disabled={deckCardSubmitting}
+                                  onClick={handleAddSelectedDeckCard}
+                                >
+                                  {deckCardSubmitting ? "Adicionando…" : "+ Adicionar"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cartas agrupadas por tipo */}
                 {deckWishCardsLoading ? (
                   <p className="empty">Carregando…</p>
                 ) : deckWishCards.length === 0 ? (
@@ -2664,36 +2788,53 @@ export default function App() {
                     <p>Nenhuma carta adicionada ainda.</p>
                     <p className="wishlist-empty-sub">Use o formulário acima para buscar cartas na Scryfall.</p>
                   </div>
-                ) : (
-                  <div className="deck-detail-grid">
-                    {deckWishCards.map(card => (
-                      <div
-                        key={card.id}
-                        className="deck-detail-card"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setDeckCardDetail(card)}
-                        onKeyDown={e => e.key === "Enter" && setDeckCardDetail(card)}
-                      >
-                        {card.image_uri ? (
-                          <img src={card.image_uri} alt={card.name} className="deck-detail-card-img" loading="lazy" />
-                        ) : (
-                          <div className="deck-detail-card-placeholder">{card.set_code}</div>
-                        )}
-                        <div className="deck-detail-card-footer">
-                          <span className="deck-detail-card-name">{card.printed_name || card.name}</span>
-                          <span className="deck-detail-card-set">{card.set_code} #{card.collection_number}{card.foil ? " ✦" : ""}</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="deck-detail-card-del"
-                          aria-label="Remover"
-                          onClick={e => { e.stopPropagation(); handleDeleteDeckCard(card.id); }}
-                        >✕</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ) : (() => {
+                  const groups = buildWishCardGroups(deckWishCards);
+                  return (
+                    <div className="deck-type-sections">
+                      {WISH_CARD_TYPE_ORDER.map(type => {
+                        const group = groups[type];
+                        if (!group || group.length === 0) return null;
+                        return (
+                          <div key={type} className="deck-type-group">
+                            <div className="deck-type-divider">
+                              <span className="deck-type-label">{type}</span>
+                              <span className="deck-type-count">{group.length}</span>
+                            </div>
+                            <div className="deck-detail-grid">
+                              {group.map(card => (
+                                <div
+                                  key={card.id}
+                                  className="deck-detail-card"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setDeckCardDetail(card)}
+                                  onKeyDown={e => e.key === "Enter" && setDeckCardDetail(card)}
+                                >
+                                  {card.image_uri ? (
+                                    <img src={card.image_uri} alt={card.name} className="deck-detail-card-img" loading="lazy" />
+                                  ) : (
+                                    <div className="deck-detail-card-placeholder">{card.set_code}</div>
+                                  )}
+                                  <div className="deck-detail-card-footer">
+                                    <span className="deck-detail-card-name">{card.printed_name || card.name}</span>
+                                    <span className="deck-detail-card-set">{card.set_code} #{card.collection_number}{card.foil ? " ✦" : ""}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="deck-detail-card-del"
+                                    aria-label="Remover"
+                                    onClick={e => { e.stopPropagation(); handleDeleteDeckCard(card.id); }}
+                                  >✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
                 {/* Overlay de detalhe da carta */}
                 {deckCardDetail && (
