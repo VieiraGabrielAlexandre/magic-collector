@@ -380,6 +380,17 @@ export async function deleteDeckWishCard(deckId, cardId) {
   if (!res.ok) throw new Error("Erro ao remover carta");
 }
 
+export async function importWishDeckList(deckId, deckList) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/import-list`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ deck_list: deckList }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao importar lista");
+  return json;
+}
+
 // ── Tokens ───────────────────────────────────────────────────────────────────
 
 export async function listTokens() {

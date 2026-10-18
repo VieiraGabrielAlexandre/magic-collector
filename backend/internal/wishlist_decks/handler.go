@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"magic-collection-api/internal/mtgapi"
 
@@ -142,6 +143,94 @@ func (h *Handler) AddCard(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, result)
+}
+
+type deckListLine struct {
+	quantity int
+	name     string
+}
+
+func parseDeckList(raw string) []deckListLine {
+	var result []deckListLine
+	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		qtyStr := strings.TrimRight(strings.TrimRight(parts[0], "x"), "X")
+		qty, err := strconv.Atoi(qtyStr)
+		if err != nil || qty <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(parts[1])
+		// Remove set/collector annotations: "Forest (M19) 266" → "Forest"
+		if idx := strings.Index(name, " ("); idx != -1 {
+			name = strings.TrimSpace(name[:idx])
+		}
+		if name != "" {
+			result = append(result, deckListLine{quantity: qty, name: name})
+		}
+	}
+	return result
+}
+
+func (h *Handler) ImportList(c *gin.Context) {
+	deckID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id inválido"})
+		return
+	}
+	var input struct {
+		DeckList string `json:"deck_list"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || strings.TrimSpace(input.DeckList) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deck_list é obrigatório"})
+		return
+	}
+	lines := parseDeckList(input.DeckList)
+	if len(lines) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nenhuma carta encontrada na lista"})
+		return
+	}
+
+	type importResult struct {
+		Added   int      `json:"added"`
+		Skipped []string `json:"skipped"`
+	}
+	res := importResult{Skipped: []string{}}
+
+	for i, line := range lines {
+		if i > 0 {
+			time.Sleep(100 * time.Millisecond)
+		}
+		card, err := h.mtgClient.SearchOldestPrinting(line.name)
+		if err != nil || card == nil {
+			res.Skipped = append(res.Skipped, line.name)
+			continue
+		}
+		printedName := card.PrintedName
+		if printedName == "" {
+			printedName = card.Name
+		}
+		dci := AddDeckCardInput{SetCode: card.Set, CollectionNumber: card.Number}
+		failed := false
+		for j := 0; j < line.quantity; j++ {
+			if _, err := h.repo.AddCard(deckID, dci, card.Name, printedName, card.Type, card.ImageURL); err != nil {
+				if !failed {
+					res.Skipped = append(res.Skipped, line.name)
+					failed = true
+				}
+				break
+			}
+			res.Added++
+		}
+	}
+
+	c.JSON(http.StatusOK, res)
 }
 
 func (h *Handler) DeleteCard(c *gin.Context) {

@@ -598,6 +598,26 @@ func (c *Client) SearchToken(setCode, number string) (*ExternalToken, error) {
 	return tok, nil
 }
 
+// SearchOldestPrinting busca a impressão mais antiga de uma carta pelo nome exato.
+// Usa unique=prints&order=released&dir=asc para obter a versão mais antiga primeiro.
+// Faz fallback para busca fuzzy se o nome exato não for encontrado.
+func (c *Client) SearchOldestPrinting(name string) (*ExternalCard, error) {
+	if name == "" {
+		return nil, nil
+	}
+	q := `!"` + name + `"`
+	searchURL := fmt.Sprintf(
+		"https://api.scryfall.com/cards/search?q=%s&unique=prints&order=released&dir=asc",
+		url.QueryEscape(q),
+	)
+	page, err := c.fetchPage(searchURL)
+	if err == nil && len(page.Data) > 0 {
+		return page.Data[0].toExternal(), nil
+	}
+	// fallback: fuzzy named endpoint
+	return c.fetch("https://api.scryfall.com/cards/named?fuzzy=" + url.QueryEscape(name))
+}
+
 // SearchPrintings busca todas as impressões de uma carta pelo nome (parcial ou exato).
 // Retorna apenas a primeira página (até 175 resultados).
 func (c *Client) SearchPrintings(name string) ([]*ExternalCard, error) {

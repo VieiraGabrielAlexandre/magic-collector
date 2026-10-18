@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -867,6 +867,11 @@ export default function App() {
   const [deckCardSearchDone, setDeckCardSearchDone] = useState(false);
   const [deckCardSelectedCard, setDeckCardSelectedCard] = useState(null);
   const [deckCardFoil, setDeckCardFoil] = useState(false);
+  // import de lista
+  const [showDeckImportModal, setShowDeckImportModal] = useState(false);
+  const [deckImportText, setDeckImportText] = useState("");
+  const [deckImportLoading, setDeckImportLoading] = useState(false);
+  const [deckImportResult, setDeckImportResult] = useState(null);
 
   // ── Pontuação / Life Counter ─────────────────────────────────────────────────
   const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
@@ -1141,6 +1146,26 @@ export default function App() {
     setDeckWishCards([]);
     setDeckCardDetail(null);
     resetDeckCardSearch();
+    setShowDeckImportModal(false);
+    setDeckImportText("");
+    setDeckImportResult(null);
+  }
+
+  async function handleDeckImport(e) {
+    e.preventDefault();
+    if (!deckImportText.trim() || !deckWishCardsFor) return;
+    setDeckImportLoading(true);
+    setDeckImportResult(null);
+    try {
+      const result = await importWishDeckList(deckWishCardsFor.id, deckImportText);
+      setDeckImportResult(result);
+      const cards = await listDeckWishCards(deckWishCardsFor.id);
+      setDeckWishCards(cards ?? []);
+    } catch (err) {
+      setDeckImportResult({ added: 0, skipped: [], error: err.message });
+    } finally {
+      setDeckImportLoading(false);
+    }
   }
 
   async function handleDeckCardSearch(e) {
@@ -2703,6 +2728,9 @@ export default function App() {
                   </div>
                   <div className="deck-detail-count">
                     <span className="total-badge">{deckWishCards.length} carta{deckWishCards.length !== 1 ? "s" : ""}</span>
+                    <button type="button" className="deck-list-import-btn" onClick={() => { setShowDeckImportModal(true); setDeckImportResult(null); setDeckImportText(""); }}>
+                      📥 Importar lista
+                    </button>
                     {deckWishCards.length > 0 && (
                       <button type="button" className="deck-list-copy-btn" onClick={copyDeckList}>
                         {deckListCopied ? "✓ Copiado!" : "📋 Copiar lista"}
@@ -2835,6 +2863,62 @@ export default function App() {
                     </div>
                   );
                 })()}
+
+                {/* Modal de importação de lista */}
+                {showDeckImportModal && (
+                  <div className="modal-overlay" onClick={() => !deckImportLoading && setShowDeckImportModal(false)}>
+                    <div className="modal deck-import-modal" onClick={e => e.stopPropagation()}>
+                      <button className="modal-close" onClick={() => !deckImportLoading && setShowDeckImportModal(false)} disabled={deckImportLoading}>✕</button>
+                      <h3 className="deck-import-title">📥 Importar lista de cartas</h3>
+                      {!deckImportResult ? (
+                        <form onSubmit={handleDeckImport} className="deck-import-form">
+                          <p className="deck-import-hint">
+                            Cole uma lista no formato padrão, uma carta por linha:<br />
+                            <code>1 Command Tower</code><br />
+                            <code>2 Forest</code>
+                          </p>
+                          <textarea
+                            className="deck-import-textarea"
+                            placeholder={"1 Command Tower\n1 Arcane Signet\n2 Forest\n..."}
+                            value={deckImportText}
+                            onChange={e => setDeckImportText(e.target.value)}
+                            rows={12}
+                            disabled={deckImportLoading}
+                          />
+                          <button
+                            type="submit"
+                            className="deck-import-submit"
+                            disabled={deckImportLoading || !deckImportText.trim()}
+                          >
+                            {deckImportLoading ? "⏳ Importando… pode levar alguns segundos" : "Importar"}
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="deck-import-result">
+                          {deckImportResult.error ? (
+                            <p className="deck-import-error">Erro: {deckImportResult.error}</p>
+                          ) : (
+                            <p className="deck-import-success">✓ {deckImportResult.added} carta{deckImportResult.added !== 1 ? "s" : ""} adicionada{deckImportResult.added !== 1 ? "s" : ""}!</p>
+                          )}
+                          {deckImportResult.skipped && deckImportResult.skipped.length > 0 && (
+                            <div className="deck-import-skipped">
+                              <p>Não encontradas ({deckImportResult.skipped.length}):</p>
+                              <ul>{deckImportResult.skipped.map((n, i) => <li key={i}>{n}</li>)}</ul>
+                            </div>
+                          )}
+                          <div className="deck-import-actions">
+                            <button type="button" className="deck-import-again" onClick={() => { setDeckImportResult(null); setDeckImportText(""); }}>
+                              Importar outra lista
+                            </button>
+                            <button type="button" className="deck-import-close" onClick={() => setShowDeckImportModal(false)}>
+                              Fechar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Overlay de detalhe da carta */}
                 {deckCardDetail && (
