@@ -517,6 +517,13 @@ export async function restoreGameSession(id) {
   return json;
 }
 
+export async function reviveGameSessionPlayer(sessionId, playerId) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/players/${playerId}/revive`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao reviver jogador");
+  return json;
+}
+
 export async function listProxyCards() {
   const res = await authFetch(`${BASE_URL}/cards/proxies`);
   const json = await res.json();

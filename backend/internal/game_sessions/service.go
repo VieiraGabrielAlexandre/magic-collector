@@ -262,3 +262,7 @@ func (s *Service) Restore(sessionID int64) (*GameSession, error) {
 	}
 	return s.repo.Restore(sessionID)
 }
+
+func (s *Service) RevivePlayer(sessionID, playerID int64) (*Player, error) {
+	return s.repo.RevivePlayer(sessionID, playerID)
+}

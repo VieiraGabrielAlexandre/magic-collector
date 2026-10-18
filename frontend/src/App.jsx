@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -659,6 +659,126 @@ function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onT
   );
 }
 
+function formatTimer(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function LifeSparkline({ history, color }) {
+  if (!history || history.length < 2) return null;
+  const max = Math.max(...history) + 1;
+  const min = Math.min(...history, 0) - 1;
+  const range = max - min || 1;
+  const w = 56, h = 16;
+  const pts = history.map((v, i) => {
+    const x = ((i / (history.length - 1)) * w).toFixed(1);
+    const y = (h - ((v - min) / range) * h).toFixed(1);
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="life-sparkline">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+    </svg>
+  );
+}
+
+function CommanderSearch({ selected, onSelect, onClear }) {
+  // selected = { name, set_code, collection_number, image_url } | null
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef(null);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (query.length < 2) { setResults([]); setOpen(false); return; }
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const cards = await searchDeckWishCards(query);
+        setResults(cards ?? []);
+        setOpen((cards ?? []).length > 0);
+      } catch { setResults([]); setOpen(false); }
+      setLoading(false);
+    }, 400);
+  }, [query]);
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    function onDown(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
+  function handleSelect(card) {
+    setQuery(card.printed_name || card.name);
+    setResults([]);
+    setOpen(false);
+    onSelect({ name: card.name, set_code: card.set, collection_number: card.number, image_url: card.image_url });
+  }
+
+  function handleClear() {
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+    onClear?.();
+  }
+
+  return (
+    <div className="cmd-search-wrap" ref={wrapRef}>
+      <div className="cmd-search-field">
+        <span className="cmd-search-crown">👑</span>
+        {selected?.image_url && !open && (
+          <img src={selected.image_url} className="cmd-search-preview" alt="" />
+        )}
+        <input
+          type="text"
+          placeholder={selected?.name ? selected.name : "Buscar comandante…"}
+          value={query}
+          onChange={e => { setQuery(e.target.value); if (!e.target.value) handleClear(); }}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          autoComplete="off"
+          className="cmd-search-input"
+        />
+        {loading && <span className="cmd-search-spinner">⟳</span>}
+        {!loading && selected?.name && !query && (
+          <button type="button" className="cmd-search-clear" onClick={handleClear} title="Limpar">✕</button>
+        )}
+      </div>
+      {open && results.length > 0 && (
+        <div className="cmd-search-dropdown">
+          {results.slice(0, 10).map((card, i) => (
+            <button key={i} type="button" className="cmd-search-item" onClick={() => handleSelect(card)}>
+              {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
+              <div className="cmd-search-item-info">
+                <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
+                <span className="cmd-search-item-set">{card.set_name || card.set} · #{card.number}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {selected?.name && !open && (
+        <p className="cmd-search-selected">✓ {selected.name} · {selected.set_code} #{selected.collection_number}</p>
+      )}
+    </div>
+  );
+}
+
+const DECK_COLOR_GROUPS_DEF = [
+  { key: "base",  label: null },
+  { key: "mono",  label: "Cores MTG (WUBRG)" },
+  { key: "extra", label: "Outras cores" },
+  { key: "guild", label: "Guildas de Ravnica" },
+];
+
 function DeckColorSelect({ value, onChange }) {
   const theme = getDeckTheme(value);
   return (
@@ -671,9 +791,12 @@ function DeckColorSelect({ value, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           style={theme?.bg ? { background: theme.bg, borderColor: theme.border, color: theme.text } : {}}
         >
-          {DECK_THEME_COLORS.map((c) => (
-            <option key={c.id} value={c.id}>{c.label}</option>
-          ))}
+          {DECK_COLOR_GROUPS_DEF.map(({ key, label }) => {
+            const opts = DECK_THEME_COLORS.filter(c => c.group === key);
+            if (!opts.length) return null;
+            const items = opts.map(c => <option key={c.id} value={c.id}>{c.label}</option>);
+            return label ? <optgroup key={key} label={label}>{items}</optgroup> : items;
+          })}
         </select>
       </div>
     </label>
@@ -875,7 +998,7 @@ export default function App() {
 
   // ── Pontuação / Life Counter ─────────────────────────────────────────────────
   const EMPTY_SESSION_FORM = { name: "", format: "Commander", starting_life: 40 };
-  const EMPTY_PLAYER_ROW = { name: "", short_code: "", commander_set_code: "", commander_collection_number: "" };
+  const EMPTY_PLAYER_ROW = { name: "", short_code: "", commander_set_code: "", commander_collection_number: "", _cmd: null };
   const [gameSessions, setGameSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [sessionView, setSessionView] = useState("list");
@@ -894,10 +1017,21 @@ export default function App() {
   const [layoutSelectedSlot, setLayoutSelectedSlot] = useState(null); // índice do slot selecionado no modal
   const playerTimers = useRef({});
   const playerPending = useRef({});
+  const cmdByOpponentRef = useRef({});
   // null = fechado, number = player.id cujo modal de contadores está aberto
   const [counterModalPlayerId, setCounterModalPlayerId] = useState(null);
   // { [playerId]: { [opponentId]: number } } — dano por comandante, local only
   const [localCmdByOpponent, setLocalCmdByOpponent] = useState({});
+  // histórico de vida por jogador (últimos 20 valores)
+  const [lifeHistory, setLifeHistory] = useState({});
+  // timer da sessão em segundos
+  const [sessionTimerSecs, setSessionTimerSecs] = useState(0);
+  const sessionTimerRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  // wizard de criação (passo 1=config, 2=jogadores)
+  const [createStep, setCreateStep] = useState(1);
+  // resumo pós-jogo
+  const [showGameSummary, setShowGameSummary] = useState(false);
 
   const EMPTY_LIST_FORM = { deck_name: "", set_code: "", language: "EN", colors: "", commander: false, theme_color: "", description: "", deck_list: "" };
   const [listModal, setListModal] = useState(false);
@@ -1268,6 +1402,18 @@ export default function App() {
     setActiveSession(session);
     setSessionView("play");
     setPlayerDisplayOrder(session.players.map(p => p.id));
+    setShowGameSummary(session.status === "finished");
+    setLifeHistory({});
+    setSessionTimerSecs(0);
+    // Inicializa mapa de dano por comandante a partir dos dados persistidos
+    const initialCmdMap = {};
+    session.players.forEach(p => {
+      if (p.cmd_damage_by_source && Object.keys(p.cmd_damage_by_source).length > 0) {
+        initialCmdMap[p.id] = { ...p.cmd_damage_by_source };
+      }
+    });
+    setLocalCmdByOpponent(initialCmdMap);
+    cmdByOpponentRef.current = initialCmdMap;
     openLayoutModal(session);
   }
 
@@ -1306,6 +1452,11 @@ export default function App() {
         : p),
     }) : prev);
 
+    // Registra histórico de vida
+    if (field === "life" || field === "commander_damage_received") {
+      setLifeHistory(prev => ({ ...prev, [playerId]: [...(prev[playerId] ?? []).slice(-19), newLife] }));
+    }
+
     // Envia para o backend em background após pausa nas alterações
     clearTimeout(playerTimers.current[playerId]);
     const sessionId = activeSession.id;
@@ -1313,7 +1464,8 @@ export default function App() {
       const values = playerPending.current[playerId];
       delete playerPending.current[playerId];
       try {
-        const updated = await updateGameSessionPlayer(sessionId, playerId, values);
+        const cmdMap = cmdByOpponentRef.current[playerId] ?? {};
+        const updated = await updateGameSessionPlayer(sessionId, playerId, { ...values, cmd_damage_by_source: cmdMap });
         // Só sincroniza status de eliminação — nunca reverte os valores exibidos
         setActiveSession(prev => prev ? ({
           ...prev,
@@ -1327,12 +1479,38 @@ export default function App() {
     }, 800);
   }
 
+  async function handleRevivePlayer(playerId) {
+    if (!activeSession || activeSession.status === "finished") return;
+
+    // UI imediata: remove overlay de eliminação, devolve ao menos 1 de vida
+    setActiveSession(prev => prev ? ({
+      ...prev,
+      players: prev.players.map(p => p.id === playerId
+        ? { ...p, life: Math.max(p.life, 1), is_eliminated: false, eliminated_reason: '' }
+        : p),
+    }) : prev);
+
+    try {
+      const updated = await reviveGameSessionPlayer(activeSession.id, playerId);
+      // Sincroniza vida real retornada pelo backend
+      setActiveSession(prev => prev ? ({
+        ...prev,
+        players: prev.players.map(p => p.id === playerId
+          ? { ...p, life: updated.life, is_eliminated: updated.is_eliminated, eliminated_reason: updated.eliminated_reason }
+          : p),
+      }) : prev);
+    } catch {}
+  }
+
   function adjustCmdByOpponent(playerId, opponentId, delta) {
     setLocalCmdByOpponent(prev => {
       const playerMap = prev[playerId] ?? {};
       const current = playerMap[opponentId] ?? 0;
       const next = Math.max(0, current + delta);
-      return { ...prev, [playerId]: { ...playerMap, [opponentId]: next } };
+      const updated = { ...prev, [playerId]: { ...playerMap, [opponentId]: next } };
+      // Mantém ref sincronizado para acesso no flush async
+      cmdByOpponentRef.current = updated;
+      return updated;
     });
     handleUpdatePlayer(playerId, "commander_damage_received", delta);
   }
@@ -1370,6 +1548,8 @@ export default function App() {
     if (!activeSession) return;
     const session = await resetGameSession(activeSession.id);
     setActiveSession(session);
+    setLifeHistory({});
+    setSessionTimerSecs(0);
     await loadGameSessions();
   }
 
@@ -1377,6 +1557,7 @@ export default function App() {
     if (!activeSession) return;
     const session = await finishGameSession(activeSession.id);
     setActiveSession(session);
+    setShowGameSummary(true);
     await loadGameSessions();
   }
 
@@ -1479,6 +1660,31 @@ export default function App() {
       setIsFullscreen(true);
     }
   }
+
+  // Timer da sessão
+  useEffect(() => {
+    if (sessionView === "play" && activeSession?.status === "active" && activeSession?.created_at) {
+      const start = new Date(activeSession.created_at).getTime();
+      function tick() { setSessionTimerSecs(Math.floor((Date.now() - start) / 1000)); }
+      tick();
+      sessionTimerRef.current = setInterval(tick, 1000);
+      return () => clearInterval(sessionTimerRef.current);
+    }
+    clearInterval(sessionTimerRef.current);
+    return () => clearInterval(sessionTimerRef.current);
+  }, [sessionView, activeSession?.id, activeSession?.status]);
+
+  // Wake Lock — mantém a tela ligada durante a partida
+  useEffect(() => {
+    async function lock() {
+      try { if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch {}
+    }
+    function release() {
+      if (wakeLockRef.current) { wakeLockRef.current.release().catch(() => {}); wakeLockRef.current = null; }
+    }
+    if (sessionView === "play" && activeSession?.status === "active") lock(); else release();
+    return release;
+  }, [sessionView, activeSession?.status]);
 
   function changePlayLayout(mode) {
     setPlayLayout(mode);
@@ -3592,7 +3798,7 @@ export default function App() {
                   </div>
                 </div>
                 {sessionError && <p className="form-error">{sessionError}</p>}
-                <button type="button" onClick={() => { setSessionError(""); setSessionView("create"); }}>
+                <button type="button" onClick={() => { setSessionError(""); setCreateStep(1); setSessionView("create"); }}>
                   + Nova Sessão
                 </button>
               </section>
@@ -3644,132 +3850,167 @@ export default function App() {
             </section>
           )}
 
-          {/* Vista: Criar sessão */}
+          {/* Vista: Criar sessão — wizard 2 passos */}
           {sessionView === "create" && (
             <div className="score-create-page">
               <button type="button" className="score-back-btn" onClick={() => setSessionView("list")}>← Voltar</button>
-              <form className="card form" onSubmit={handleCreateSession}>
-                <h2>Nova Sessão de Jogo</h2>
-                <label>
-                  Nome da sessão *
-                  <input
-                    required
-                    placeholder="Commander sexta-feira"
-                    value={sessionForm.name}
-                    onChange={e => setSessionForm({ ...sessionForm, name: e.target.value })}
-                  />
-                </label>
-                <div className="score-form-row">
-                  <label>
-                    Formato
-                    <select
-                      value={sessionForm.format}
-                      onChange={e => {
-                        const fmt = e.target.value;
-                        const life = fmt === "Casual" ? 20 : 40;
-                        setSessionForm({ ...sessionForm, format: fmt, starting_life: life });
-                      }}
-                    >
-                      <option>Commander</option>
-                      <option>Casual</option>
-                      <option>Standard</option>
-                      <option>Modern</option>
-                      <option>Pioneer</option>
-                      <option>Legacy</option>
-                    </select>
-                  </label>
-                  <label>
-                    Vida inicial
-                    <input
-                      type="number"
-                      min={1}
-                      value={sessionForm.starting_life}
-                      onChange={e => setSessionForm({ ...sessionForm, starting_life: Number(e.target.value) })}
-                    />
-                  </label>
-                </div>
 
-                <div className="score-players-header">
-                  <h3>Jogadores <span className="score-player-count">({sessionPlayers.length}/8)</span></h3>
-                  {sessionPlayers.length < 8 && (
-                    <button
-                      type="button"
-                      className="score-btn-secondary"
-                      onClick={() => setSessionPlayers([...sessionPlayers, { ...EMPTY_PLAYER_ROW }])}
-                    >
-                      + Jogador
-                    </button>
-                  )}
+              {/* Indicador de passos */}
+              <div className="score-wizard-steps">
+                <div className={`score-wizard-step${createStep >= 1 ? " done" : ""}`}>
+                  <span className="score-wizard-step-num">1</span>
+                  <span className="score-wizard-step-label">Sessão</span>
                 </div>
+                <div className="score-wizard-step-line" />
+                <div className={`score-wizard-step${createStep >= 2 ? " done" : ""}`}>
+                  <span className="score-wizard-step-num">2</span>
+                  <span className="score-wizard-step-label">Jogadores</span>
+                </div>
+              </div>
 
-                {sessionPlayers.map((p, i) => (
-                  <div key={i} className="score-player-block">
-                    <div className="score-player-row">
+              <form className="card form score-wizard-form" onSubmit={createStep === 1 ? e => { e.preventDefault(); if (sessionForm.name.trim()) setCreateStep(2); } : handleCreateSession}>
+                {createStep === 1 && (
+                  <>
+                    <h2 className="score-wizard-title">⚔ Nova Sessão</h2>
+                    <label>
+                      Nome da sessão
                       <input
-                        placeholder="Nome do jogador"
-                        value={p.name}
+                        autoFocus
                         required
-                        onChange={e => {
-                          const ps = [...sessionPlayers];
-                          ps[i] = { ...ps[i], name: e.target.value };
-                          setSessionPlayers(ps);
-                        }}
+                        placeholder="Commander sexta-feira"
+                        value={sessionForm.name}
+                        onChange={e => setSessionForm({ ...sessionForm, name: e.target.value })}
                       />
-                      <input
-                        className="score-short-input"
-                        placeholder="Sigla"
-                        maxLength={3}
-                        value={p.short_code}
-                        required
-                        onChange={e => {
-                          const ps = [...sessionPlayers];
-                          ps[i] = { ...ps[i], short_code: e.target.value.toUpperCase() };
-                          setSessionPlayers(ps);
-                        }}
-                      />
-                      {sessionPlayers.length > 2 && (
+                    </label>
+                    <div className="score-form-row">
+                      <label>
+                        Formato
+                        <select
+                          value={sessionForm.format}
+                          onChange={e => {
+                            const fmt = e.target.value;
+                            const life = fmt === "Casual" || fmt === "Standard" || fmt === "Modern" || fmt === "Pioneer" || fmt === "Legacy" ? 20 : 40;
+                            setSessionForm({ ...sessionForm, format: fmt, starting_life: life });
+                          }}
+                        >
+                          <option>Commander</option>
+                          <option>Casual</option>
+                          <option>Standard</option>
+                          <option>Modern</option>
+                          <option>Pioneer</option>
+                          <option>Legacy</option>
+                        </select>
+                      </label>
+                      <label>
+                        Vida inicial
+                        <input
+                          type="number"
+                          min={1}
+                          value={sessionForm.starting_life}
+                          onChange={e => setSessionForm({ ...sessionForm, starting_life: Number(e.target.value) })}
+                        />
+                      </label>
+                    </div>
+                    {/* Preview dos formatos */}
+                    <div className="score-format-chips">
+                      {[["Commander","40♥","100 cartas, 4 jog."],["Casual","20♥","Livre"],["Standard","20♥","Rotação atual"]].map(([fmt, life, desc]) => (
+                        <button
+                          key={fmt}
+                          type="button"
+                          className={`score-format-chip${sessionForm.format === fmt ? " active" : ""}`}
+                          onClick={() => setSessionForm({ ...sessionForm, format: fmt, starting_life: fmt === "Commander" ? 40 : 20 })}
+                        >
+                          <span className="score-format-chip-name">{fmt}</span>
+                          <span className="score-format-chip-life">{life}</span>
+                          <span className="score-format-chip-desc">{desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="score-form-actions">
+                      <button type="submit" className="score-btn-primary" disabled={!sessionForm.name.trim()}>
+                        Próximo →
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {createStep === 2 && (
+                  <>
+                    <h2 className="score-wizard-title">👥 Jogadores</h2>
+                    <p className="score-form-intro">{sessionForm.name} · {sessionForm.format} · ♥ {sessionForm.starting_life}</p>
+
+                    <div className="score-players-header">
+                      <h3>Jogadores <span className="score-player-count">({sessionPlayers.length}/8)</span></h3>
+                      {sessionPlayers.length < 8 && (
                         <button
                           type="button"
-                          className="score-remove-row"
-                          onClick={() => setSessionPlayers(sessionPlayers.filter((_, j) => j !== i))}
-                        >✕</button>
+                          className="score-btn-secondary"
+                          onClick={() => setSessionPlayers([...sessionPlayers, { ...EMPTY_PLAYER_ROW }])}
+                        >
+                          + Jogador
+                        </button>
                       )}
                     </div>
-                    <div className="score-commander-row">
-                      <span className="score-commander-label">👑</span>
-                      <input
-                        className="score-set-input"
-                        placeholder="Sigla set"
-                        maxLength={6}
-                        value={p.commander_set_code}
-                        onChange={e => {
-                          const ps = [...sessionPlayers];
-                          ps[i] = { ...ps[i], commander_set_code: e.target.value.toUpperCase() };
-                          setSessionPlayers(ps);
-                        }}
-                      />
-                      <input
-                        className="score-num-input"
-                        placeholder="Nº carta"
-                        maxLength={6}
-                        value={p.commander_collection_number}
-                        onChange={e => {
-                          const ps = [...sessionPlayers];
-                          ps[i] = { ...ps[i], commander_collection_number: e.target.value };
-                          setSessionPlayers(ps);
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
 
-                {sessionError && <p className="score-error">{sessionError}</p>}
-                <div className="score-form-actions">
-                  <button type="button" className="score-btn-secondary" onClick={() => setSessionView("list")}>Cancelar</button>
-                  <button type="submit" className="score-btn-primary" disabled={sessionLoading}>
-                    {sessionLoading ? "Criando…" : "✓ Criar Sessão"}
-                  </button>
-                </div>
+                    {sessionPlayers.map((p, i) => (
+                      <div key={i} className="score-player-block">
+                        <div className="score-player-row">
+                          <span className="score-player-color-dot" style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }} />
+                          <input
+                            placeholder="Nome do jogador"
+                            value={p.name}
+                            required
+                            onChange={e => {
+                              const ps = [...sessionPlayers];
+                              ps[i] = { ...ps[i], name: e.target.value };
+                              setSessionPlayers(ps);
+                            }}
+                          />
+                          <input
+                            className="score-short-input"
+                            placeholder="Sigla"
+                            maxLength={3}
+                            value={p.short_code}
+                            required
+                            onChange={e => {
+                              const ps = [...sessionPlayers];
+                              ps[i] = { ...ps[i], short_code: e.target.value.toUpperCase() };
+                              setSessionPlayers(ps);
+                            }}
+                          />
+                          {sessionPlayers.length > 2 && (
+                            <button
+                              type="button"
+                              className="score-remove-row"
+                              onClick={() => setSessionPlayers(sessionPlayers.filter((_, j) => j !== i))}
+                            >✕</button>
+                          )}
+                        </div>
+                        <CommanderSearch
+                          selected={p._cmd}
+                          onSelect={cmd => {
+                            const ps = [...sessionPlayers];
+                            ps[i] = { ...ps[i], commander_set_code: cmd.set_code, commander_collection_number: cmd.collection_number, _cmd: cmd };
+                            setSessionPlayers(ps);
+                          }}
+                          onClear={() => {
+                            const ps = [...sessionPlayers];
+                            ps[i] = { ...ps[i], commander_set_code: "", commander_collection_number: "", _cmd: null };
+                            setSessionPlayers(ps);
+                          }}
+                        />
+                      </div>
+                    ))}
+
+                    {sessionError && <p className="score-error">{sessionError}</p>}
+                    <div className="score-form-actions">
+                      <button type="button" className="score-btn-secondary" onClick={() => setCreateStep(1)}>← Voltar</button>
+                      <button type="submit" className="score-btn-primary" disabled={sessionLoading}>
+                        {sessionLoading ? "Criando…" : "✓ Iniciar Sessão"}
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
             </div>
           )}
@@ -3901,22 +4142,28 @@ export default function App() {
                   <span className="score-play-name">{activeSession.name}</span>
                   <span className="score-format-tag">{activeSession.format}</span>
                   <span className={`score-badge ${activeSession.status}`}>
-                    {activeSession.status === "active" ? "Ativo" : "Encerrado"}
+                    {activeSession.status === "active" ? "● Ativo" : "■ Encerrado"}
                   </span>
+                  {activeSession.status === "active" && (
+                    <span className="score-timer" title="Duração da sessão">⏱ {formatTimer(sessionTimerSecs)}</span>
+                  )}
                 </div>
-                <button type="button" className="score-layout-open-btn" onClick={() => openLayoutModal(activeSession)}>
-                  <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><rect x="0" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="9" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="0" y="10" width="7" height="6" rx="1"/><rect x="9" y="10" width="7" height="6" rx="1"/></svg>
-                  Layout
-                </button>
                 <div className="score-play-actions">
+                  <button type="button" className="score-layout-open-btn" onClick={() => openLayoutModal(activeSession)}>
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><rect x="0" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="9" y="0" width="7" height="6" rx="1" opacity="0.5"/><rect x="0" y="10" width="7" height="6" rx="1"/><rect x="9" y="10" width="7" height="6" rx="1"/></svg>
+                    Layout
+                  </button>
                   {activeSession.status === "active" && (
                     <>
-                      <button type="button" className="score-btn-secondary" onClick={handleResetSession}>↺ Reset</button>
+                      <button type="button" className="score-btn-secondary" onClick={handleResetSession}>↺</button>
                       <button type="button" className="score-btn-danger" onClick={handleFinishSession}>■ Encerrar</button>
                     </>
                   )}
                   {activeSession.status === "finished" && (
-                    <button type="button" className="score-btn-secondary" onClick={() => handleRestoreSession(activeSession.id)}>↩ Restaurar</button>
+                    <>
+                      <button type="button" className="score-btn-secondary" onClick={() => setShowGameSummary(s => !s)}>📊 Resumo</button>
+                      <button type="button" className="score-btn-secondary" onClick={() => handleRestoreSession(activeSession.id)}>↩ Restaurar</button>
+                    </>
                   )}
                   <button type="button" className="score-fullscreen-btn" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={toggleFullscreen}>
                     {isFullscreen ? "⛶" : "⛶"}
@@ -3925,6 +4172,43 @@ export default function App() {
               </div>
 
               {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
+
+              {/* Resumo pós-jogo */}
+              {showGameSummary && (() => {
+                const sorted = [...activeSession.players].sort((a, b) => {
+                  if (!a.is_eliminated && !b.is_eliminated) return b.life - a.life;
+                  if (!a.is_eliminated) return -1;
+                  if (!b.is_eliminated) return 1;
+                  return b.life - a.life;
+                });
+                const start = activeSession.created_at ? new Date(activeSession.created_at).getTime() : null;
+                const end = activeSession.ended_at ? new Date(activeSession.ended_at).getTime() : Date.now();
+                const duration = start ? formatTimer(Math.floor((end - start) / 1000)) : null;
+                return (
+                  <div className="score-summary-panel">
+                    <div className="score-summary-header">
+                      <span className="score-summary-title">🏆 Resumo da Partida</span>
+                      {duration && <span className="score-summary-duration">⏱ {duration}</span>}
+                      <button type="button" className="score-summary-close" onClick={() => setShowGameSummary(false)}>✕</button>
+                    </div>
+                    <div className="score-summary-rows">
+                      {sorted.map((p, i) => {
+                        const color = PLAYER_COLORS[activeSession.players.findIndex(x => x.id === p.id) % PLAYER_COLORS.length];
+                        return (
+                          <div key={p.id} className={`score-summary-row${i === 0 && !p.is_eliminated ? " winner" : p.is_eliminated ? " elim" : ""}`}>
+                            <span className="score-summary-pos">{i === 0 && !p.is_eliminated ? "👑" : p.is_eliminated ? "💀" : `#${i+1}`}</span>
+                            <span className="score-summary-avatar" style={{ background: color }}>{p.short_code}</span>
+                            <span className="score-summary-name">{p.name}</span>
+                            <span className="score-summary-life" style={{ color: p.is_eliminated ? "var(--danger)" : color }}>♥ {p.life}</span>
+                            {p.commander_damage_received > 0 && <span className="score-summary-chip">⚔{p.commander_damage_received}</span>}
+                            {p.poison > 0 && <span className="score-summary-chip">☠{p.poison}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {(() => {
 
@@ -3977,13 +4261,16 @@ export default function App() {
                   const color = PLAYER_COLORS[globalIdx % PLAYER_COLORS.length];
                   const isWinner = player.id === winnerId;
                   const isElim = player.is_eliminated;
+                  const hist = lifeHistory[player.id];
+                  const lifeClass = player.life <= 0 ? " dead" : player.life <= 5 ? " low" : player.life <= 10 ? " warn" : "";
+
                   return (
                     <div
                       key={player.id}
                       className={`score-prow${isElim ? " prow-elim" : ""}${isWinner ? " prow-winner" : ""}${flipped ? " prow-flipped" : ""}${player.commander_image_url ? " has-bg" : ""}`}
                       style={{ '--pcolor': color }}
                     >
-                      {/* Imagem do comandante como fundo total */}
+                      {/* Arte do comandante como fundo */}
                       {player.commander_image_url && (
                         <div className="score-prow-bg">
                           <img src={player.commander_image_url} alt="" />
@@ -3991,63 +4278,99 @@ export default function App() {
                         </div>
                       )}
 
+                      {/* Overlay de eliminação */}
+                      {isElim && (
+                        <div className="score-prow-elim-overlay">
+                          <span className="score-prow-elim-skull">💀</span>
+                          <span className="score-prow-elim-reason">
+                            {player.eliminated_reason === "life" ? "Sem vida" : player.eliminated_reason === "commander_damage" ? "Dano de comandante" : "Eliminado"}
+                          </span>
+                          {!isFinished && (
+                            <button
+                              type="button"
+                              className="score-revive-btn"
+                              onClick={e => { e.stopPropagation(); handleRevivePlayer(player.id); }}
+                              title="Reviver com 1 de vida"
+                            >
+                              ↩ Reviver
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Coroa do vencedor */}
+                      {isWinner && <div className="score-prow-winner-crown">👑 Vencedor!</div>}
+
                       <div className="score-prow-content">
+                        {/* Topo: avatar + nome + botão remover */}
                         <div className="score-prow-head">
-                          <div className="score-prow-badge">{isElim ? '💀' : isWinner ? '👑' : player.short_code}</div>
+                          <div className="score-prow-avatar" style={{ background: color }}>{player.short_code}</div>
                           <div className="score-prow-nameblock">
                             <span className="score-prow-name">{player.name}</span>
-                            {isElim && (
-                              <span className="score-prow-elim-tag">
-                                {player.eliminated_reason === "life" && "☠ Sem vida"}
-                                {player.eliminated_reason === "commander_damage" && "⚔ Cmd damage"}
-                              </span>
+                            {player.commander_name && (
+                              <span className="score-prow-cmd-inline">👑 {player.commander_name}</span>
                             )}
-                            {isWinner && <span className="score-prow-winner-tag">🏆 Vencedor!</span>}
                           </div>
-                          {!isElim && (
-                            <div className="score-life-header">
-                              <span className="score-life-icon">❤️</span>
-                              <span className={`score-life-big${player.life <= 0 ? " dead" : player.life <= 5 ? " low" : ""}`}>{player.life}</span>
-                            </div>
-                          )}
-                          {!isFinished && n > 2 && (
+                          {!isFinished && n > 2 && !isElim && (
                             <button type="button" className="score-remove-player" title="Remover" onClick={() => handleRemoveSessionPlayer(player.id)}>✕</button>
                           )}
                         </div>
+
+                        {/* Vida — elemento dominante */}
+                        <div className="score-life-center">
+                          <span className={`score-life-giant${lifeClass}`}>{isElim ? player.life : player.life}</span>
+                          {hist && <LifeSparkline history={hist} color={color} />}
+                        </div>
+
+                        {/* Controles de vida */}
                         {!isElim && (
                           <div className="score-controls">
                             <div className="score-life-row">
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
-                              <button type="button" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
+                              <button type="button" className="life-btn-big life-btn-neg" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -5)}>−5</button>
+                              <button type="button" className="life-btn-small life-btn-neg" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", -1)}>−1</button>
+                              <button type="button" className="life-btn-small life-btn-pos" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +1)}>+1</button>
+                              <button type="button" className="life-btn-big life-btn-pos" disabled={isFinished} onClick={() => handleUpdatePlayer(player.id, "life", +5)}>+5</button>
                             </div>
-                            {/* Botão que abre o modal de contadores deste jogador */}
-                            <button
-                              type="button"
-                              className={`score-counters-toggle${counterModalPlayerId === player.id ? " open" : ""}`}
-                              onClick={() => setCounterModalPlayerId(player.id)}
-                            >
-                              <span className="score-counters-toggle-label">Contadores</span>
-                              <span className="score-counters-toggle-summary">
-                                {player.commander_damage_received > 0 && <span title="Dano de comandante">⚔{player.commander_damage_received}</span>}
-                                {player.poison > 0 && <span title="Veneno">☠{player.poison}</span>}
-                                {(player.experience ?? 0) > 0 && <span title="Experiência">✨{player.experience}</span>}
-                                {(player.energy ?? 0) > 0 && <span title="Energia">⚡{player.energy}</span>}
-                              </span>
-                              <span className="score-counters-toggle-chevron">▾</span>
+                          </div>
+                        )}
+
+                        {/* Chips de contadores sempre visíveis */}
+                        <div className="score-counter-chips">
+                          {(() => {
+                            const cmdMap = localCmdByOpponent[player.id] ?? {};
+                            const maxSingleCmd = Object.keys(cmdMap).length > 0
+                              ? Math.max(...Object.values(cmdMap))
+                              : player.commander_damage_received;
+                            return (
+                              <button
+                                type="button"
+                                className={`score-chip score-chip-cmd score-chip-cmd-icon${maxSingleCmd >= 21 ? " chip-dead" : maxSingleCmd >= 15 ? " chip-warn" : ""}`}
+                                onClick={() => setCounterModalPlayerId(player.id)}
+                                title={`Dano de comandante — máx: ${maxSingleCmd}/21`}
+                              >
+                                ⚔
+                              </button>
+                            );
+                          })()}
+                          <button
+                            type="button"
+                            className={`score-chip score-chip-poison${player.poison >= 10 ? " chip-dead" : player.poison >= 7 ? " chip-warn" : ""}`}
+                            onClick={() => !isFinished && setCounterModalPlayerId(player.id)}
+                            title="Veneno"
+                          >
+                            ☠ {player.poison}<span className="score-chip-max">/10</span>
+                          </button>
+                          {(player.experience ?? 0) > 0 && (
+                            <button type="button" className="score-chip score-chip-xp" onClick={() => !isFinished && setCounterModalPlayerId(player.id)} title="Experiência">
+                              ✨ {player.experience}
                             </button>
-                          </div>
-                        )}
-                        {/* Nome do comandante no rodapé */}
-                        {player.commander_name && (
-                          <div className="score-prow-cmd-footer">
-                            <span className="score-prow-cmd-name">{player.commander_name}</span>
-                            {player.commander_set_code && (
-                              <span className="score-prow-cmd-set">{player.commander_set_code} #{player.commander_collection_number}</span>
-                            )}
-                          </div>
-                        )}
+                          )}
+                          {(player.energy ?? 0) > 0 && (
+                            <button type="button" className="score-chip score-chip-energy" onClick={() => !isFinished && setCounterModalPlayerId(player.id)} title="Energia">
+                              ⚡ {player.energy}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -4101,7 +4424,7 @@ export default function App() {
                       </div>
 
                       {/* Dano por comandante */}
-                      <div className="score-counters-section-title">⚔ Dano por Comandante <span className="score-counters-total">(total {cPlayer.commander_damage_received}/21)</span></div>
+                      <div className="score-counters-section-title">⚔ Dano por Comandante <span className="score-counters-total">(21 de qualquer fonte = eliminado)</span></div>
                       {opponents2.map((opp, oi) => {
                         const dmg = cmdMap[opp.id] ?? 0;
                         return (
@@ -4176,23 +4499,11 @@ export default function App() {
                           onChange={e => setAddPlayerForm({ ...addPlayerForm, short_code: e.target.value.toUpperCase() })}
                         />
                       </div>
-                      <div className="score-commander-row">
-                        <span className="score-commander-label">👑</span>
-                        <input
-                          className="score-set-input"
-                          placeholder="Sigla set"
-                          maxLength={6}
-                          value={addPlayerForm.commander_set_code}
-                          onChange={e => setAddPlayerForm({ ...addPlayerForm, commander_set_code: e.target.value.toUpperCase() })}
-                        />
-                        <input
-                          className="score-num-input"
-                          placeholder="Nº carta"
-                          maxLength={6}
-                          value={addPlayerForm.commander_collection_number}
-                          onChange={e => setAddPlayerForm({ ...addPlayerForm, commander_collection_number: e.target.value })}
-                        />
-                      </div>
+                      <CommanderSearch
+                        selected={addPlayerForm._cmd}
+                        onSelect={cmd => setAddPlayerForm({ ...addPlayerForm, commander_set_code: cmd.set_code, commander_collection_number: cmd.collection_number, _cmd: cmd })}
+                        onClear={() => setAddPlayerForm({ ...addPlayerForm, commander_set_code: "", commander_collection_number: "", _cmd: null })}
+                      />
                       <div className="score-player-row">
                         <button type="submit" className="score-btn-primary">Adicionar</button>
                         <button type="button" className="score-btn-secondary" onClick={() => setShowAddPlayer(false)}>Cancelar</button>

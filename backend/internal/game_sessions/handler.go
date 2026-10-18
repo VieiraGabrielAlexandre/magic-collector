@@ -131,3 +131,14 @@ func (h *Handler) Restore(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, session)
 }
+
+func (h *Handler) RevivePlayer(c *gin.Context) {
+	sessionID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	playerID, _ := strconv.ParseInt(c.Param("player_id"), 10, 64)
+	player, err := h.svc.RevivePlayer(sessionID, playerID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, player)
+}

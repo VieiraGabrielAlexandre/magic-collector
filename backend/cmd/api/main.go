@@ -160,6 +160,7 @@ func main() {
 	api.POST("/game-sessions/:id/reset", gameSessionHandler.Reset)
 	api.POST("/game-sessions/:id/finish", gameSessionHandler.Finish)
 	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
+	api.POST("/game-sessions/:id/players/:player_id/revive", gameSessionHandler.RevivePlayer)
 
 	router.Run(":8080")
 }

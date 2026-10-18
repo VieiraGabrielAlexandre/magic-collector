@@ -1,5 +1,7 @@
 package game_sessions
 
+import "encoding/json"
+
 type GameSession struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
@@ -26,10 +28,20 @@ type Player struct {
 	CommanderDamageReceived     int    `json:"commander_damage_received"`
 	Experience                  int    `json:"experience"`
 	Energy                      int    `json:"energy"`
-	IsEliminated                bool   `json:"is_eliminated"`
-	EliminatedReason            string `json:"eliminated_reason"`
-	CreatedAt                   string `json:"created_at"`
-	UpdatedAt                   string `json:"updated_at"`
+	IsEliminated                bool           `json:"is_eliminated"`
+	EliminatedReason            string         `json:"eliminated_reason"`
+	CmdDamageBySource           map[string]int `json:"cmd_damage_by_source"`
+	CreatedAt                   string         `json:"created_at"`
+	UpdatedAt                   string         `json:"updated_at"`
+}
+
+// parseCmdDamageBySource safely decodes a JSON string into a map.
+func parseCmdDamageBySource(raw string) map[string]int {
+	m := map[string]int{}
+	if raw != "" && raw != "{}" {
+		_ = json.Unmarshal([]byte(raw), &m)
+	}
+	return m
 }
 
 type PlayerInput struct {
@@ -50,9 +62,10 @@ type CreateSessionInput struct {
 }
 
 type UpdatePlayerInput struct {
-	Life                    int `json:"life"`
-	Poison                  int `json:"poison"`
-	CommanderDamageReceived int `json:"commander_damage_received"`
-	Experience              int `json:"experience"`
-	Energy                  int `json:"energy"`
+	Life                    int            `json:"life"`
+	Poison                  int            `json:"poison"`
+	CommanderDamageReceived int            `json:"commander_damage_received"`
+	Experience              int            `json:"experience"`
+	Energy                  int            `json:"energy"`
+	CmdDamageBySource       map[string]int `json:"cmd_damage_by_source"`
 }

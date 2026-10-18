@@ -2,6 +2,7 @@ package game_sessions
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -53,6 +54,7 @@ func (r *Repository) List() ([]GameSession, error) {
 			COALESCE(commander_image_url,''),
 			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
+			COALESCE(cmd_damage_by_source,'{}'),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
 		FROM game_session_players ORDER BY id ASC
@@ -64,13 +66,16 @@ func (r *Repository) List() ([]GameSession, error) {
 
 	for playerRows.Next() {
 		var p Player
+		var cmdDmgRaw string
 		if err := playerRows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
 			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 			&p.CommanderImageURL,
 			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
-			&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.IsEliminated, &p.EliminatedReason, &cmdDmgRaw,
+			&p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.CmdDamageBySource = parseCmdDamageBySource(cmdDmgRaw)
 		if idx, ok := sessionMap[p.SessionID]; ok {
 			sessions[idx].Players = append(sessions[idx].Players, p)
 		}
@@ -106,6 +111,7 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 			COALESCE(commander_image_url,''),
 			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
+			COALESCE(cmd_damage_by_source,'{}'),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
 		FROM game_session_players WHERE session_id = ? ORDER BY id ASC
@@ -118,13 +124,16 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 	s.Players = make([]Player, 0)
 	for rows.Next() {
 		var p Player
+		var cmdDmgRaw string
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Name, &p.ShortCode,
 			&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 			&p.CommanderImageURL,
 			&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
-			&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.IsEliminated, &p.EliminatedReason, &cmdDmgRaw,
+			&p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.CmdDamageBySource = parseCmdDamageBySource(cmdDmgRaw)
 		s.Players = append(s.Players, p)
 	}
 
@@ -166,12 +175,14 @@ func (r *Repository) Delete(id int64) error {
 
 func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 	var p Player
+	var cmdDmgRaw string
 	err := r.db.QueryRow(`
 		SELECT id, session_id, name, short_code,
 			COALESCE(commander_name,''), COALESCE(commander_set_code,''), COALESCE(commander_collection_number,''),
 			COALESCE(commander_image_url,''),
 			life, poison, commander_damage_received, experience, energy,
 			is_eliminated, COALESCE(eliminated_reason, ''),
+			COALESCE(cmd_damage_by_source,'{}'),
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s')
 		FROM game_session_players WHERE id = ?
@@ -179,10 +190,12 @@ func (r *Repository) getPlayerByID(id int64) (*Player, error) {
 		&p.CommanderName, &p.CommanderSetCode, &p.CommanderCollectionNumber,
 		&p.CommanderImageURL,
 		&p.Life, &p.Poison, &p.CommanderDamageReceived, &p.Experience, &p.Energy,
-		&p.IsEliminated, &p.EliminatedReason, &p.CreatedAt, &p.UpdatedAt)
+		&p.IsEliminated, &p.EliminatedReason, &cmdDmgRaw,
+		&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	p.CmdDamageBySource = parseCmdDamageBySource(cmdDmgRaw)
 	return &p, nil
 }
 
@@ -204,15 +217,23 @@ func (r *Repository) UpdatePlayer(sessionID, playerID int64, input UpdatePlayerI
 	isEliminated := false
 	eliminatedReason := ""
 
-	if input.CommanderDamageReceived >= 21 {
-		isEliminated = true
-		eliminatedReason = "commander_damage"
-	} else if input.Poison >= 10 {
-		isEliminated = true
-		eliminatedReason = "poison"
-	} else if input.Life <= 0 {
-		isEliminated = true
-		eliminatedReason = "life"
+	// Commander damage: each source (opponent) can independently deal 21 to eliminate
+	for _, dmg := range input.CmdDamageBySource {
+		if dmg >= 21 {
+			isEliminated = true
+			eliminatedReason = "commander_damage"
+			break
+		}
+	}
+
+	if !isEliminated {
+		if input.Poison >= 10 {
+			isEliminated = true
+			eliminatedReason = "poison"
+		} else if input.Life <= 0 {
+			isEliminated = true
+			eliminatedReason = "life"
+		}
 	}
 
 	var eliminatedReasonVal interface{}
@@ -220,15 +241,24 @@ func (r *Repository) UpdatePlayer(sessionID, playerID int64, input UpdatePlayerI
 		eliminatedReasonVal = eliminatedReason
 	}
 
+	cmdJSON := "{}"
+	if len(input.CmdDamageBySource) > 0 {
+		if b, err := json.Marshal(input.CmdDamageBySource); err == nil {
+			cmdJSON = string(b)
+		}
+	}
+
 	_, err := r.db.Exec(`
 		UPDATE game_session_players
 		SET life = ?, poison = ?, commander_damage_received = ?,
 			experience = ?, energy = ?,
-			is_eliminated = ?, eliminated_reason = ?
+			is_eliminated = ?, eliminated_reason = ?,
+			cmd_damage_by_source = ?
 		WHERE id = ? AND session_id = ?
 	`, input.Life, input.Poison, input.CommanderDamageReceived,
 		input.Experience, input.Energy,
-		isEliminated, eliminatedReasonVal, playerID, sessionID)
+		isEliminated, eliminatedReasonVal,
+		cmdJSON, playerID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -239,6 +269,19 @@ func (r *Repository) UpdatePlayer(sessionID, playerID int64, input UpdatePlayerI
 func (r *Repository) DeletePlayer(sessionID, playerID int64) error {
 	_, err := r.db.Exec("DELETE FROM game_session_players WHERE id = ? AND session_id = ?", playerID, sessionID)
 	return err
+}
+
+func (r *Repository) RevivePlayer(sessionID, playerID int64) (*Player, error) {
+	_, err := r.db.Exec(`
+		UPDATE game_session_players
+		SET is_eliminated = 0, eliminated_reason = NULL,
+		    life = GREATEST(life, 1)
+		WHERE id = ? AND session_id = ?
+	`, playerID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return r.getPlayerByID(playerID)
 }
 
 func (r *Repository) Reset(sessionID int64) (*GameSession, error) {
@@ -252,7 +295,8 @@ func (r *Repository) Reset(sessionID int64) (*GameSession, error) {
 		UPDATE game_session_players
 		SET life = ?, poison = 0, commander_damage_received = 0,
 			experience = 0, energy = 0,
-			is_eliminated = 0, eliminated_reason = NULL
+			is_eliminated = 0, eliminated_reason = NULL,
+			cmd_damage_by_source = '{}'
 		WHERE session_id = ?
 	`, startingLife, sessionID)
 	if err != nil {
