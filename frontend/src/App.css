@@ -1752,6 +1752,111 @@ input[type="radio"] {
   background: linear-gradient(90deg, rgba(200,155,60,0.05) 0%, var(--surface-3) 20%);
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
+.deck-list-item-wish {
+  border-left-color: rgba(125,211,252,0.5);
+  border-style: dashed;
+  border-left-style: solid;
+  opacity: 0.85;
+}
+.deck-list-item-wish:hover { border-left-color: #7dd3fc; opacity: 1; }
+.deck-wish-planning-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: rgba(125,211,252,0.12);
+  border: 1px solid rgba(125,211,252,0.3);
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.deck-wish-in-decks { margin-top: 8px; }
+.deck-wish-in-decks-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px 8px;
+  border-top: 1px solid var(--border-dim);
+  margin-top: 4px;
+}
+.deck-wish-in-decks-label { font-size: 12px; font-weight: 700; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.06em; }
+.deck-wish-in-decks-count {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(125,211,252,0.1);
+  border: 1px solid rgba(125,211,252,0.25);
+  color: #7dd3fc;
+}
+
+/* ── Cartas de Decks Planejados (na aba wishlist/cards) ── */
+.deck-wish-cards-in-wishlist {
+  margin-top: 24px;
+  border-top: 1px dashed rgba(125,211,252,0.2);
+  padding-top: 16px;
+}
+.deck-wish-cards-wl-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.deck-wish-cards-wl-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.deck-wish-cards-wl-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.deck-wish-cards-wl-group {
+  margin-bottom: 20px;
+}
+.deck-wish-cards-wl-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: rgba(125,211,252,0.05);
+  border-radius: 8px;
+  border-left: 3px solid rgba(125,211,252,0.4);
+}
+.deck-wish-cards-wl-deck-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.deck-wish-cards-wl-pending {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+.deck-wish-cards-wl-open-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(125,211,252,0.12);
+  border: 1px solid rgba(125,211,252,0.3);
+  color: #7dd3fc;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.deck-wish-cards-wl-open-btn:hover { background: rgba(125,211,252,0.22); }
+.deck-wish-cards-wl-grid { margin-top: 4px; }
+.deck-wish-card-item .wishlist-card-name { flex-wrap: wrap; gap: 4px; }
+.deck-wish-card-type { font-size: 10px; color: var(--text-dim); font-style: italic; }
+.wishlist-btn-acquire.acquired {
+  background: rgba(74,222,128,0.15);
+  border-color: rgba(74,222,128,0.4);
+  color: #4ade80;
+}
+
 .deck-list-icon {
   display: flex;
   align-items: center;
@@ -5744,10 +5849,38 @@ input[type="radio"] {
 }
 .deck-detail-card-set { font-size: 11px; color: var(--text-muted); }
 
-.deck-detail-card-del {
+/* Acquired state */
+.deck-detail-card-acquired { opacity: 0.55; }
+.deck-detail-card-acquired:hover { opacity: 0.8; }
+.deck-detail-card-acquired-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(16,185,129,0.85);
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+/* Action buttons overlay */
+.deck-detail-card-actions {
   position: absolute;
   top: 5px;
   right: 5px;
+  display: none;
+  gap: 3px;
+  flex-direction: column;
+}
+.deck-detail-card:hover .deck-detail-card-actions { display: flex; }
+
+.deck-detail-card-del,
+.deck-detail-card-check {
   background: rgba(0,0,0,0.65);
   color: #fff;
   border: none;
@@ -5756,12 +5889,17 @@ input[type="radio"] {
   height: 22px;
   font-size: 11px;
   cursor: pointer;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
 }
-.deck-detail-card:hover .deck-detail-card-del { display: flex; }
+.deck-detail-card-check { background: rgba(0,0,0,0.65); color: rgba(255,255,255,0.6); }
+.deck-detail-card-check.checked { background: rgba(16,185,129,0.8); color: #fff; }
+.deck-detail-card-check:hover { background: rgba(16,185,129,0.6); color: #fff; }
+.deck-detail-card-del:hover { background: rgba(248,81,73,0.7); }
+
+.deck-type-acquired-count { font-size: 11px; color: #10b981; font-weight: 600; margin-left: 4px; }
 
 /* ── Divisórias por tipo + botão copiar ─────────────────────────────────── */
 .deck-detail-count {
@@ -6039,28 +6177,33 @@ input[type="radio"] {
   }
 }
 
+/* Mobile: cartão horizontal (imagem à esquerda, info à direita) */
 @media (max-width: 640px) {
   .wishlist-grid { grid-template-columns: 1fr; gap: 8px; }
 
   .wishlist-card {
     flex-direction: row;
     align-items: flex-start;
+    min-height: auto;
   }
 
   .wishlist-card-img-wrap,
   .wishlist-card-img-placeholder {
-    width: 100px;
+    width: 90px;
     flex-shrink: 0;
     aspect-ratio: 5 / 7;
   }
 
   .wishlist-card-img {
     height: 100%;
+    aspect-ratio: auto;
+    object-fit: cover;
   }
 
   .wishlist-card-body {
     flex: 1;
     min-width: 0;
+    padding: 8px 10px;
   }
 
   .wishlist-modal-img {
@@ -6068,19 +6211,14 @@ input[type="radio"] {
   }
 }
 
+/* Tablet: 2 colunas */
 @media (min-width: 641px) and (max-width: 899px) {
   .wishlist-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* Desktop largo */
 @media (min-width: 1280px) {
   .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-}
-
-@media (max-width: 680px) {
-  .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
-}
-@media (max-width: 420px) {
-  .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -6478,16 +6616,11 @@ input[type="radio"] {
 }
 .cmd-search-clear:hover { color: #f85149; }
 .cmd-search-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
   background: #161b22;
   border: 1px solid rgba(48,54,61,1);
   border-radius: 10px;
-  overflow: hidden;
-  z-index: 200;
-  max-height: 320px;
   overflow-y: auto;
+  max-height: 320px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 .cmd-search-item {

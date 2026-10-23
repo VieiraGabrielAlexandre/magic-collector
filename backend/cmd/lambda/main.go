@@ -17,10 +17,11 @@ import (
 	"magic-collection-api/internal/decks"
 	game_sessions "magic-collection-api/internal/game_sessions"
 	"magic-collection-api/internal/importer"
+	"magic-collection-api/internal/lore"
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
-	"magic-collection-api/internal/lore"
 	"magic-collection-api/internal/wishlist"
+	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 )
 
 func getenv(key, fallback string) string {
@@ -71,6 +72,9 @@ func main() {
 	wishlistRepo := wishlist.NewRepository(db)
 	wishlistSvc := wishlist.NewService(wishlistRepo, mtgClient)
 	wishlistHandler := wishlist.NewHandler(wishlistSvc)
+
+	wishlistDeckRepo := wishlist_decks.NewRepository(db)
+	wishlistDeckHandler := wishlist_decks.NewHandler(wishlistDeckRepo, mtgClient)
 
 	gameSessionRepo := game_sessions.NewRepository(db)
 	gameSessionSvc := game_sessions.NewService(gameSessionRepo, battleRepo)
@@ -140,6 +144,17 @@ func main() {
 	api.DELETE("/wishlist/:id", wishlistHandler.Delete)
 	api.POST("/wishlist/:id/acquire", wishlistHandler.Acquire)
 
+	api.GET("/wishlist-decks", wishlistDeckHandler.List)
+	api.GET("/wishlist-decks/search-cards", wishlistDeckHandler.SearchCards)
+	api.POST("/wishlist-decks", wishlistDeckHandler.Create)
+	api.PATCH("/wishlist-decks/:id/acquire", wishlistDeckHandler.Acquire)
+	api.DELETE("/wishlist-decks/:id", wishlistDeckHandler.Delete)
+	api.GET("/wishlist-decks/:id/cards", wishlistDeckHandler.ListCards)
+	api.POST("/wishlist-decks/:id/cards", wishlistDeckHandler.AddCard)
+	api.POST("/wishlist-decks/:id/import-list", wishlistDeckHandler.ImportList)
+	api.PATCH("/wishlist-decks/:id/cards/:card_id/acquired", wishlistDeckHandler.ToggleCardAcquired)
+	api.DELETE("/wishlist-decks/:id/cards/:card_id", wishlistDeckHandler.DeleteCard)
+
 	api.GET("/tokens", tokenHandler.List)
 	api.POST("/tokens/preview", tokenHandler.Preview)
 	api.POST("/tokens", tokenHandler.Create)
@@ -156,6 +171,7 @@ func main() {
 	api.POST("/game-sessions/:id/reset", gameSessionHandler.Reset)
 	api.POST("/game-sessions/:id/finish", gameSessionHandler.Finish)
 	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
+	api.POST("/game-sessions/:id/players/:player_id/revive", gameSessionHandler.RevivePlayer)
 
 	// algnhsa converte eventos Lambda Function URL (formato HTTP API v2)
 	// para chamadas net/http que o Gin processa normalmente.

@@ -14,6 +14,8 @@ Gerenciador de coleção de cartas Magic: The Gathering com backend em Go e fron
 - [Lógica de busca na API externa](#lógica-de-busca-na-api-externa)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [API REST](#api-rest)
+- [Adicionando novas rotas](#adicionando-novas-rotas)
+- [Build e Deploy (produção)](#build-e-deploy-produção)
 
 ---
 
@@ -260,3 +262,114 @@ magic-collector/
   }
 }
 ```
+
+---
+
+## Adicionando novas rotas
+
+O projeto tem **dois entrypoints** de backend que precisam ser mantidos em sincronia:
+
+| Arquivo | Usado em |
+|---|---|
+| `backend/cmd/api/main.go` | Desenvolvimento local (Docker Compose) |
+| `backend/cmd/lambda/main.go` | Produção (AWS Lambda) |
+
+> ⚠️ **Toda rota nova precisa ser registrada nos dois arquivos.** Esquecer o `cmd/lambda/main.go` causa 404 em produção mesmo que funcione localmente.
+
+### Checklist para uma nova rota
+
+1. **Modelo** — `internal/<domínio>/model.go`: adicione as structs de input/output
+2. **Repository** — `internal/<domínio>/repository.go`: SQL puro
+3. **Service** — `internal/<domínio>/service.go` (se houver regras de negócio)
+4. **Handler** — `internal/<domínio>/handler.go`: bind do request, chama service, retorna JSON
+5. **Banco** — `internal/database/mysql.go`: `ALTER TABLE` para colunas novas (nunca migrations externas)
+6. **Rotas locais** — `backend/cmd/api/main.go`: registrar a rota no grupo `api`
+7. **Rotas Lambda** — `backend/cmd/lambda/main.go`: **mesma rota**, no mesmo grupo `api`
+8. **Frontend** — `frontend/src/services/api.js`: adicionar a função `fetch`
+9. **UI** — `frontend/src/App.jsx`: usar a nova função
+
+### Verificar compilação antes de fazer deploy
+
+```bash
+# Compila o binário Lambda (arm64) sem gerar arquivo — só valida erros
+cd backend
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/lambda
+
+# Compila o binário local (para desenvolvimento)
+go build ./cmd/api
+```
+
+Se nenhum erro aparecer, o código está pronto para deploy.
+
+---
+
+## Build e Deploy (produção)
+
+A produção roda em **AWS Lambda + S3 + CloudFront** (sem Docker em produção).
+
+```
+Frontend  →  S3 + CloudFront  (arquivos estáticos)
+Backend   →  AWS Lambda       (binário Go arm64)
+Banco     →  MySQL externo    (RDS ou outro host)
+```
+
+### Script de deploy
+
+```bash
+# Deploy completo (backend + frontend + infra Terraform)
+./deploy.sh
+
+# Só o backend Lambda (mais rápido — evita recriar infra)
+./deploy.sh --backend-only
+
+# Só o frontend (S3 sync + invalidação CloudFront)
+./deploy.sh --frontend-only
+
+# Só a infra Terraform (sem recompilar código)
+./deploy.sh --infra-only
+```
+
+### O que cada opção faz
+
+**`--backend-only`**
+1. Compila `backend/cmd/lambda` para `GOOS=linux GOARCH=arm64`
+2. Empacota em `terraform/lambda_package.zip`
+3. Envia o ZIP direto para o Lambda via `aws lambda update-function-code`
+4. Aguarda a função ficar ativa (`aws lambda wait function-updated`)
+
+**`--frontend-only`**
+1. Roda `npm ci && npm run build` dentro de `frontend/`
+2. Sincroniza `frontend/dist/` para o bucket S3 (`aws s3 sync --delete`)
+3. Invalida o cache do CloudFront (`/*`)
+
+**`--backend-only` sem Terraform** é a opção mais rápida para publicar mudanças de rota ou lógica — leva ~30 segundos.
+
+### Pré-requisitos para deploy
+
+- `go` instalado localmente (para compilar o binário)
+- `aws` CLI configurado com credenciais válidas (`aws configure`)
+- `terraform` instalado (necessário apenas para `--infra-only` ou primeiro deploy)
+- `npm` instalado (necessário apenas para `--frontend-only`)
+
+### Verificar logs do Lambda em produção
+
+```bash
+# Logs em tempo real
+aws logs tail /aws/lambda/magic-collector --since 5m --follow --region us-east-1
+
+# Últimas invocações (erros e cold starts)
+aws logs tail /aws/lambda/magic-collector --since 30m --region us-east-1
+```
+
+### Variáveis de ambiente em produção
+
+As variáveis são configuradas no Lambda via Terraform (`terraform/main.tf`). Para alterar sem recriar a infra:
+
+```bash
+aws lambda update-function-configuration \
+  --function-name magic-collector \
+  --environment "Variables={DB_HOST=...,DB_USER=...,DB_PASSWORD=...,DB_NAME=...}" \
+  --region us-east-1
+```
+
+> ⚠️ Nunca commite `terraform/terraform.tfvars` nem `terraform/*.tfstate*` — contêm credenciais.

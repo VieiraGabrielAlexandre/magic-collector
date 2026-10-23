@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -686,13 +686,20 @@ function LifeSparkline({ history, color }) {
 }
 
 function CommanderSearch({ selected, onSelect, onClear }) {
-  // selected = { name, set_code, collection_number, image_url } | null
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState(null);
   const timerRef = useRef(null);
   const wrapRef = useRef(null);
+
+  function computePos() {
+    if (wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect();
+      setDropPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+  }
 
   useEffect(() => {
     if (query.length < 2) { setResults([]); setOpen(false); return; }
@@ -701,20 +708,23 @@ function CommanderSearch({ selected, onSelect, onClear }) {
       setLoading(true);
       try {
         const cards = await searchDeckWishCards(query);
-        setResults(cards ?? []);
-        setOpen((cards ?? []).length > 0);
+        const list = cards ?? [];
+        setResults(list);
+        if (list.length > 0) { computePos(); setOpen(true); }
+        else setOpen(false);
       } catch { setResults([]); setOpen(false); }
       setLoading(false);
     }, 400);
   }, [query]);
 
-  // Fecha dropdown ao clicar fora
   useEffect(() => {
-    function onDown(e) {
+    function close(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    function onScroll() { setOpen(false); }
+    document.addEventListener("mousedown", close);
+    window.addEventListener("scroll", onScroll, true);
+    return () => { document.removeEventListener("mousedown", close); window.removeEventListener("scroll", onScroll, true); };
   }, []);
 
   function handleSelect(card) {
@@ -725,10 +735,7 @@ function CommanderSearch({ selected, onSelect, onClear }) {
   }
 
   function handleClear() {
-    setQuery("");
-    setResults([]);
-    setOpen(false);
-    onClear?.();
+    setQuery(""); setResults([]); setOpen(false); onClear?.();
   }
 
   return (
@@ -743,7 +750,7 @@ function CommanderSearch({ selected, onSelect, onClear }) {
           placeholder={selected?.name ? selected.name : "Buscar comandante…"}
           value={query}
           onChange={e => { setQuery(e.target.value); if (!e.target.value) handleClear(); }}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onFocus={() => { if (results.length > 0) { computePos(); setOpen(true); } }}
           autoComplete="off"
           className="cmd-search-input"
         />
@@ -752,10 +759,10 @@ function CommanderSearch({ selected, onSelect, onClear }) {
           <button type="button" className="cmd-search-clear" onClick={handleClear} title="Limpar">✕</button>
         )}
       </div>
-      {open && results.length > 0 && (
-        <div className="cmd-search-dropdown">
+      {open && results.length > 0 && dropPos && (
+        <div className="cmd-search-dropdown" style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}>
           {results.slice(0, 10).map((card, i) => (
-            <button key={i} type="button" className="cmd-search-item" onClick={() => handleSelect(card)}>
+            <button key={i} type="button" className="cmd-search-item" onMouseDown={e => { e.preventDefault(); handleSelect(card); }}>
               {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
               <div className="cmd-search-item-info">
                 <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
@@ -979,6 +986,8 @@ export default function App() {
   const [deckWishCardsFor, setDeckWishCardsFor] = useState(null); // deck object
   const [deckWishCards, setDeckWishCards] = useState([]);
   const [deckWishCardsLoading, setDeckWishCardsLoading] = useState(false);
+  // cartas de todos os decks desejados (para listagem na aba de cartas)
+  const [deckWishAllCards, setDeckWishAllCards] = useState([]); // [{deck:{id,name,format,colors}, card:{...}}]
   const [deckCardSubmitting, setDeckCardSubmitting] = useState(false);
   const [deckCardError, setDeckCardError] = useState("");
   const [deckCardDetail, setDeckCardDetail] = useState(null);
@@ -1346,6 +1355,18 @@ export default function App() {
     setDeckWishCards(prev => prev.filter(c => c.id !== cardId));
   }
 
+  async function handleToggleDeckCardAcquired(cardId, deckIdOverride) {
+    const deckId = deckIdOverride ?? deckWishCardsFor?.id;
+    if (!deckId) return;
+    try {
+      const updated = await toggleDeckWishCardAcquired(deckId, cardId);
+      if (!deckIdOverride) {
+        setDeckWishCards(prev => prev.map(c => c.id === cardId ? { ...c, acquired: updated.acquired } : c));
+      }
+      setDeckWishAllCards(prev => prev.map(e => e.card.id === cardId && e.deck.id === deckId ? { ...e, card: { ...e.card, acquired: updated.acquired } } : e));
+    } catch {}
+  }
+
   function copyDeckList() {
     if (!deckWishCardsFor || deckWishCards.length === 0) return;
     const groups = buildWishCardGroups(deckWishCards);
@@ -1598,10 +1619,25 @@ export default function App() {
   useEffect(() => { loadBattles(); }, []);
   useEffect(() => { loadWishlist(); }, []);
   useEffect(() => { loadDeckWishList(); }, []);
+  useEffect(() => { loadDeckWishAllCards(deckWishList); }, [deckWishList.length]);
 
   async function loadDeckWishList() {
     const data = await listWishlistDecks();
     setDeckWishList(data ?? []);
+  }
+
+  async function loadDeckWishAllCards(decks) {
+    const allEntries = [];
+    for (const deck of (decks ?? [])) {
+      if (deck.acquired) continue;
+      try {
+        const cards = await listDeckWishCards(deck.id);
+        for (const card of (cards ?? [])) {
+          allEntries.push({ deck: { id: deck.id, name: deck.name, format: deck.format, colors: deck.colors }, card });
+        }
+      } catch (_) { /* ignore per-deck errors */ }
+    }
+    setDeckWishAllCards(allEntries);
   }
 
   async function loadProxies() {
@@ -2727,6 +2763,39 @@ export default function App() {
                   </div>
                 ))}
                 {decks.length === 0 && <p className="empty">Nenhum deck cadastrado.</p>}
+
+                {/* Decks desejados ainda não montados */}
+                {deckWishList.filter(d => !d.acquired).length > 0 && (
+                  <div className="deck-wish-in-decks">
+                    <div className="deck-wish-in-decks-header">
+                      <span className="deck-wish-in-decks-label">🎯 Em planejamento</span>
+                      <span className="deck-wish-in-decks-count">{deckWishList.filter(d => !d.acquired).length}</span>
+                    </div>
+                    {deckWishList.filter(d => !d.acquired).map(deck => (
+                      <div key={deck.id} className="deck-list-item deck-list-item-wish" style={{ '--deck-wish-border': 'rgba(125,211,252,0.25)' }}>
+                        <div className="deck-list-icon">
+                          <span className="set-icon-placeholder" style={{ color: '#7dd3fc' }}>🎯</span>
+                        </div>
+                        <div className="deck-list-body">
+                          <div className="deck-list-name">
+                            <strong>{deck.name}</strong>
+                            <span className="deck-wish-planning-badge">Desejado</span>
+                            {deck.colors && deck.colors.split(",").filter(Boolean).map(c => (
+                              <img key={c} src={`/mana-icons/${MTG_CODE_TO_ICON[c] || "incolour"}.svg`} alt={c} style={{ width: 14, height: 14 }} />
+                            ))}
+                          </div>
+                          <div className="deck-list-meta">
+                            <span className="deck-set-label">{deck.format}</span>
+                            {deck.note && <span className="deck-desc">{deck.note}</span>}
+                          </div>
+                        </div>
+                        <div className="actions">
+                          <button type="button" onClick={() => { setActiveTab("wishlist"); setWishlistSubTab("decks"); openDeckWishCards(deck); }}>Ver cartas</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           </section>
@@ -3034,12 +3103,15 @@ export default function App() {
                             <div className="deck-type-divider">
                               <span className="deck-type-label">{type}</span>
                               <span className="deck-type-count">{group.length}</span>
+                              {group.some(c => c.acquired) && (
+                                <span className="deck-type-acquired-count">{group.filter(c => c.acquired).length} ✓</span>
+                              )}
                             </div>
                             <div className="deck-detail-grid">
                               {group.map(card => (
                                 <div
                                   key={card.id}
-                                  className="deck-detail-card"
+                                  className={`deck-detail-card${card.acquired ? " deck-detail-card-acquired" : ""}`}
                                   role="button"
                                   tabIndex={0}
                                   onClick={() => setDeckCardDetail(card)}
@@ -3050,16 +3122,25 @@ export default function App() {
                                   ) : (
                                     <div className="deck-detail-card-placeholder">{card.set_code}</div>
                                   )}
+                                  {card.acquired && <div className="deck-detail-card-acquired-badge">✓</div>}
                                   <div className="deck-detail-card-footer">
                                     <span className="deck-detail-card-name">{card.printed_name || card.name}</span>
                                     <span className="deck-detail-card-set">{card.set_code} #{card.collection_number}{card.foil ? " ✦" : ""}</span>
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="deck-detail-card-del"
-                                    aria-label="Remover"
-                                    onClick={e => { e.stopPropagation(); handleDeleteDeckCard(card.id); }}
-                                  >✕</button>
+                                  <div className="deck-detail-card-actions" onClick={e => e.stopPropagation()}>
+                                    <button
+                                      type="button"
+                                      className={`deck-detail-card-check${card.acquired ? " checked" : ""}`}
+                                      aria-label={card.acquired ? "Desmarcar adquirida" : "Marcar como adquirida"}
+                                      onClick={() => handleToggleDeckCardAcquired(card.id)}
+                                    >{card.acquired ? "✓" : "○"}</button>
+                                    <button
+                                      type="button"
+                                      className="deck-detail-card-del"
+                                      aria-label="Remover"
+                                      onClick={() => handleDeleteDeckCard(card.id)}
+                                    >✕</button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -3267,6 +3348,76 @@ export default function App() {
                     ))}
                   </div>
                 )}
+
+                {/* ── Cartas de Decks Desejados ── */}
+                {deckWishAllCards.length > 0 && (() => {
+                  const deckIds = [...new Set(deckWishAllCards.map(e => e.deck.id))];
+                  const notAcquiredTotal = deckWishAllCards.filter(e => !e.card.acquired).length;
+                  return (
+                    <div className="deck-wish-cards-in-wishlist">
+                      <div className="deck-wish-cards-wl-header">
+                        <span className="deck-wish-cards-wl-label">Cartas de Decks Planejados</span>
+                        <span className="deck-wish-cards-wl-count">{notAcquiredTotal} pendentes · {deckIds.length} deck{deckIds.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      {deckIds.map(deckId => {
+                        const deckEntries = deckWishAllCards.filter(e => e.deck.id === deckId);
+                        const deckInfo = deckEntries[0]?.deck;
+                        const pendingCount = deckEntries.filter(e => !e.card.acquired).length;
+                        return (
+                          <div key={deckId} className="deck-wish-cards-wl-group">
+                            <div className="deck-wish-cards-wl-group-header">
+                              <span className="deck-wish-cards-wl-deck-name">{deckInfo?.name}</span>
+                              {deckInfo?.format && <span className="deck-wish-format">{deckInfo.format}</span>}
+                              <span className="deck-wish-cards-wl-pending">{pendingCount} pendente{pendingCount !== 1 ? "s" : ""}</span>
+                              <button
+                                type="button"
+                                className="deck-wish-cards-wl-open-btn"
+                                onClick={() => { setWishlistSubTab("decks"); const deck = deckWishList.find(d => d.id === deckId); if (deck) openDeckWishCards(deck); }}
+                              >
+                                Ver deck →
+                              </button>
+                            </div>
+                            <div className="wishlist-grid deck-wish-cards-wl-grid">
+                              {deckEntries.map(({ card }) => (
+                                <div
+                                  key={card.id}
+                                  className={`wishlist-card deck-wish-card-item${card.acquired ? " wishlist-acquired" : ""}`}
+                                >
+                                  {card.image_uri ? (
+                                    <div className="wishlist-card-img-wrap">
+                                      <img src={card.image_uri} alt={card.name} className="wishlist-card-img" loading="lazy" />
+                                    </div>
+                                  ) : (
+                                    <div className="wishlist-card-img-placeholder"><span>{card.set_code || "?"}</span></div>
+                                  )}
+                                  <div className="wishlist-card-body">
+                                    <div className="wishlist-card-name">
+                                      <span className="wishlist-card-name-text">{card.printed_name || card.name}</span>
+                                      {card.acquired && <span className="wishlist-badge-acquired">✓</span>}
+                                    </div>
+                                    <div className="wishlist-card-meta">
+                                      <span className="wishlist-meta-set">{card.set_code} #{card.collection_number}</span>
+                                      {card.card_type && <span className="deck-wish-card-type">{card.card_type}</span>}
+                                    </div>
+                                    <div className="wishlist-card-actions" onClick={e => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        className={card.acquired ? "wishlist-btn-acquire acquired" : "wishlist-btn-acquire"}
+                                        onClick={() => handleToggleDeckCardAcquired(card.id, deckId)}
+                                      >
+                                        {card.acquired ? "✓ Adquirida" : "Marcar"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </>
             )}
 

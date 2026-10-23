@@ -28,6 +28,7 @@ type DeckCard struct {
 	ImageURI         string `json:"image_uri"`
 	Foil             bool   `json:"foil"`
 	Note             string `json:"note"`
+	Acquired         bool   `json:"acquired"`
 	CreatedAt        string `json:"created_at"`
 }
 

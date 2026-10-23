@@ -63,36 +63,53 @@ func (r *Repository) ListCards(deckID int64) ([]DeckCard, error) {
 	rows, err := r.db.Query(`
 		SELECT id, wishlist_deck_id, set_code, collection_number,
 			COALESCE(name,''), COALESCE(printed_name,''), COALESCE(type_line,''),
-			COALESCE(image_uri,''), foil, COALESCE(note,''),
+			COALESCE(image_uri,''), foil, COALESCE(note,''), COALESCE(acquired,0),
 			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
 		FROM wishlist_deck_cards WHERE wishlist_deck_id = ? ORDER BY id ASC
 	`, deckID)
 	if err != nil {
-		// fallback: type_line ainda não existe no banco (migração pendente)
-		rows, err = r.db.Query(`
-			SELECT id, wishlist_deck_id, set_code, collection_number,
-				COALESCE(name,''), COALESCE(printed_name,''), '' AS type_line,
-				COALESCE(image_uri,''), foil, COALESCE(note,''),
-				DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
-			FROM wishlist_deck_cards WHERE wishlist_deck_id = ? ORDER BY id ASC
-		`, deckID)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	defer rows.Close()
 	cards := make([]DeckCard, 0)
 	for rows.Next() {
 		var c DeckCard
-		var foil int
+		var foil, acquired int
 		if err := rows.Scan(&c.ID, &c.WishlistDeckID, &c.SetCode, &c.CollectionNumber,
-			&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &c.CreatedAt); err != nil {
+			&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &acquired, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		c.Foil = foil == 1
+		c.Acquired = acquired == 1
 		cards = append(cards, c)
 	}
 	return cards, nil
+}
+
+func (r *Repository) ToggleCardAcquired(deckID, cardID int64) (*DeckCard, error) {
+	_, err := r.db.Exec(`
+		UPDATE wishlist_deck_cards SET acquired = NOT acquired
+		WHERE id = ? AND wishlist_deck_id = ?
+	`, cardID, deckID)
+	if err != nil {
+		return nil, err
+	}
+	var c DeckCard
+	var foil, acquired int
+	err = r.db.QueryRow(`
+		SELECT id, wishlist_deck_id, set_code, collection_number,
+			COALESCE(name,''), COALESCE(printed_name,''), COALESCE(type_line,''),
+			COALESCE(image_uri,''), foil, COALESCE(note,''), COALESCE(acquired,0),
+			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
+		FROM wishlist_deck_cards WHERE id = ?
+	`, cardID).Scan(&c.ID, &c.WishlistDeckID, &c.SetCode, &c.CollectionNumber,
+		&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &acquired, &c.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	c.Foil = foil == 1
+	c.Acquired = acquired == 1
+	return &c, nil
 }
 
 func (r *Repository) AddCard(deckID int64, input AddDeckCardInput, name, printedName, typeLine, imageURI string) (*DeckCard, error) {
@@ -118,29 +135,20 @@ func (r *Repository) AddCard(deckID int64, input AddDeckCardInput, name, printed
 	}
 	id, _ := res.LastInsertId()
 	var c DeckCard
+	var acquiredInt int
 	err = r.db.QueryRow(`
 		SELECT id, wishlist_deck_id, set_code, collection_number,
 			COALESCE(name,''), COALESCE(printed_name,''), COALESCE(type_line,''),
-			COALESCE(image_uri,''), foil, COALESCE(note,''),
+			COALESCE(image_uri,''), foil, COALESCE(note,''), COALESCE(acquired,0),
 			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
 		FROM wishlist_deck_cards WHERE id = ?
 	`, id).Scan(&c.ID, &c.WishlistDeckID, &c.SetCode, &c.CollectionNumber,
-		&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &c.CreatedAt)
+		&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &acquiredInt, &c.CreatedAt)
 	if err != nil {
-		// fallback select sem type_line
-		err = r.db.QueryRow(`
-			SELECT id, wishlist_deck_id, set_code, collection_number,
-				COALESCE(name,''), COALESCE(printed_name,''), '' AS type_line,
-				COALESCE(image_uri,''), foil, COALESCE(note,''),
-				DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
-			FROM wishlist_deck_cards WHERE id = ?
-		`, id).Scan(&c.ID, &c.WishlistDeckID, &c.SetCode, &c.CollectionNumber,
-			&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &c.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	c.Foil = foil == 1
+	c.Acquired = acquiredInt == 1
 	return &c, nil
 }
 

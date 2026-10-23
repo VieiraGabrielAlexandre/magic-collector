@@ -142,6 +142,7 @@ func main() {
 	api.GET("/wishlist-decks/:id/cards", wishlistDeckHandler.ListCards)
 	api.POST("/wishlist-decks/:id/cards", wishlistDeckHandler.AddCard)
 	api.POST("/wishlist-decks/:id/import-list", wishlistDeckHandler.ImportList)
+	api.PATCH("/wishlist-decks/:id/cards/:card_id/acquired", wishlistDeckHandler.ToggleCardAcquired)
 	api.DELETE("/wishlist-decks/:id/cards/:card_id", wishlistDeckHandler.DeleteCard)
 
 	api.GET("/tokens", tokenHandler.List)

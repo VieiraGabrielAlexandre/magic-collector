@@ -233,6 +233,25 @@ func (h *Handler) ImportList(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (h *Handler) ToggleCardAcquired(c *gin.Context) {
+	deckID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id inválido"})
+		return
+	}
+	cardID, err := strconv.ParseInt(c.Param("card_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "card_id inválido"})
+		return
+	}
+	card, err := h.repo.ToggleCardAcquired(deckID, cardID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, card)
+}
+
 func (h *Handler) DeleteCard(c *gin.Context) {
 	deckID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
