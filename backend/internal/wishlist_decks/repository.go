@@ -13,6 +13,7 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]WishlistDeck, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, format, colors, COALESCE(note,''), acquired,
+			COALESCE(linked_deck_id,0),
 			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
 		FROM wishlist_decks ORDER BY acquired ASC, created_at DESC
 	`)
@@ -25,7 +26,7 @@ func (r *Repository) List() ([]WishlistDeck, error) {
 	for rows.Next() {
 		var d WishlistDeck
 		var acquired int
-		if err := rows.Scan(&d.ID, &d.Name, &d.Format, &d.Colors, &d.Note, &acquired, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Format, &d.Colors, &d.Note, &acquired, &d.LinkedDeckID, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		d.Acquired = acquired == 1
@@ -162,12 +163,42 @@ func (r *Repository) getByID(id int64) (*WishlistDeck, error) {
 	var acquired int
 	err := r.db.QueryRow(`
 		SELECT id, name, format, colors, COALESCE(note,''), acquired,
+			COALESCE(linked_deck_id,0),
 			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
 		FROM wishlist_decks WHERE id = ?
-	`, id).Scan(&d.ID, &d.Name, &d.Format, &d.Colors, &d.Note, &acquired, &d.CreatedAt)
+	`, id).Scan(&d.ID, &d.Name, &d.Format, &d.Colors, &d.Note, &acquired, &d.LinkedDeckID, &d.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	d.Acquired = acquired == 1
 	return &d, nil
+}
+
+func (r *Repository) GetCard(deckID, cardID int64) (*DeckCard, error) {
+	var c DeckCard
+	var foil, acquired int
+	err := r.db.QueryRow(`
+		SELECT id, wishlist_deck_id, set_code, collection_number,
+			COALESCE(name,''), COALESCE(printed_name,''), COALESCE(type_line,''),
+			COALESCE(image_uri,''), foil, COALESCE(note,''), COALESCE(acquired,0),
+			DATE_FORMAT(created_at,'%Y-%m-%dT%H:%i:%s')
+		FROM wishlist_deck_cards WHERE id = ? AND wishlist_deck_id = ?
+	`, cardID, deckID).Scan(&c.ID, &c.WishlistDeckID, &c.SetCode, &c.CollectionNumber,
+		&c.Name, &c.PrintedName, &c.TypeLine, &c.ImageURI, &foil, &c.Note, &acquired, &c.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	c.Foil = foil == 1
+	c.Acquired = acquired == 1
+	return &c, nil
+}
+
+func (r *Repository) SetLinkedDeck(deckID, linkedDeckID int64) error {
+	_, err := r.db.Exec(`UPDATE wishlist_decks SET linked_deck_id = ? WHERE id = ?`, linkedDeckID, deckID)
+	return err
+}
+
+func (r *Repository) MarkCardAcquired(deckID, cardID int64) error {
+	_, err := r.db.Exec(`UPDATE wishlist_deck_cards SET acquired = 1 WHERE id = ? AND wishlist_deck_id = ?`, cardID, deckID)
+	return err
 }

@@ -1,13 +1,19 @@
 package wishlist_decks
 
 type WishlistDeck struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Format    string `json:"format"`
-	Colors    string `json:"colors"`
-	Note      string `json:"note"`
-	Acquired  bool   `json:"acquired"`
-	CreatedAt string `json:"created_at"`
+	ID            int64  `json:"id"`
+	Name          string `json:"name"`
+	Format        string `json:"format"`
+	Colors        string `json:"colors"`
+	Note          string `json:"note"`
+	Acquired      bool   `json:"acquired"`
+	LinkedDeckID  int64  `json:"linked_deck_id"`
+	CreatedAt     string `json:"created_at"`
+}
+
+type AcquireCardResult struct {
+	DeckID int64 `json:"deck_id"`
+	CardID int64 `json:"card_id"`
 }
 
 type CreateWishlistDeckInput struct {

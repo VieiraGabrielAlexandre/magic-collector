@@ -74,7 +74,7 @@ func main() {
 	wishlistHandler := wishlist.NewHandler(wishlistSvc)
 
 	wishlistDeckRepo := wishlist_decks.NewRepository(db)
-	wishlistDeckHandler := wishlist_decks.NewHandler(wishlistDeckRepo, mtgClient)
+	wishlistDeckHandler := wishlist_decks.NewHandler(wishlistDeckRepo, mtgClient, repository, deckRepo)
 
 	gameSessionRepo := game_sessions.NewRepository(db)
 	gameSessionSvc := game_sessions.NewService(gameSessionRepo, battleRepo)
@@ -152,6 +152,7 @@ func main() {
 	api.GET("/wishlist-decks/:id/cards", wishlistDeckHandler.ListCards)
 	api.POST("/wishlist-decks/:id/cards", wishlistDeckHandler.AddCard)
 	api.POST("/wishlist-decks/:id/import-list", wishlistDeckHandler.ImportList)
+	api.POST("/wishlist-decks/:id/cards/:card_id/acquire", wishlistDeckHandler.AcquireCard)
 	api.PATCH("/wishlist-decks/:id/cards/:card_id/acquired", wishlistDeckHandler.ToggleCardAcquired)
 	api.DELETE("/wishlist-decks/:id/cards/:card_id", wishlistDeckHandler.DeleteCard)
 

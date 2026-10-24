@@ -524,6 +524,13 @@ export async function toggleDeckWishCardAcquired(deckId, cardId) {
   return json;
 }
 
+export async function acquireWishlistDeckCard(deckId, cardId) {
+  const res = await authFetch(`${BASE_URL}/wishlist-decks/${deckId}/cards/${cardId}/acquire`, { method: "POST" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao adquirir carta");
+  return json; // { deck_id, card_id }
+}
+
 export async function reviveGameSessionPlayer(sessionId, playerId) {
   const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/players/${playerId}/revive`, { method: "POST" });
   const json = await res.json();

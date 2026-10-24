@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -695,10 +695,20 @@ function CommanderSearch({ selected, onSelect, onClear }) {
   const wrapRef = useRef(null);
 
   function computePos() {
-    if (wrapRef.current) {
-      const r = wrapRef.current.getBoundingClientRect();
-      setDropPos({ top: r.bottom + 4, left: r.left, width: r.width });
-    }
+    if (!wrapRef.current) return;
+    const r = wrapRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const dropH = Math.min(320, results.length * 54 + 16);
+    const w = Math.max(r.width, Math.min(360, vw - 16));
+    let left = r.left;
+    // não sair pela direita
+    if (left + w > vw - 8) left = vw - w - 8;
+    if (left < 8) left = 8;
+    // abrir para cima se não couber embaixo
+    const spaceBelow = vh - r.bottom - 8;
+    const top = spaceBelow >= dropH ? r.bottom + 4 : r.top - dropH - 4;
+    setDropPos({ top, left, width: w });
   }
 
   useEffect(() => {
@@ -710,22 +720,32 @@ function CommanderSearch({ selected, onSelect, onClear }) {
         const cards = await searchDeckWishCards(query);
         const list = cards ?? [];
         setResults(list);
-        if (list.length > 0) { computePos(); setOpen(true); }
+        if (list.length > 0) { setOpen(true); }
         else setOpen(false);
       } catch { setResults([]); setOpen(false); }
       setLoading(false);
     }, 400);
   }, [query]);
 
+  // recalcular posição quando open/results mudam
+  useEffect(() => {
+    if (open && results.length > 0) computePos();
+  }, [open, results.length]);
+
   useEffect(() => {
     function close(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     }
-    function onScroll() { setOpen(false); }
+    function onScrollResize() { if (open) computePos(); }
     document.addEventListener("mousedown", close);
-    window.addEventListener("scroll", onScroll, true);
-    return () => { document.removeEventListener("mousedown", close); window.removeEventListener("scroll", onScroll, true); };
-  }, []);
+    window.addEventListener("scroll", onScrollResize, true);
+    window.addEventListener("resize", onScrollResize);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", onScrollResize, true);
+      window.removeEventListener("resize", onScrollResize);
+    };
+  }, [open]);
 
   function handleSelect(card) {
     setQuery(card.printed_name || card.name);
@@ -737,6 +757,26 @@ function CommanderSearch({ selected, onSelect, onClear }) {
   function handleClear() {
     setQuery(""); setResults([]); setOpen(false); onClear?.();
   }
+
+  const dropdown = open && results.length > 0 && dropPos
+    ? createPortal(
+        <div
+          className="cmd-search-dropdown"
+          style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 99999 }}
+        >
+          {results.slice(0, 10).map((card, i) => (
+            <button key={i} type="button" className="cmd-search-item" onMouseDown={e => { e.preventDefault(); handleSelect(card); }}>
+              {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
+              <div className="cmd-search-item-info">
+                <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
+                <span className="cmd-search-item-set">{card.set_name || card.set} · #{card.number}</span>
+              </div>
+            </button>
+          ))}
+        </div>,
+        document.body
+      )
+    : null;
 
   return (
     <div className="cmd-search-wrap" ref={wrapRef}>
@@ -750,28 +790,16 @@ function CommanderSearch({ selected, onSelect, onClear }) {
           placeholder={selected?.name ? selected.name : "Buscar comandante…"}
           value={query}
           onChange={e => { setQuery(e.target.value); if (!e.target.value) handleClear(); }}
-          onFocus={() => { if (results.length > 0) { computePos(); setOpen(true); } }}
+          onFocus={() => { if (results.length > 0) { setOpen(true); } }}
           autoComplete="off"
           className="cmd-search-input"
         />
         {loading && <span className="cmd-search-spinner">⟳</span>}
-        {!loading && selected?.name && !query && (
+        {!loading && (selected?.name || query) && (
           <button type="button" className="cmd-search-clear" onClick={handleClear} title="Limpar">✕</button>
         )}
       </div>
-      {open && results.length > 0 && dropPos && (
-        <div className="cmd-search-dropdown" style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}>
-          {results.slice(0, 10).map((card, i) => (
-            <button key={i} type="button" className="cmd-search-item" onMouseDown={e => { e.preventDefault(); handleSelect(card); }}>
-              {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
-              <div className="cmd-search-item-info">
-                <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
-                <span className="cmd-search-item-set">{card.set_name || card.set} · #{card.number}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      {dropdown}
       {selected?.name && !open && (
         <p className="cmd-search-selected">✓ {selected.name} · {selected.set_code} #{selected.collection_number}</p>
       )}
@@ -1367,6 +1395,27 @@ export default function App() {
     } catch {}
   }
 
+  async function handleAcquireDeckCard(cardId, deckIdParam) {
+    const deckId = deckIdParam ?? deckWishCardsFor?.id;
+    if (!deckId) return;
+    try {
+      const result = await acquireWishlistDeckCard(deckId, cardId);
+      // Marca como adquirida na UI local
+      if (!deckIdParam) {
+        setDeckWishCards(prev => prev.map(c => c.id === cardId ? { ...c, acquired: true } : c));
+      }
+      setDeckWishAllCards(prev => prev.map(e => e.card.id === cardId && e.deck.id === deckId ? { ...e, card: { ...e.card, acquired: true } } : e));
+      // Atualiza linked_deck_id no deckWishList
+      if (result.deck_id) {
+        setDeckWishList(prev => prev.map(d => d.id === deckId ? { ...d, linked_deck_id: result.deck_id } : d));
+      }
+      // Recarrega cartas e decks reais
+      await Promise.all([loadCards(), loadDecks()]);
+    } catch (err) {
+      alert(err.message || "Erro ao adquirir carta");
+    }
+  }
+
   function copyDeckList() {
     if (!deckWishCardsFor || deckWishCards.length === 0) return;
     const groups = buildWishCardGroups(deckWishCards);
@@ -1614,12 +1663,12 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { loadCards(); }, [sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType]);
-  useEffect(() => { loadDecks(); }, []);
-  useEffect(() => { loadBattles(); }, []);
-  useEffect(() => { loadWishlist(); }, []);
-  useEffect(() => { loadDeckWishList(); }, []);
-  useEffect(() => { loadDeckWishAllCards(deckWishList); }, [deckWishList.length]);
+  useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType]);
+  useEffect(() => { if (authReady && authUser) loadDecks(); }, [authReady, authUser]);
+  useEffect(() => { if (authReady && authUser) loadBattles(); }, [authReady, authUser]);
+  useEffect(() => { if (authReady && authUser) loadWishlist(); }, [authReady, authUser]);
+  useEffect(() => { if (authReady && authUser) loadDeckWishList(); }, [authReady, authUser]);
+  useEffect(() => { if (authReady && authUser) loadDeckWishAllCards(deckWishList); }, [deckWishList.length]);
 
   async function loadDeckWishList() {
     const data = await listWishlistDecks();
@@ -1653,7 +1702,7 @@ export default function App() {
   useEffect(() => {
     if (activeTab === "proxies") loadProxies();
   }, [activeTab]);
-  useEffect(() => { loadGameSessions(); }, []);
+  useEffect(() => { if (authReady && authUser) loadGameSessions(); }, [authReady, authUser]);
 
   useEffect(() => {
     function onFsChange() {
@@ -1784,10 +1833,10 @@ export default function App() {
     }
   }
 
-  useEffect(() => { loadTokensList(); }, []);
+  useEffect(() => { if (authReady && authUser) loadTokensList(); }, [authReady, authUser]);
   useEffect(() => {
-    listColorCombos().then(data => setAvailableColors(data ?? []));
-  }, []);
+    if (authReady && authUser) listColorCombos().then(data => setAvailableColors(data ?? []));
+  }, [authReady, authUser]);
 
   function handleSearchChange(e) {
     const q = e.target.value;
@@ -3132,7 +3181,7 @@ export default function App() {
                                       type="button"
                                       className={`deck-detail-card-check${card.acquired ? " checked" : ""}`}
                                       aria-label={card.acquired ? "Desmarcar adquirida" : "Marcar como adquirida"}
-                                      onClick={() => handleToggleDeckCardAcquired(card.id)}
+                                      onClick={() => card.acquired ? handleToggleDeckCardAcquired(card.id) : handleAcquireDeckCard(card.id)}
                                     >{card.acquired ? "✓" : "○"}</button>
                                     <button
                                       type="button"
@@ -3403,7 +3452,7 @@ export default function App() {
                                       <button
                                         type="button"
                                         className={card.acquired ? "wishlist-btn-acquire acquired" : "wishlist-btn-acquire"}
-                                        onClick={() => handleToggleDeckCardAcquired(card.id, deckId)}
+                                        onClick={() => card.acquired ? handleToggleDeckCardAcquired(card.id, deckId) : handleAcquireDeckCard(card.id, deckId)}
                                       >
                                         {card.acquired ? "✓ Adquirida" : "Marcar"}
                                       </button>

@@ -1,11 +1,14 @@
 package wishlist_decks
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"magic-collection-api/internal/cards"
+	"magic-collection-api/internal/decks"
 	"magic-collection-api/internal/mtgapi"
 
 	"github.com/gin-gonic/gin"
@@ -14,10 +17,12 @@ import (
 type Handler struct {
 	repo      *Repository
 	mtgClient *mtgapi.Client
+	cardRepo  *cards.Repository
+	deckRepo  *decks.Repository
 }
 
-func NewHandler(repo *Repository, mtgClient *mtgapi.Client) *Handler {
-	return &Handler{repo: repo, mtgClient: mtgClient}
+func NewHandler(repo *Repository, mtgClient *mtgapi.Client, cardRepo *cards.Repository, deckRepo *decks.Repository) *Handler {
+	return &Handler{repo: repo, mtgClient: mtgClient, cardRepo: cardRepo, deckRepo: deckRepo}
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -231,6 +236,117 @@ func (h *Handler) ImportList(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, res)
+}
+
+func rarityToCode(r string) string {
+	switch strings.ToLower(r) {
+	case "common":
+		return "C"
+	case "uncommon":
+		return "U"
+	case "rare":
+		return "R"
+	case "mythic":
+		return "M"
+	case "land":
+		return "L"
+	case "token":
+		return "T"
+	default:
+		return "C"
+	}
+}
+
+func (h *Handler) AcquireCard(c *gin.Context) {
+	deckID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id inválido"})
+		return
+	}
+	cardID, err := strconv.ParseInt(c.Param("card_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "card_id inválido"})
+		return
+	}
+
+	// Busca o deck desejado
+	wishDeck, err := h.repo.getByID(deckID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "deck desejado não encontrado"})
+		return
+	}
+
+	// Busca a carta desejada
+	wishCard, err := h.repo.GetCard(deckID, cardID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "carta não encontrada"})
+		return
+	}
+
+	// Cria o deck real se ainda não existe
+	linkedDeckID := wishDeck.LinkedDeckID
+	if linkedDeckID == 0 {
+		isCommander := strings.EqualFold(wishDeck.Format, "Commander")
+		newDeckID, err := h.deckRepo.Create(decks.DeckInput{
+			Name:      wishDeck.Name,
+			Colors:    wishDeck.Colors,
+			Commander: isCommander,
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "erro ao criar deck: " + err.Error()})
+			return
+		}
+		linkedDeckID = newDeckID
+		if err := h.repo.SetLinkedDeck(deckID, linkedDeckID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "erro ao vincular deck: " + err.Error()})
+			return
+		}
+	}
+
+	// Busca dados da carta na Scryfall
+	ext, err := h.mtgClient.Search(wishCard.SetCode, wishCard.CollectionNumber, "", "")
+	if err != nil || ext == nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "carta não encontrada na Scryfall"})
+		return
+	}
+
+	// Monta JSON de cores
+	colorsJSON, _ := json.Marshal(ext.Colors)
+	colorsStr := string(colorsJSON)
+	colorDisplay := cards.ColorsJSONToDisplay(colorsStr)
+
+	// Cria a carta na coleção
+	newCard := cards.Card{
+		MTGID:            ext.ID,
+		Name:             ext.Name,
+		Color:            colorDisplay,
+		Colors:           colorsStr,
+		Type:             ext.Type,
+		CollectionNumber: ext.Number,
+		SetCode:          strings.ToUpper(ext.Set),
+		Rarity:           rarityToCode(ext.Rarity),
+		ManaCost:         ext.ManaCost,
+		Artist:           ext.Artist,
+		Foil:             wishCard.Foil,
+		Quantity:         1,
+		Condition:        "near_mint",
+		DeckID:           int(linkedDeckID),
+		ImageURL:         ext.ImageURL,
+		Year:             ext.Year,
+		DoubleFaced:      ext.DoubleFaced,
+		ImageURLBack:     ext.BackImageURL,
+		FullArt:          ext.FullArt,
+	}
+	newCardID, err := h.cardRepo.Create(newCard)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "erro ao criar carta: " + err.Error()})
+		return
+	}
+
+	// Marca a carta do deck desejado como adquirida
+	_ = h.repo.MarkCardAcquired(deckID, cardID)
+
+	c.JSON(http.StatusOK, AcquireCardResult{DeckID: linkedDeckID, CardID: newCardID})
 }
 
 func (h *Handler) ToggleCardAcquired(c *gin.Context) {
