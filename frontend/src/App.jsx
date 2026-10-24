@@ -689,119 +689,100 @@ function CommanderSearch({ selected, onSelect, onClear }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [dropPos, setDropPos] = useState(null);
+  const [showResults, setShowResults] = useState(false);
   const timerRef = useRef(null);
   const wrapRef = useRef(null);
 
-  function computePos() {
-    if (!wrapRef.current) return;
-    const r = wrapRef.current.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const dropH = Math.min(320, results.length * 54 + 16);
-    const w = Math.max(r.width, Math.min(360, vw - 16));
-    let left = r.left;
-    // não sair pela direita
-    if (left + w > vw - 8) left = vw - w - 8;
-    if (left < 8) left = 8;
-    // abrir para cima se não couber embaixo
-    const spaceBelow = vh - r.bottom - 8;
-    const top = spaceBelow >= dropH ? r.bottom + 4 : r.top - dropH - 4;
-    setDropPos({ top, left, width: w });
-  }
-
   useEffect(() => {
-    if (query.length < 2) { setResults([]); setOpen(false); return; }
+    if (query.length < 2) { setResults([]); setShowResults(false); return; }
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const cards = await searchDeckWishCards(query);
-        const list = cards ?? [];
+        // filtra criaturas que podem ser comandantes; deduplicamos por nome (unique=prints retorna várias impressões)
+        const cards = await searchDeckWishCards(`${query} t:creature is:commander`);
+        const seen = new Set();
+        const list = (cards ?? []).filter(c => {
+          const key = c.name.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
         setResults(list);
-        if (list.length > 0) { setOpen(true); }
-        else setOpen(false);
-      } catch { setResults([]); setOpen(false); }
+        setShowResults(list.length > 0);
+      } catch { setResults([]); setShowResults(false); }
       setLoading(false);
     }, 400);
   }, [query]);
 
-  // recalcular posição quando open/results mudam
-  useEffect(() => {
-    if (open && results.length > 0) computePos();
-  }, [open, results.length]);
-
   useEffect(() => {
     function close(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setShowResults(false);
     }
-    function onScrollResize() { if (open) computePos(); }
     document.addEventListener("mousedown", close);
-    window.addEventListener("scroll", onScrollResize, true);
-    window.addEventListener("resize", onScrollResize);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      window.removeEventListener("scroll", onScrollResize, true);
-      window.removeEventListener("resize", onScrollResize);
-    };
-  }, [open]);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
 
   function handleSelect(card) {
-    setQuery(card.printed_name || card.name);
+    setQuery("");
     setResults([]);
-    setOpen(false);
+    setShowResults(false);
     onSelect({ name: card.name, set_code: card.set, collection_number: card.number, image_url: card.image_url });
   }
 
   function handleClear() {
-    setQuery(""); setResults([]); setOpen(false); onClear?.();
+    setQuery(""); setResults([]); setShowResults(false); onClear?.();
   }
-
-  const dropdown = open && results.length > 0 && dropPos
-    ? createPortal(
-        <div
-          className="cmd-search-dropdown"
-          style={{ position: "fixed", top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 99999 }}
-        >
-          {results.slice(0, 10).map((card, i) => (
-            <button key={i} type="button" className="cmd-search-item" onMouseDown={e => { e.preventDefault(); handleSelect(card); }}>
-              {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
-              <div className="cmd-search-item-info">
-                <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
-                <span className="cmd-search-item-set">{card.set_name || card.set} · #{card.number}</span>
-              </div>
-            </button>
-          ))}
-        </div>,
-        document.body
-      )
-    : null;
 
   return (
     <div className="cmd-search-wrap" ref={wrapRef}>
-      <div className="cmd-search-field">
-        <span className="cmd-search-crown">👑</span>
-        {selected?.image_url && !open && (
-          <img src={selected.image_url} className="cmd-search-preview" alt="" />
-        )}
-        <input
-          type="text"
-          placeholder={selected?.name ? selected.name : "Buscar comandante…"}
-          value={query}
-          onChange={e => { setQuery(e.target.value); if (!e.target.value) handleClear(); }}
-          onFocus={() => { if (results.length > 0) { setOpen(true); } }}
-          autoComplete="off"
-          className="cmd-search-input"
-        />
-        {loading && <span className="cmd-search-spinner">⟳</span>}
-        {!loading && (selected?.name || query) && (
-          <button type="button" className="cmd-search-clear" onClick={handleClear} title="Limpar">✕</button>
-        )}
-      </div>
-      {dropdown}
-      {selected?.name && !open && (
-        <p className="cmd-search-selected">✓ {selected.name} · {selected.set_code} #{selected.collection_number}</p>
+      {/* Campo selecionado */}
+      {selected?.name && !showResults && !query && (
+        <div className="cmd-search-selected-card">
+          {selected.image_url && <img src={selected.image_url} className="cmd-search-preview" alt="" />}
+          <div className="cmd-search-selected-info">
+            <span className="cmd-search-selected-name">👑 {selected.name}</span>
+            <span className="cmd-search-selected-set">{selected.set_code} #{selected.collection_number}</span>
+          </div>
+          <button type="button" className="cmd-search-clear" onClick={handleClear} title="Trocar">✕</button>
+        </div>
+      )}
+      {/* Campo de busca — oculto quando já tem selecionado e não está editando */}
+      {(!selected?.name || query || showResults) && (
+        <div className="cmd-search-field">
+          <span className="cmd-search-crown">👑</span>
+          <input
+            type="text"
+            placeholder="Buscar comandante pelo nome…"
+            value={query}
+            onChange={e => { setQuery(e.target.value); if (!e.target.value) { setResults([]); setShowResults(false); } }}
+            onFocus={() => { if (results.length > 0) setShowResults(true); }}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="cmd-search-input"
+          />
+          {loading && <span className="cmd-search-spinner">⟳</span>}
+          {!loading && query && (
+            <button type="button" className="cmd-search-clear" onClick={handleClear} title="Limpar">✕</button>
+          )}
+        </div>
+      )}
+      {/* Lista de resultados — inline, sem float */}
+      {showResults && results.length > 0 && (
+        <ul className="cmd-search-results">
+          {results.slice(0, 8).map((card, i) => (
+            <li key={i}>
+              <button type="button" className="cmd-search-item" onMouseDown={e => { e.preventDefault(); handleSelect(card); }}>
+                {card.image_url && <img src={card.image_url} className="cmd-search-item-img" alt="" />}
+                <div className="cmd-search-item-info">
+                  <span className="cmd-search-item-name">{card.printed_name || card.name}</span>
+                  <span className="cmd-search-item-set">{card.set_name || card.set} · #{card.number}</span>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
