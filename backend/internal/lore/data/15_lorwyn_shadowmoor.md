@@ -1,22 +1,5 @@
+<!-- tags: Lorwyn, Shadowmoor, Aurora, Oona, Faeries -->
 # Volume 15 — Lorwyn e Shadowmoor: a Great Aurora
-
-> **Nota de fontes — mudança importante.** A partir deste volume, **existe
-> material oficial da Wizards consultável online**. A página oficial do
-> plano ([Lorwyn & Shadowmoor](https://magic.wizards.com/en/story/lorwyn-and-shadowmoor-plane))
-> foi usada como âncora primária deste capítulo, e é citada como tal.
->
-> O cânone narrativo detalhado ainda vem dos romances *Lorwyn* (2007),
-> *Morningtide* (2008) e *Eventide* (2008), de Cory J. Herndon e Scott
-> McGough, **não publicados online** — essas partes continuam sendo
-> reconstrução a partir de fontes secundárias (MTG Wiki).
->
-> Marcações: **【OFICIAL】** afirmação sustentada por página da Wizards ·
-> **⚠️** divergência entre fontes · **🔎** fonte única, não corroborada ·
-> *(interpretação)* leitura temática.
->
-> Datação: a Grande Aurora do bloco ocorre em **4520 AR** — vinte anos
-> depois do **Mending** (Volume 14). O elo entre as duas coisas é direto e
-> está na seção 6.
 
 ---
 

@@ -1,18 +1,5 @@
+<!-- tags: Multiverso, Lorwyn, Planeswalkers, Nicol Bolas, Agents of Artifice -->
 # Volume 16 — Os Lorwyn Five: as histórias iniciais
-
-> **Nota de fontes.** Cânone primário desta era: os romances *Agents of
-> Artifice* (2009, Ari Marmell) e *The Purifying Fire* (2009, Laura Resnick),
-> os webcomics de 2007–2008, e as histórias oficiais publicadas em
-> magic.wizards.com a partir de 2015 (as **Origins**), que **revisaram
-> partes deste material**. Os romances não estão online; as revisões estão.
->
-> Salvo indicação contrária, o conteúdo é reconstrução a partir de fontes
-> secundárias (MTG Wiki). Este volume trata **apenas das histórias
-> iniciais** — as biografias completas ficam para a Parte VI (volumes
-> 25–34).
->
-> Marcações: **⚠️** divergência ou **retcon oficial** · **🔎** fonte única ·
-> *(interpretação)* leitura temática.
 
 ---
 

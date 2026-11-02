@@ -1,14 +1,5 @@
+<!-- tags: Dominaria, Hanna, Barrin, Tolaria, Invasão Phyrexiana -->
 # Volume 07 — Hanna e Barrin: a praga, a mentira e a destruição de Tolaria
-
-> **Nota de fontes.** Cânone primário: romances *Prophecy* (1999),
-> *Invasion* (1999) e *Planeshift* (2000), além do ciclo de Urza para a
-> história anterior de Barrin, Rayne e da Academia. **Nenhum desses textos
-> está no site oficial da Wizards.** Salvo indicação contrária, o conteúdo
-> abaixo é **reconstrução a partir de fontes secundárias derivadas do
-> cânone** (sobretudo MTG Wiki), e não leitura direta do texto oficial.
->
-> Marcações: **⚠️** divergência entre fontes · **🔎** detalhe presente em
-> apenas uma fonte, não corroborado · *(interpretação)* leitura temática.
 
 ---
 

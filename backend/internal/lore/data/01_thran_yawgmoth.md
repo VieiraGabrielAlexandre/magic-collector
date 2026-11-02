@@ -1,3 +1,4 @@
+<!-- tags: Dominaria, Thran, Yawgmoth, Old Phyrexia, Pré-história -->
 # Volume I --- The Thran, Yawgmoth e o nascimento de Phyrexia
 
 ## Dominaria antes de Urza

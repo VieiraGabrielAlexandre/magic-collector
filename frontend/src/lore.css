@@ -887,6 +887,47 @@
   background: rgba(196,154,76,0.03);
   border-radius: 0 5px 5px 0;
 }
+
+/* Caixa de nota: > **Título.** */
+.lore-md .md-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: rgba(125,211,252,0.06);
+  border: 1px solid rgba(125,211,252,0.18);
+  border-left: 3px solid rgba(125,211,252,0.45);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin: 18px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.lore-md .md-note-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.8;
+}
+.lore-md .md-note-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.lore-md .md-note-title {
+  font-weight: 700;
+  font-style: normal;
+  color: rgba(125,211,252,0.85);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.lore-md .md-note-title strong { font-weight: 700; }
+.lore-md .md-note-body {
+  color: rgba(201,209,217,0.7);
+  font-style: italic;
+}
+
 .lore-md .md-ul { margin: 0 0 13px 16px; padding: 0; list-style: none; }
 .lore-md .md-li {
   position: relative;
@@ -952,6 +993,38 @@
   color: #4a4038;
   text-transform: uppercase;
 }
+
+/* ── Tags ─────────────────────────────────────────────────────────── */
+.lore-tag {
+  display: inline-block;
+  font-family: 'Cinzel', serif;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--era-c, #c49a4c);
+  border: 1px solid rgba(var(--era-c, 196, 154, 76), 0.35);
+  border-color: color-mix(in srgb, var(--era-c, #c49a4c) 40%, transparent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  opacity: 0.75;
+}
+.lore-ch-card-tags,
+.lore-ch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+/* ── Markdown links ───────────────────────────────────────────────── */
+.lore-md a {
+  color: var(--era-c, #c49a4c);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.lore-md a:hover { opacity: 1; }
 
 /* ── Cards showcase entry (in main lore) ──────────────────────────── */
 .lore-cards-entry {
@@ -1557,6 +1630,44 @@
   .lore-enc-grid   { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .lore-enc-visual { height: 60px; }
 }
+
+/* ── Tag chips ────────────────────────────────────────────────────── */
+.lore-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: "Cinzel", serif;
+  letter-spacing: 0.04em;
+  background: rgba(196,154,76,0.12);
+  border: 1px solid rgba(196,154,76,0.28);
+  color: rgba(196,154,76,0.85);
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.lore-ch-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.lore-ch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* Link styles inside lore markdown */
+.lore-md a {
+  color: rgba(125, 195, 240, 0.9);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+.lore-md a:hover { color: #7dc3f0; }
 
 @media (prefers-reduced-motion: reduce) {
   .lore-root * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

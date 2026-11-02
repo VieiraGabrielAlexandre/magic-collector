@@ -1,3 +1,4 @@
+<!-- tags: Dominaria, Urza, Xantcha, Serra, Tolaria -->
 # Volume III --- Xantcha, Serra, Tolaria e o projeto Legacy
 
 ## Xantcha

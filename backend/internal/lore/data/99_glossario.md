@@ -1,3 +1,4 @@
+<!-- tags: Glossário, Referência, Personagens, Planos, Conceitos -->
 # Volume XIV --- Glossário de personagens, planos e conceitos
 
 ## Planeswalker
@@ -240,10 +241,6 @@ retorno de Zhalfir durante March of the Machine.
 ---
 
 # Acréscimos — Bloco 2 (era clássica, Otaria)
-
-> Verbetes derivados dos Volumes 09–11. As ressalvas de fonte desses volumes
-> valem aqui: cânone de romances não disponíveis online, reconstruído por
-> fontes secundárias.
 
 ## Mirari
 

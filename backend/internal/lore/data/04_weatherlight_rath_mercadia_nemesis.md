@@ -1,3 +1,4 @@
+<!-- tags: Dominaria, Weatherlight, Gerrard, Rath, Mercadia -->
 # Volume IV --- Weatherlight, Rath, Mercadia e Nemesis
 
 ## Rath

@@ -1,15 +1,5 @@
+<!-- tags: Alara, Conflux, Nicol Bolas, Ajani, Shards -->
 # Volume 17 — Alara: os cinco shards e a Conflux
-
-> **Nota de fontes.** Existe **material oficial da Wizards** para este plano
-> ([Alara — página do plano](https://magic.wizards.com/en/story/alara-plane)),
-> usado como âncora. O cânone narrativo detalhado vem do romance ***Alara
-> Unbroken*** (2009, Doug Beyer) e de ***Agents of Artifice*** (2009, Ari
-> Marmell), **não publicados online** — essas partes são reconstrução por
-> fontes secundárias (MTG Wiki).
->
-> Marcações: **【OFICIAL】** afirmação sustentada por página da Wizards ·
-> **⚠️** divergência ou lacuna · **🔎** fonte única · *(interpretação)*
-> leitura temática.
 
 ---
 

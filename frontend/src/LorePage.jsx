@@ -156,7 +156,9 @@ function parseLine(line) {
   return line
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
 function isTableRow(line) {
@@ -195,13 +197,33 @@ function renderMarkdown(md) {
   }
   function flushBq() {
     if (!bqLines.length) return;
-    nodes.push(
-      <blockquote
-        key={key++}
-        className="md-blockquote"
-        dangerouslySetInnerHTML={{ __html: bqLines.join(" ") }}
-      />
-    );
+    // Detecta padrão de nota: primeira linha é só texto em negrito, ex: **Nota de fontes.**
+    const firstLine = bqLines[0].trim();
+    const isNote = /^<strong>[^<]+<\/strong>\.?$/.test(firstLine);
+    if (isNote) {
+      const body = bqLines.slice(1).filter(l => l.trim()).join(" ");
+      nodes.push(
+        <div key={key++} className="md-note">
+          <span className="md-note-icon" aria-hidden="true">📌</span>
+          <div className="md-note-content">
+            <span className="md-note-title" dangerouslySetInnerHTML={{ __html: firstLine }} />
+            {body && <span className="md-note-body" dangerouslySetInnerHTML={{ __html: body }} />}
+          </div>
+        </div>
+      );
+    } else {
+      // Blockquote normal — preserva quebras de linha entre as linhas
+      nodes.push(
+        <blockquote key={key++} className="md-blockquote">
+          {bqLines.map((line, idx) => (
+            <span key={idx}>
+              {idx > 0 && <br />}
+              <span dangerouslySetInnerHTML={{ __html: line }} />
+            </span>
+          ))}
+        </blockquote>
+      );
+    }
     bqLines = [];
   }
   function flushTable(header, rows) {
@@ -277,7 +299,7 @@ function renderMarkdown(md) {
       nodes.push(<hr key={key++} className="md-hr" />);
       continue;
     }
-    if (!line.trim()) { flushList(); flushBq(); continue; }
+    if (!line.trim() || /^<!--.*-->$/.test(line.trim())) { flushList(); flushBq(); continue; }
     flushList(); flushBq();
     let para = line;
     while (
@@ -420,9 +442,19 @@ export default function LorePage({ onClose }) {
   // IntersectionObserver — only active when on Capítulos
   useEffect(() => {
     if (activeSection !== "capitulos" || !chapters.length) return;
+    const root = mainRef.current;
+    if (!root) return;
     const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) setActiveNavSlug(e.target.dataset.slug); }),
-      { threshold: 0.1, rootMargin: "-10% 0px -65% 0px" }
+      entries => {
+        // Usa o entry mais próximo do topo do container scroll
+        const visible = entries.filter(e => e.isIntersecting);
+        if (!visible.length) return;
+        const top = visible.reduce((best, e) =>
+          e.boundingClientRect.top < best.boundingClientRect.top ? e : best
+        );
+        setActiveNavSlug(top.target.dataset.slug);
+      },
+      { root, threshold: 0, rootMargin: "-15% 0px -60% 0px" }
     );
     Object.values(chapRefs.current).forEach(el => { if (el) obs.observe(el); });
     return () => obs.disconnect();
@@ -624,6 +656,11 @@ export default function LorePage({ onClose }) {
                             {era.chars.slice(0, 3).map(c => <span key={c}>{c}</span>)}
                           </div>
                         )}
+                        {ch.tags && ch.tags.length > 0 && (
+                          <div className="lore-ch-card-tags">
+                            {ch.tags.slice(0, 3).map(t => <span key={t} className="lore-tag">{t}</span>)}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -668,6 +705,11 @@ export default function LorePage({ onClose }) {
                           {era.chars && (
                             <div className="lore-ch-chars">
                               {era.chars.map(c => <span key={c} className="lore-char">{c}</span>)}
+                            </div>
+                          )}
+                          {ch.tags && ch.tags.length > 0 && (
+                            <div className="lore-ch-tags">
+                              {ch.tags.slice(0, 4).map(t => <span key={t} className="lore-tag">{t}</span>)}
                             </div>
                           )}
                         </div>

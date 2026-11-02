@@ -14,14 +14,15 @@ import (
 var loreFS embed.FS
 
 type Chapter struct {
-	Slug    string `json:"slug"`
-	Volume  string `json:"volume"`
-	Title   string `json:"title"`
-	Content string `json:"content,omitempty"`
+	Slug    string   `json:"slug"`
+	Volume  string   `json:"volume"`
+	Title   string   `json:"title"`
+	Tags    []string `json:"tags,omitempty"`
+	Content string   `json:"content,omitempty"`
 }
 
 func parseTitle(content string) (volume, title string) {
-	for _, line := range strings.SplitN(content, "\n", 5) {
+	for _, line := range strings.SplitN(content, "\n", 6) {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "# ") {
 			raw := strings.TrimPrefix(line, "# ")
@@ -34,6 +35,26 @@ func parseTitle(content string) (volume, title string) {
 		}
 	}
 	return "", ""
+}
+
+// parseTags extrai tags do comentário HTML <!-- tags: A, B, C --> na primeira linha.
+func parseTags(content string) []string {
+	firstLine := content
+	if idx := strings.Index(content, "\n"); idx >= 0 {
+		firstLine = content[:idx]
+	}
+	firstLine = strings.TrimSpace(firstLine)
+	if !strings.HasPrefix(firstLine, "<!-- tags:") || !strings.HasSuffix(firstLine, "-->") {
+		return nil
+	}
+	inner := strings.TrimSuffix(strings.TrimPrefix(firstLine, "<!-- tags:"), "-->")
+	var tags []string
+	for _, t := range strings.Split(inner, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			tags = append(tags, t)
+		}
+	}
+	return tags
 }
 
 func slugFromName(name string) string {
@@ -63,7 +84,7 @@ func listChapters(withContent bool) ([]Chapter, error) {
 		}
 		content := string(raw)
 		volume, title := parseTitle(content)
-		ch := Chapter{Slug: slugFromName(e.Name()), Volume: volume, Title: title}
+		ch := Chapter{Slug: slugFromName(e.Name()), Volume: volume, Title: title, Tags: parseTags(content)}
 		if withContent {
 			ch.Content = content
 		}
@@ -97,7 +118,7 @@ func GetChapter(c *gin.Context) {
 	}
 	content := string(raw)
 	volume, title := parseTitle(content)
-	c.JSON(http.StatusOK, Chapter{Slug: slug, Volume: volume, Title: title, Content: content})
+	c.JSON(http.StatusOK, Chapter{Slug: slug, Volume: volume, Title: title, Tags: parseTags(content), Content: content})
 }
 
 // ── Card showcases ────────────────────────────────────────────────
