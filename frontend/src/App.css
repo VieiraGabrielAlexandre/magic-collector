@@ -4385,6 +4385,276 @@ input[type="radio"] {
   box-shadow: 0 0 16px rgba(200,155,60,0.3);
 }
 
+/* ── Abas do modal ─────────────────────────────────────── */
+.qa-tabs {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.qa-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.05em;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.qa-tab:first-child { border-right: 1px solid var(--border); }
+.qa-tab.active {
+  background: rgba(196,154,76,0.14);
+  color: var(--gold);
+}
+.qa-tab:hover:not(.active) { background: rgba(255,255,255,0.04); }
+
+/* ── Modo Em Lote ──────────────────────────────────────── */
+.batch-add-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.batch-global-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+.batch-foil-check { margin-bottom: 2px; }
+.batch-entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.18);
+}
+.batch-entry-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.batch-entry-item:last-child { border-bottom: none; }
+.batch-entry-num {
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 18px;
+  text-align: right;
+}
+.batch-entry-set {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  min-width: 44px;
+}
+.batch-entry-col {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.batch-entry-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.batch-entry-remove:hover { opacity: 1; color: #e55; }
+.batch-input-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 40px;
+  gap: 8px;
+}
+.batch-input-set, .batch-input-num {
+  padding: 8px 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 13px;
+}
+.batch-input-set { text-transform: uppercase; letter-spacing: 0.06em; }
+.batch-input-add {
+  background: rgba(196,154,76,0.18);
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+  font-size: 20px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+.batch-input-add:hover { background: rgba(196,154,76,0.3); }
+.batch-paste-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -6px 0;
+}
+.batch-paste-hint code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.batch-search-btn { margin-top: 2px; }
+
+/* ── Modal confirmação em lote ──────────────────────────── */
+.batch-confirm-modal {
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.batch-confirm-title {
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+.batch-confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 2px;
+}
+.batch-confirm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+  user-select: none;
+}
+.batch-confirm-card.selected {
+  border-color: rgba(196,154,76,0.5);
+  background: rgba(196,154,76,0.07);
+}
+.batch-confirm-card.not-found {
+  opacity: 0.65;
+}
+.batch-confirm-card.not-found.selected {
+  border-color: rgba(255,180,0,0.4);
+}
+.batch-confirm-check { display: none; }
+.batch-confirm-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 7/10;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.3);
+}
+.batch-confirm-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 7px;
+  display: block;
+}
+.batch-confirm-img-ph {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+}
+.batch-confirm-check-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(80,160,80,0.9);
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.batch-confirm-nf-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(200,80,60,0.9);
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.batch-confirm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: center;
+}
+.batch-confirm-name {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.batch-confirm-set {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.05em;
+}
+.batch-confirm-nf-label {
+  font-size: 10px;
+  color: #e06060;
+  font-style: italic;
+}
+.batch-confirm-actions { justify-content: center; }
+
+@media (max-width: 600px) {
+  .batch-global-row { grid-template-columns: 1fr 1fr; }
+  .batch-foil-check { grid-column: 1 / -1; }
+  .batch-confirm-modal { max-width: 100%; border-radius: 16px 16px 0 0; }
+  .batch-confirm-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .quick-add-modal { max-width: 100%; }
+}
+
 /* ══════════════════════════════════════════════════════════
    SESSION BAR
 ══════════════════════════════════════════════════════════ */

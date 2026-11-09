@@ -519,19 +519,40 @@ function renderEvalContent(text) {
 
 // ── Deck theme colors ───────────────────────────────────────────────────
 const DECK_THEME_COLORS = [
-  { id: "",          label: "Nenhuma"                                                                        },
-  { id: "pearl",     label: "Branco",    bg: "#181614", border: "#b0a898", text: "#eeeade", swatch: "#ccc4b4" },
-  { id: "obsidian",  label: "Preto",     bg: "#07060e", border: "#28203c", text: "#7a6092", swatch: "#0e0b1c" },
-  { id: "crimson",   label: "Vermelho",  bg: "#3a0c0c", border: "#7a2020", text: "#ff9090"                   },
-  { id: "sapphire",  label: "Azul",      bg: "#081428", border: "#1a4080", text: "#80c0ff"                   },
-  { id: "emerald",   label: "Verde",     bg: "#071a0c", border: "#1a5828", text: "#80d890"                   },
-  { id: "violet",    label: "Roxo",      bg: "#150a28", border: "#4a2890", text: "#c090f0"                   },
-  { id: "gold",      label: "Dourado",   bg: "#221404", border: "#805010", text: "#e8c060"                   },
-  { id: "teal",      label: "Turquesa",  bg: "#041820", border: "#0c6878", text: "#60d0c8"                   },
-  { id: "ember",     label: "Laranja",   bg: "#280e04", border: "#904010", text: "#f09050"                   },
-  { id: "silver",    label: "Prata",     bg: "#0e1218", border: "#384858", text: "#a0b8c8"                   },
-  { id: "rose",      label: "Rosa",      bg: "#280a18", border: "#8a1e50", text: "#f080b0"                   },
-  { id: "bone",      label: "Marfim",    bg: "#1c1608", border: "#6a5828", text: "#e0d8b0"                   },
+  { id: "",          label: "Nenhuma"                                                                           },
+  // ── Neutros ──
+  { id: "pearl",     label: "Branco",          bg: "#181614", border: "#b0a898", text: "#eeeade", swatch: "#ccc4b4" },
+  { id: "silver",    label: "Prata",           bg: "#0e1218", border: "#384858", text: "#a0b8c8", swatch: "#607888" },
+  { id: "smoke",     label: "Cinza",           bg: "#0e0e10", border: "#404048", text: "#a0a0b0", swatch: "#606068" },
+  { id: "obsidian",  label: "Preto",           bg: "#07060e", border: "#28203c", text: "#7a6092", swatch: "#0e0b1c" },
+  // ── Quentes ──
+  { id: "crimson",   label: "Vermelho",        bg: "#3a0c0c", border: "#7a2020", text: "#ff9090", swatch: "#992020" },
+  { id: "wine",      label: "Vinho",           bg: "#1a0510", border: "#6a1030", text: "#d06080", swatch: "#7a1838" },
+  { id: "coral",     label: "Coral",           bg: "#2a0c08", border: "#9a3828", text: "#f8907a", swatch: "#b04030" },
+  { id: "ember",     label: "Laranja",         bg: "#280e04", border: "#904010", text: "#f09050", swatch: "#a84810" },
+  { id: "copper",    label: "Cobre",           bg: "#1a0c04", border: "#7a4010", text: "#d88040", swatch: "#904818" },
+  { id: "gold",      label: "Dourado",         bg: "#221404", border: "#805010", text: "#e8c060", swatch: "#a06818" },
+  { id: "bronze",    label: "Bronze",          bg: "#140c02", border: "#604010", text: "#b07838", swatch: "#704c18" },
+  { id: "brown",     label: "Marrom",          bg: "#160c04", border: "#5a3010", text: "#c09060", swatch: "#6a3c14" },
+  { id: "sand",      label: "Areia",           bg: "#1c1408", border: "#7a6020", text: "#d8c080", swatch: "#907830" },
+  { id: "bone",      label: "Marfim",          bg: "#1c1608", border: "#6a5828", text: "#e0d8b0", swatch: "#7a6830" },
+  // ── Rosa / Roxo ──
+  { id: "rose",      label: "Rosa",            bg: "#280a18", border: "#8a1e50", text: "#f080b0", swatch: "#a02860" },
+  { id: "lilac",     label: "Lilás",           bg: "#140a1c", border: "#6048a0", text: "#d0b0f0", swatch: "#7058b0" },
+  { id: "lavender",  label: "Lavanda",         bg: "#100a28", border: "#5040a0", text: "#c0b0f8", swatch: "#6050b8" },
+  { id: "violet",    label: "Roxo",            bg: "#150a28", border: "#4a2890", text: "#c090f0", swatch: "#5a30a8" },
+  // ── Azul ──
+  { id: "midnight",  label: "Meia-noite",      bg: "#030510", border: "#0c1848", text: "#4060c0", swatch: "#102060" },
+  { id: "navy",      label: "Azul-Marinho",    bg: "#030818", border: "#0c2060", text: "#5080e0", swatch: "#103078" },
+  { id: "sapphire",  label: "Azul",            bg: "#081428", border: "#1a4080", text: "#80c0ff", swatch: "#204898" },
+  { id: "petrol",    label: "Petróleo",        bg: "#04121c", border: "#0c5068", text: "#50c0d8", swatch: "#0c6070" },
+  { id: "teal",      label: "Turquesa",        bg: "#041820", border: "#0c6878", text: "#60d0c8", swatch: "#0c7888" },
+  { id: "mint",      label: "Menta",           bg: "#04180e", border: "#0c6840", text: "#60e8b0", swatch: "#0c7848" },
+  // ── Verde ──
+  { id: "emerald",   label: "Verde",           bg: "#071a0c", border: "#1a5828", text: "#80d890", swatch: "#1e6830" },
+  { id: "forest",    label: "Verde Floresta",  bg: "#040e06", border: "#1a4820", text: "#60b870", swatch: "#1a5020" },
+  { id: "olive",     label: "Oliva",           bg: "#101204", border: "#485010", text: "#a0b050", swatch: "#586010" },
+  { id: "avocado",   label: "Abacate",         bg: "#0c1804", border: "#4a7010", text: "#b8e040", swatch: "#588010" },
 ];
 
 function getDeckTheme(themeId) {
@@ -799,7 +820,7 @@ function DeckColorSelect({ value, onChange }) {
   const theme = getDeckTheme(value);
   return (
     <label>
-      Cor do deck
+      Cor do shield
       <div className="deck-color-select-row">
         {theme?.bg && <span className="deck-color-swatch" style={{ background: theme.swatch ?? theme.bg, borderColor: theme.border }} />}
         <select
@@ -807,12 +828,9 @@ function DeckColorSelect({ value, onChange }) {
           onChange={(e) => onChange(e.target.value)}
           style={theme?.bg ? { background: theme.bg, borderColor: theme.border, color: theme.text } : {}}
         >
-          {DECK_COLOR_GROUPS_DEF.map(({ key, label }) => {
-            const opts = DECK_THEME_COLORS.filter(c => c.group === key);
-            if (!opts.length) return null;
-            const items = opts.map(c => <option key={c.id} value={c.id}>{c.label}</option>);
-            return label ? <optgroup key={key} label={label}>{items}</optgroup> : items;
-          })}
+          {DECK_THEME_COLORS.map(c => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
         </select>
       </div>
     </label>
@@ -927,6 +945,17 @@ export default function App() {
 
   const [quickAddModal, setQuickAddModal] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
+  const [quickAddTab, setQuickAddTab] = useState("individual"); // "individual" | "lote"
+
+  // Lote state
+  const [batchEntries, setBatchEntries]   = useState([]);
+  const [batchGlobal, setBatchGlobal]     = useState({ language: "EN", deck_id: 0, foil: false });
+  const [batchInputSet, setBatchInputSet] = useState("");
+  const [batchInputNum, setBatchInputNum] = useState("");
+  const [batchConfirm, setBatchConfirm]   = useState(null); // [{entry,found,card,formData,selected}]
+  const [batchSearching, setBatchSearching] = useState(false);
+  const [batchCreating, setBatchCreating]   = useState(false);
+
   const [openMenu, setOpenMenu] = useState(null);
 
   const [selectedCard, setSelectedCard] = useState(null);
@@ -1868,6 +1897,78 @@ export default function App() {
       setConfirmCard({ found: false, card: null, formData: payload, origin: "quickAdd" });
     } finally {
       setConfirmLoading(false);
+    }
+  }
+
+  function batchAddEntry(e) {
+    if (e) e.preventDefault();
+    const s = batchInputSet.trim().toUpperCase();
+    const n = batchInputNum.trim();
+    if (!s || !n) return;
+    setBatchEntries(prev => [...prev, { set_code: s, collection_number: n, id: Date.now() }]);
+    setBatchInputSet(""); setBatchInputNum("");
+  }
+
+  function batchRemoveEntry(id) {
+    setBatchEntries(prev => prev.filter(e => e.id !== id));
+  }
+
+  function batchPasteLines(text) {
+    // Aceita linhas como "KLD 123" ou "KLD123"
+    const lines = text.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean);
+    const parsed = [];
+    for (const line of lines) {
+      const m = line.match(/^([A-Za-z0-9]{2,6})\s+(\S+)$/);
+      if (m) parsed.push({ set_code: m[1].toUpperCase(), collection_number: m[2], id: Date.now() + Math.random() });
+    }
+    if (parsed.length) setBatchEntries(prev => [...prev, ...parsed]);
+  }
+
+  async function handleBatchSearch() {
+    if (!batchEntries.length) return;
+    setBatchSearching(true);
+    setQuickAddModal(false);
+    try {
+      const results = await Promise.all(
+        batchEntries.map(async (entry) => {
+          const payload = {
+            ...batchGlobal,
+            deck_id: batchGlobal.deck_id || 0,
+            set_code: entry.set_code,
+            collection_number: entry.collection_number,
+            quantity: 1,
+          };
+          try {
+            const preview = await previewCard(payload);
+            return {
+              entry, found: preview.found, card: preview.card ?? null,
+              formData: { ...payload, name: preview.card?.printed_name || preview.card?.name || "" },
+              selected: true,
+            };
+          } catch {
+            return { entry, found: false, card: null, formData: { ...payload, name: "" }, selected: true };
+          }
+        })
+      );
+      setBatchConfirm(results);
+    } finally {
+      setBatchSearching(false);
+    }
+  }
+
+  async function handleBatchCreate() {
+    if (!batchConfirm) return;
+    setBatchCreating(true);
+    const toCreate = batchConfirm.filter(r => r.selected);
+    try {
+      await Promise.all(toCreate.map(r => createCard(r.formData)));
+      setBatchConfirm(null);
+      setBatchEntries([]);
+      setBatchGlobal({ language: "EN", deck_id: 0, foil: false });
+      setPage(1);
+      loadCards({ page: 1 });
+    } finally {
+      setBatchCreating(false);
     }
   }
 
@@ -4704,64 +4805,158 @@ export default function App() {
         </>
       )}
 
-      {/* ── MODAL BUSCA RÁPIDA ── */}
+      {/* ── MODAL CADASTRAR CARTA ── */}
       {quickAddModal && (
         <div className="modal-overlay" onClick={() => setQuickAddModal(false)}>
           <div className="modal quick-add-modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" aria-label="Fechar" onClick={() => setQuickAddModal(false)}>✕</button>
-            <h2>⚡ Busca Rápida</h2>
-            <p className="quick-add-hint">Informe a sigla e o número da coleção para buscar a carta no Scryfall automaticamente.</p>
-            <form className="quick-add-form" onSubmit={handleQuickAdd}>
-              <div className="qa-row-2col">
-                <label>
-                  Sigla *
-                  <input required autoFocus placeholder="KLD, BRO…"
-                    value={quickAddForm.set_code}
+            <h2>✦ Cadastrar Carta</h2>
+
+            {/* Abas */}
+            <div className="qa-tabs">
+              <button className={`qa-tab${quickAddTab === "individual" ? " active" : ""}`} onClick={() => setQuickAddTab("individual")}>Individual</button>
+              <button className={`qa-tab${quickAddTab === "lote" ? " active" : ""}`} onClick={() => setQuickAddTab("lote")}>Em Lote</button>
+            </div>
+
+            {/* ── Individual ── */}
+            {quickAddTab === "individual" && (
+              <>
+                <p className="quick-add-hint">Informe a sigla e o número da coleção para buscar a carta no Scryfall automaticamente.</p>
+                <form className="quick-add-form" onSubmit={handleQuickAdd}>
+                  <div className="qa-row-2col">
+                    <label>
+                      Sigla *
+                      <input required autoFocus placeholder="KLD, BRO…"
+                        value={quickAddForm.set_code}
+                        style={{ textTransform: "uppercase" }}
+                        onChange={(e) => setQuickAddForm({ ...quickAddForm, set_code: e.target.value.toUpperCase().trim() })} />
+                    </label>
+                    <label>
+                      Número *
+                      <input required placeholder="017, 253a"
+                        value={quickAddForm.collection_number}
+                        onChange={(e) => setQuickAddForm({ ...quickAddForm, collection_number: e.target.value.trim() })} />
+                    </label>
+                  </div>
+                  <label>
+                    Idioma
+                    <select value={quickAddForm.language} onChange={(e) => setQuickAddForm({ ...quickAddForm, language: e.target.value })}>
+                      <option value="EN">Inglês</option>
+                      <option value="PT">Português</option>
+                      <option value="ES">Espanhol</option>
+                      <option value="JP">Japonês</option>
+                      <option value="FR">Francês</option>
+                      <option value="DE">Alemão</option>
+                    </select>
+                  </label>
+                  <label>
+                    Quantidade
+                    <input type="number" min="1" value={quickAddForm.quantity}
+                      onChange={(e) => setQuickAddForm({ ...quickAddForm, quantity: e.target.value })} />
+                  </label>
+                  <label>
+                    Deck
+                    <select value={quickAddForm.deck_id || 0} onChange={(e) => setQuickAddForm({ ...quickAddForm, deck_id: Number(e.target.value) })}>
+                      <option value={0}>— Nenhum —</option>
+                      {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={quickAddForm.foil}
+                      onChange={(e) => setQuickAddForm({ ...quickAddForm, foil: e.target.checked })} />
+                    ✦ Foil
+                  </label>
+                  <label className="checkbox-label proxy-checkbox">
+                    <input type="checkbox" checked={quickAddForm.proxy || false}
+                      onChange={(e) => setQuickAddForm({ ...quickAddForm, proxy: e.target.checked })} />
+                    ⚠ Proxy
+                  </label>
+                  <button type="submit" className="quick-add-submit">Buscar e Confirmar →</button>
+                </form>
+              </>
+            )}
+
+            {/* ── Em Lote ── */}
+            {quickAddTab === "lote" && (
+              <div className="batch-add-wrap">
+                <p className="quick-add-hint">Configure idioma e deck, adicione as cartas pela sigla + número e clique em Buscar todas.</p>
+
+                {/* Configurações globais */}
+                <div className="batch-global-row">
+                  <label>
+                    Idioma
+                    <select value={batchGlobal.language} onChange={e => setBatchGlobal({ ...batchGlobal, language: e.target.value })}>
+                      <option value="EN">Inglês</option>
+                      <option value="PT">Português</option>
+                      <option value="ES">Espanhol</option>
+                      <option value="JP">Japonês</option>
+                      <option value="FR">Francês</option>
+                      <option value="DE">Alemão</option>
+                    </select>
+                  </label>
+                  <label>
+                    Deck
+                    <select value={batchGlobal.deck_id} onChange={e => setBatchGlobal({ ...batchGlobal, deck_id: Number(e.target.value) })}>
+                      <option value={0}>— Nenhum —</option>
+                      {decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="checkbox-label batch-foil-check">
+                    <input type="checkbox" checked={batchGlobal.foil} onChange={e => setBatchGlobal({ ...batchGlobal, foil: e.target.checked })} />
+                    ✦ Foil
+                  </label>
+                </div>
+
+                {/* Lista de entradas */}
+                {batchEntries.length > 0 && (
+                  <ul className="batch-entry-list">
+                    {batchEntries.map((en, i) => (
+                      <li key={en.id} className="batch-entry-item">
+                        <span className="batch-entry-num">{i + 1}</span>
+                        <span className="batch-entry-set">{en.set_code}</span>
+                        <span className="batch-entry-col">#{en.collection_number}</span>
+                        <button type="button" className="batch-entry-remove" onClick={() => batchRemoveEntry(en.id)} aria-label="Remover">✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Input row */}
+                <form className="batch-input-row" onSubmit={batchAddEntry}>
+                  <input
+                    className="batch-input-set"
+                    placeholder="Sigla"
+                    value={batchInputSet}
                     style={{ textTransform: "uppercase" }}
-                    onChange={(e) => setQuickAddForm({ ...quickAddForm, set_code: e.target.value.toUpperCase().trim() })} />
-                </label>
-                <label>
-                  Número *
-                  <input required placeholder="017, 253a"
-                    value={quickAddForm.collection_number}
-                    onChange={(e) => setQuickAddForm({ ...quickAddForm, collection_number: e.target.value.trim() })} />
-                </label>
+                    onChange={e => setBatchInputSet(e.target.value.toUpperCase())}
+                    onPaste={e => {
+                      const text = e.clipboardData.getData("text");
+                      if (text.includes("\n") || text.includes(",")) {
+                        e.preventDefault();
+                        batchPasteLines(text);
+                      }
+                    }}
+                  />
+                  <input
+                    className="batch-input-num"
+                    placeholder="Número"
+                    value={batchInputNum}
+                    onChange={e => setBatchInputNum(e.target.value)}
+                  />
+                  <button type="submit" className="batch-input-add">+</button>
+                </form>
+                <p className="batch-paste-hint">Dica: cole várias linhas no formato <code>KLD 123</code> (uma por linha)</p>
+
+                <button
+                  type="button"
+                  className="quick-add-submit batch-search-btn"
+                  disabled={batchEntries.length === 0 || batchSearching}
+                  onClick={handleBatchSearch}
+                >
+                  {batchSearching ? "Buscando…" : `Buscar todas (${batchEntries.length})`}
+                </button>
               </div>
-              <label>
-                Idioma
-                <select value={quickAddForm.language} onChange={(e) => setQuickAddForm({ ...quickAddForm, language: e.target.value })}>
-                  <option value="EN">Inglês</option>
-                  <option value="PT">Português</option>
-                  <option value="ES">Espanhol</option>
-                  <option value="JP">Japonês</option>
-                  <option value="FR">Francês</option>
-                  <option value="DE">Alemão</option>
-                </select>
-              </label>
-              <label>
-                Quantidade
-                <input type="number" min="1" value={quickAddForm.quantity}
-                  onChange={(e) => setQuickAddForm({ ...quickAddForm, quantity: e.target.value })} />
-              </label>
-              <label>
-                Deck
-                <select value={quickAddForm.deck_id || 0} onChange={(e) => setQuickAddForm({ ...quickAddForm, deck_id: Number(e.target.value) })}>
-                  <option value={0}>— Nenhum —</option>
-                  {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </label>
-              <label className="checkbox-label">
-                <input type="checkbox" checked={quickAddForm.foil}
-                  onChange={(e) => setQuickAddForm({ ...quickAddForm, foil: e.target.checked })} />
-                ✦ Foil
-              </label>
-              <label className="checkbox-label proxy-checkbox">
-                <input type="checkbox" checked={quickAddForm.proxy || false}
-                  onChange={(e) => setQuickAddForm({ ...quickAddForm, proxy: e.target.checked })} />
-                ⚠ Proxy
-              </label>
-              <button type="submit" className="quick-add-submit">Buscar e Confirmar →</button>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -4821,6 +5016,76 @@ export default function App() {
                     </div>
                   </>
                 )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL CONFIRMAÇÃO EM LOTE ── */}
+      {(batchConfirm || batchSearching) && (
+        <div className="modal-overlay" onClick={() => !batchCreating && !batchSearching && setBatchConfirm(null)}>
+          <div className="modal batch-confirm-modal" onClick={e => e.stopPropagation()}>
+            {batchSearching ? (
+              <div className="eval-loading">
+                <div className="eval-spinner">⚙</div>
+                <p className="eval-loading-text">Buscando cartas na Scryfall…</p>
+              </div>
+            ) : (
+              <>
+                <button className="modal-close" aria-label="Fechar" onClick={() => !batchCreating && setBatchConfirm(null)}>✕</button>
+                <h2 className="batch-confirm-title">Confirmar cadastro em lote</h2>
+                <p className="quick-add-hint">
+                  {batchConfirm.filter(r => r.selected).length} de {batchConfirm.length} cartas selecionadas.
+                  Desmarque as que não quer cadastrar.
+                </p>
+
+                <div className="batch-confirm-grid">
+                  {batchConfirm.map((r, i) => (
+                    <label
+                      key={r.entry.id}
+                      className={`batch-confirm-card${r.selected ? " selected" : ""}${!r.found ? " not-found" : ""}`}
+                      title={r.found ? (r.card?.printed_name || r.card?.name || "") : "Carta não encontrada"}
+                    >
+                      <input
+                        type="checkbox"
+                        className="batch-confirm-check"
+                        checked={r.selected}
+                        onChange={() => setBatchConfirm(prev => prev.map((x, j) => j === i ? { ...x, selected: !x.selected } : x))}
+                      />
+                      <div className="batch-confirm-img-wrap">
+                        {r.found && r.card?.image_url
+                          ? <img src={r.card.image_url} alt={r.card.name} className="batch-confirm-img" loading="lazy" />
+                          : <div className="batch-confirm-img-ph">?</div>
+                        }
+                        {r.selected && <span className="batch-confirm-check-badge">✓</span>}
+                        {!r.found && <span className="batch-confirm-nf-badge">!</span>}
+                      </div>
+                      <div className="batch-confirm-info">
+                        <span className="batch-confirm-name">
+                          {r.found ? (r.card?.printed_name || r.card?.name || `${r.entry.set_code} #${r.entry.collection_number}`) : `${r.entry.set_code} #${r.entry.collection_number}`}
+                        </span>
+                        <span className="batch-confirm-set">{r.entry.set_code} #{r.entry.collection_number}</span>
+                        {!r.found && <span className="batch-confirm-nf-label">Não encontrada</span>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="confirm-card-actions batch-confirm-actions">
+                  <button
+                    type="button"
+                    className="confirm-yes"
+                    disabled={batchCreating || batchConfirm.filter(r => r.selected).length === 0}
+                    onClick={handleBatchCreate}
+                  >
+                    {batchCreating ? "Cadastrando…" : `✓ Cadastrar ${batchConfirm.filter(r => r.selected).length} carta(s)`}
+                  </button>
+                  <button type="button" className="confirm-no" disabled={batchCreating}
+                    onClick={() => { setBatchConfirm(null); setQuickAddModal(true); setQuickAddTab("lote"); }}>
+                    ← Voltar e editar
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -5456,7 +5721,7 @@ export default function App() {
               <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
               <div className="toolbar-group">
                 <button type="button" className="quick-add-btn-toolbar" onClick={() => setQuickAddModal(true)}>
-                  ⚡ Busca Rápida
+                  ✦ Cadastrar Carta
                 </button>
                 <button type="button" className="tokens-tab-btn" onClick={() => setActiveTab("tokens")}>
                   🎭 Tokens
