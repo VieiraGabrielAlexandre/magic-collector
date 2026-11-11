@@ -92,6 +92,16 @@ export async function assignCardToDeck(cardId, deckId) {
   return res.json();
 }
 
+export async function setCardCommander(cardId, value) {
+  const res = await authFetch(`${BASE_URL}/cards/${cardId}/commander`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ commander: value }),
+  });
+  if (!res.ok) throw new Error("Erro ao atualizar comandante");
+  return res.json();
+}
+
 export async function deleteCard(id) {
   const res = await authFetch(`${BASE_URL}/cards/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Erro ao remover carta");

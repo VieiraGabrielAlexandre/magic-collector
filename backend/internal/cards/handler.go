@@ -142,6 +142,21 @@ func (h *Handler) SetDeck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) SetCommander(c *gin.Context) {
+	var input struct {
+		Commander bool `json:"commander"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.service.SetCommander(c.Param("id"), input.Commander); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar comandante"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
 func (h *Handler) NormalizeRarities(c *gin.Context) {
 	result, err := h.service.NormalizeRarities()
 	if err != nil {

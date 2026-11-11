@@ -127,6 +127,7 @@ func (m *mockCardService) GetByID(id string) (map[string]any, error) { return m.
 func (m *mockCardService) Update(id string, i UpdateCardInput) error  { return m.updateFn(id, i) }
 func (m *mockCardService) Delete(id string) error                     { return m.deleteFn(id) }
 func (m *mockCardService) SetDeck(id string, deckID int) error        { return m.setDeckFn(id, deckID) }
+func (m *mockCardService) SetCommander(id string, value bool) error   { return nil }
 func (m *mockCardService) NormalizeRarities() (NormalizeRarityResult, error) {
 	return m.normalizeRaritiesFn()
 }

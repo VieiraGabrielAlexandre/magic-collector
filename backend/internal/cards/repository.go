@@ -336,6 +336,15 @@ func (r *Repository) SetDeck(id string, deckID int) error {
 	return err
 }
 
+func (r *Repository) SetCommander(id string, value bool) error {
+	v := 0
+	if value {
+		v = 1
+	}
+	_, err := r.db.Exec(`UPDATE cards SET commander = ? WHERE id = ?`, v, id)
+	return err
+}
+
 func (r *Repository) ListAll() ([]Card, error) {
 	rows, err := r.db.Query(`SELECT ` + selectCols + ` FROM cards ORDER BY name ASC, set_code ASC`)
 	if err != nil {

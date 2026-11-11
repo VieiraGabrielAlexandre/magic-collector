@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -948,12 +948,13 @@ export default function App() {
   const [quickAddTab, setQuickAddTab] = useState("individual"); // "individual" | "lote"
 
   // Lote state
-  const [batchEntries, setBatchEntries]   = useState([]);
-  const [batchGlobal, setBatchGlobal]     = useState({ language: "EN", deck_id: 0, foil: false });
+  const [batchEntries, setBatchEntries]       = useState([]);
+  const [batchGlobal, setBatchGlobal]         = useState({ language: "EN", deck_id: 0, foil: false });
+  const [batchValidation, setBatchValidation] = useState({}); // { [id]: "loading"|"found"|"notfound" }
   const [batchInputSet, setBatchInputSet] = useState("");
   const [batchInputNum, setBatchInputNum] = useState("");
   const [batchConfirm, setBatchConfirm]   = useState(null); // [{entry,found,card,formData,selected}]
-  const [batchSearching, setBatchSearching] = useState(false);
+  // batchSearching removido — a confirmação agora lê do cache (sem nova requisição)
   const [batchCreating, setBatchCreating]   = useState(false);
 
   const [openMenu, setOpenMenu] = useState(null);
@@ -983,6 +984,7 @@ export default function App() {
   const [deckTypeFilter, setDeckTypeFilter] = useState("");
   const [deckColorFilter, setDeckColorFilter] = useState("");
   const [deckSetFilter, setDeckSetFilter] = useState("");
+  const [deckNameSearch, setDeckNameSearch] = useState("");
   const [deckPage, setDeckPage] = useState(1);
   const [deckAnomalyModal, setDeckAnomalyModal] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
@@ -1900,76 +1902,115 @@ export default function App() {
     }
   }
 
+  // Valida e armazena os dados completos da carta em cache (batchValidation).
+  // Essa é a ÚNICA chamada ao Scryfall por carta — o "Buscar todas" apenas lê esse cache.
+  async function validateBatchEntry(entry, language) {
+    const payload = {
+      ...batchGlobal,
+      deck_id: batchGlobal.deck_id || 0,
+      set_code: entry.set_code,
+      collection_number: entry.collection_number,
+      language,
+      quantity: 1,
+    };
+    setBatchValidation(prev => ({ ...prev, [entry.id]: { status: "loading", card: null, formData: payload } }));
+    try {
+      const preview = await previewCard(payload);
+      setBatchValidation(prev => ({
+        ...prev,
+        [entry.id]: {
+          status: preview.found ? "found" : "notfound",
+          card: preview.card ?? null,
+          formData: {
+            ...payload,
+            name: preview.card?.printed_name || preview.card?.name || `${entry.set_code} ${entry.collection_number}`,
+          },
+        },
+      }));
+    } catch {
+      setBatchValidation(prev => ({
+        ...prev,
+        [entry.id]: {
+          status: "notfound",
+          card: null,
+          formData: { ...payload, name: `${entry.set_code} ${entry.collection_number}` },
+        },
+      }));
+    }
+  }
+
   function batchAddEntry(e) {
     if (e) e.preventDefault();
     const s = batchInputSet.trim().toUpperCase();
     const n = batchInputNum.trim();
     if (!s || !n) return;
-    setBatchEntries(prev => [...prev, { set_code: s, collection_number: n, id: Date.now() }]);
+    const entry = { set_code: s, collection_number: n, id: Date.now() };
+    setBatchEntries(prev => [...prev, entry]);
     setBatchInputSet(""); setBatchInputNum("");
+    validateBatchEntry(entry, batchGlobal.language);
   }
 
   function batchRemoveEntry(id) {
     setBatchEntries(prev => prev.filter(e => e.id !== id));
+    setBatchValidation(prev => { const n = { ...prev }; delete n[id]; return n; });
   }
 
   function batchPasteLines(text) {
-    // Aceita linhas como "KLD 123" ou "KLD123"
     const lines = text.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean);
     const parsed = [];
     for (const line of lines) {
       const m = line.match(/^([A-Za-z0-9]{2,6})\s+(\S+)$/);
       if (m) parsed.push({ set_code: m[1].toUpperCase(), collection_number: m[2], id: Date.now() + Math.random() });
     }
-    if (parsed.length) setBatchEntries(prev => [...prev, ...parsed]);
+    if (parsed.length) {
+      setBatchEntries(prev => [...prev, ...parsed]);
+      const lang = batchGlobal.language;
+      parsed.forEach((entry, i) => setTimeout(() => validateBatchEntry(entry, lang), i * 120));
+    }
   }
 
-  async function handleBatchSearch() {
+  // Monta a confirmação a partir do cache em memória — zero requisições extras.
+  // Se alguma entrada ainda estiver carregando, aguarda sua conclusão antes de prosseguir.
+  function handleBatchSearch() {
     if (!batchEntries.length) return;
-    setBatchSearching(true);
     setQuickAddModal(false);
-    try {
-      const results = await Promise.all(
-        batchEntries.map(async (entry) => {
-          const payload = {
-            ...batchGlobal,
-            deck_id: batchGlobal.deck_id || 0,
-            set_code: entry.set_code,
-            collection_number: entry.collection_number,
-            quantity: 1,
-          };
-          try {
-            const preview = await previewCard(payload);
-            return {
-              entry, found: preview.found, card: preview.card ?? null,
-              formData: { ...payload, name: preview.card?.printed_name || preview.card?.name || "" },
-              selected: true,
-            };
-          } catch {
-            return { entry, found: false, card: null, formData: { ...payload, name: "" }, selected: true };
-          }
-        })
-      );
-      setBatchConfirm(results);
-    } finally {
-      setBatchSearching(false);
-    }
+    const results = batchEntries.map(entry => {
+      const v = batchValidation[entry.id];
+      // Aplica deck/foil atuais (podem ter mudado após a validação)
+      const formData = v?.formData
+        ? { ...v.formData, deck_id: batchGlobal.deck_id || 0, foil: batchGlobal.foil }
+        : { set_code: entry.set_code, collection_number: entry.collection_number, language: batchGlobal.language, deck_id: batchGlobal.deck_id || 0, foil: batchGlobal.foil, quantity: 1, name: `${entry.set_code} ${entry.collection_number}` };
+      return {
+        entry,
+        found: v?.status === "found",
+        card: v?.card ?? null,
+        formData,
+        selected: true,
+      };
+    });
+    setBatchConfirm(results);
   }
 
   async function handleBatchCreate() {
     if (!batchConfirm) return;
     setBatchCreating(true);
     const toCreate = batchConfirm.filter(r => r.selected);
-    try {
-      await Promise.all(toCreate.map(r => createCard(r.formData)));
+    // allSettled: cada carta é cadastrada independentemente — uma falha não cancela as demais
+    const settled = await Promise.allSettled(toCreate.map(r => createCard(r.formData)));
+    const failed = toCreate.filter((_, i) => settled[i].status === "rejected");
+    setPage(1);
+    loadCards({ page: 1 });
+    if (failed.length === 0) {
       setBatchConfirm(null);
       setBatchEntries([]);
       setBatchGlobal({ language: "EN", deck_id: 0, foil: false });
-      setPage(1);
-      loadCards({ page: 1 });
-    } finally {
-      setBatchCreating(false);
+      setBatchValidation({});
+    } else {
+      // Mantém só as que falharam para nova tentativa
+      const failedIds = new Set(failed.map(r => r.entry.id));
+      setBatchConfirm(prev => prev.filter(r => failedIds.has(r.entry.id)));
     }
+    setBatchCreating(false);
   }
 
   async function handleDetails(id) {
@@ -2257,6 +2298,11 @@ export default function App() {
     loadDecks();
   }
 
+  async function handleToggleCommander(card) {
+    await setCardCommander(card.id, !card.commander);
+    setDeckCards(prev => prev.map(c => c.id === card.id ? { ...c, commander: !card.commander } : c));
+  }
+
   async function handleExportCSV() {
     const data = await exportCards();
     const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -2449,6 +2495,7 @@ export default function App() {
   const deckCardsSorted = [...deckCards].sort((a, b) => (b.commander ? 1 : 0) - (a.commander ? 1 : 0));
 
   const filteredDeckCards = deckCardsSorted.filter(c => {
+    if (deckNameSearch && !(c.name || "").toLowerCase().includes(deckNameSearch.toLowerCase())) return false;
     if (deckTypeFilter && deckCardTypeGroup(c.type) !== deckTypeFilter) return false;
     if (deckColorFilter) {
       try {
@@ -2595,7 +2642,7 @@ export default function App() {
                     <h3 className="section-title">
                       No deck <span className="total-badge">{deckTotalQuantity}</span>
                       <span className="unique-badge">{deckCards.length} únicas</span>
-                      {(deckTypeFilter || deckColorFilter || deckSetFilter) && (
+                      {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
                         <span className="unique-badge" style={{color:"var(--gold)"}}>
                           {filteredDeckCards.length} filtradas
                         </span>
@@ -2618,6 +2665,13 @@ export default function App() {
 
                   {deckCards.length > 0 && (
                     <div className="deck-filter-bar">
+                      <input
+                        type="search"
+                        className="deck-name-search"
+                        placeholder="Filtrar por nome…"
+                        value={deckNameSearch}
+                        onChange={(e) => { setDeckNameSearch(e.target.value); setDeckPage(1); }}
+                      />
                       {deckTypeCounts.length > 0 && (
                         <div className="deck-filter-group">
                           <span className="deck-filter-label">Tipo</span>
@@ -2660,9 +2714,9 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      {(deckTypeFilter || deckColorFilter || deckSetFilter) && (
+                      {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
                         <button type="button" className="deck-filter-clear"
-                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckPage(1); }}>
+                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckNameSearch(""); setDeckPage(1); }}>
                           ✕ Limpar filtros
                         </button>
                       )}
@@ -2700,6 +2754,10 @@ export default function App() {
                           </small>
                         </div>
                         <div className="actions">
+                          <button type="button"
+                            className={`cmd-toggle-btn${card.commander ? " active" : ""}`}
+                            title={card.commander ? "Remover como comandante" : "Marcar como comandante"}
+                            onClick={() => handleToggleCommander(card)}>👑</button>
                           <button type="button" onClick={() => handleDeckDetails(card.id)}>Ver</button>
                           <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
                         </div>
@@ -4915,6 +4973,12 @@ export default function App() {
                         <span className="batch-entry-num">{i + 1}</span>
                         <span className="batch-entry-set">{en.set_code}</span>
                         <span className="batch-entry-col">#{en.collection_number}</span>
+                        <span className={`batch-entry-valid bev-${batchValidation[en.id]?.status || "idle"}`}>
+                          {batchValidation[en.id]?.status === "loading" ? "⟳"
+                            : batchValidation[en.id]?.status === "found" ? "✓"
+                            : batchValidation[en.id]?.status === "notfound" ? "✗"
+                            : ""}
+                        </span>
                         <button type="button" className="batch-entry-remove" onClick={() => batchRemoveEntry(en.id)} aria-label="Remover">✕</button>
                       </li>
                     ))}
@@ -4947,14 +5011,19 @@ export default function App() {
                 </form>
                 <p className="batch-paste-hint">Dica: cole várias linhas no formato <code>KLD 123</code> (uma por linha)</p>
 
-                <button
-                  type="button"
-                  className="quick-add-submit batch-search-btn"
-                  disabled={batchEntries.length === 0 || batchSearching}
-                  onClick={handleBatchSearch}
-                >
-                  {batchSearching ? "Buscando…" : `Buscar todas (${batchEntries.length})`}
-                </button>
+                {(() => {
+                  const anyLoading = batchEntries.some(e => batchValidation[e.id]?.status === "loading" || !batchValidation[e.id]);
+                  return (
+                    <button
+                      type="button"
+                      className="quick-add-submit batch-search-btn"
+                      disabled={batchEntries.length === 0 || anyLoading}
+                      onClick={handleBatchSearch}
+                    >
+                      {anyLoading && batchEntries.length > 0 ? "Validando…" : `Ver cartas (${batchEntries.length}) →`}
+                    </button>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -5023,15 +5092,10 @@ export default function App() {
       )}
 
       {/* ── MODAL CONFIRMAÇÃO EM LOTE ── */}
-      {(batchConfirm || batchSearching) && (
-        <div className="modal-overlay" onClick={() => !batchCreating && !batchSearching && setBatchConfirm(null)}>
+      {batchConfirm && (
+        <div className="modal-overlay" onClick={() => !batchCreating && setBatchConfirm(null)}>
           <div className="modal batch-confirm-modal" onClick={e => e.stopPropagation()}>
-            {batchSearching ? (
-              <div className="eval-loading">
-                <div className="eval-spinner">⚙</div>
-                <p className="eval-loading-text">Buscando cartas na Scryfall…</p>
-              </div>
-            ) : (
+            {true && (
               <>
                 <button className="modal-close" aria-label="Fechar" onClick={() => !batchCreating && setBatchConfirm(null)}>✕</button>
                 <h2 className="batch-confirm-title">Confirmar cadastro em lote</h2>
@@ -6238,7 +6302,6 @@ export default function App() {
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.foil} onChange={(e) => setEditForm({ ...editForm, foil: e.target.checked })} />Foil</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.full_art || false} onChange={(e) => setEditForm({ ...editForm, full_art: e.target.checked })} />Full Art</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
-                  <label className="checkbox-label"><input type="checkbox" checked={editForm.commander} onChange={(e) => setEditForm({ ...editForm, commander: e.target.checked })} />Commander</label>
                   <label className="checkbox-label proxy-checkbox"><input type="checkbox" checked={editForm.proxy || false} onChange={(e) => setEditForm({ ...editForm, proxy: e.target.checked })} />⚠ Proxy</label>
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />

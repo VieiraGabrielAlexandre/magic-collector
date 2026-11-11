@@ -238,6 +238,10 @@ func (s *Service) SetDeck(id string, deckID int) error {
 	return s.repository.SetDeck(id, deckID)
 }
 
+func (s *Service) SetCommander(id string, value bool) error {
+	return s.repository.SetCommander(id, value)
+}
+
 func (s *Service) ExportAll() ([]Card, error) {
 	return s.repository.ListAll()
 }
