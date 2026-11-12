@@ -19,6 +19,8 @@ type cardRepository interface {
 	ListEmptyPricesForRefresh() ([]CardForPriceRefresh, error)
 	UpdatePrice(id int, price float64) error
 	UpdatePriceAndMTGID(id int, mtgID string, price float64) error
+	InsertPriceHistory(cardID int, priceUSD float64, date string) error
+	GetPriceHistory(cardID string) ([]PricePoint, error)
 	UpdateImageURL(id int, imageURL string) error
 	UpdateImageURLAndMTGID(id int, mtgID, imageURL string) error
 	ListCardsWithoutColors() ([]CardForPriceRefresh, error)
@@ -65,4 +67,6 @@ type cardService interface {
 	GetAllCardsForAnalysis() ([]AnalysisCard, error)
 	ExportAll() ([]Card, error)
 	ListProxies() ([]Card, error)
+	GetPriceHistory(cardID string) ([]PricePoint, error)
 }
+

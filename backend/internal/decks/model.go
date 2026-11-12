@@ -21,8 +21,9 @@ type Deck struct {
 	BattleWins   int             `json:"battle_wins"`
 	BattleLosses int             `json:"battle_losses"`
 	BattleDraws  int             `json:"battle_draws"`
-	BattleTotal  int             `json:"battle_total"`
-	Commanders   []CommanderCard `json:"commanders,omitempty"`
+	BattleTotal       int             `json:"battle_total"`
+	EstimatedValueUSD float64         `json:"estimated_value_usd"`
+	Commanders        []CommanderCard `json:"commanders,omitempty"`
 }
 
 type DeckInput struct {

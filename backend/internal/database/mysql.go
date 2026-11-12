@@ -89,6 +89,8 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE cards ADD COLUMN image_url_back  VARCHAR(500)   NOT NULL DEFAULT ''`)
 	db.Exec(`ALTER TABLE cards ADD COLUMN proxy           TINYINT(1)     NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE cards DROP COLUMN IF EXISTS company`)
+	db.Exec("UPDATE cards SET `condition` = 'near_mint' WHERE `condition` = '' OR `condition` IS NULL")
+	db.Exec("ALTER TABLE cards ALTER COLUMN `condition` SET DEFAULT 'near_mint'")
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS battles (
@@ -115,6 +117,15 @@ func Open(dsn string) (*sql.DB, error) {
 	db.Exec(`ALTER TABLE game_session_players ADD COLUMN energy                      INT          NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE game_session_players ADD COLUMN cmd_damage_by_source        TEXT`)
 	db.Exec(`ALTER TABLE wishlist_deck_cards ADD COLUMN type_line  VARCHAR(200) NOT NULL DEFAULT ''`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS card_price_history (
+		id          BIGINT        NOT NULL AUTO_INCREMENT,
+		card_id     INT           NOT NULL,
+		price_usd   DECIMAL(10,2) NOT NULL DEFAULT 0,
+		recorded_at DATE          NOT NULL,
+		PRIMARY KEY (id),
+		INDEX idx_cph_card (card_id),
+		UNIQUE KEY uq_cph_card_date (card_id, recorded_at)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 	db.Exec(`ALTER TABLE wishlist_deck_cards ADD COLUMN acquired   TINYINT(1)   NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE wishlist_decks ADD COLUMN linked_deck_id INT NOT NULL DEFAULT 0`)
 	if err != nil {

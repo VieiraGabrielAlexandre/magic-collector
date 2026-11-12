@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -110,6 +110,42 @@ function parseCardColorIcons(card) {
   }
   if (!card.color) return [];
   return [...colorStrToIconSet(card.color)];
+}
+
+function PriceSparkline({ data }) {
+  if (!data || data.length < 2) return null;
+  const prices = data.map(p => p.price_usd);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const W = 220, H = 48, PAD = 4;
+  const range = max - min || 1;
+  const pts = prices.map((v, i) => {
+    const x = PAD + (i / (prices.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((v - min) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const last = prices[prices.length - 1];
+  const first = prices[0];
+  const color = last >= first ? "#4ade80" : "#f87171";
+  return (
+    <div className="price-sparkline-wrap">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{display:"block",overflow:"visible"}}>
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        {prices.map((v, i) => {
+          const x = PAD + (i / (prices.length - 1)) * (W - PAD * 2);
+          const y = H - PAD - ((v - min) / range) * (H - PAD * 2);
+          return i === prices.length - 1
+            ? <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)} r="3" fill={color} />
+            : null;
+        })}
+      </svg>
+      <div className="price-sparkline-labels">
+        <span style={{color:"var(--text-dim)"}}>{data[0].date}</span>
+        <span style={{color}}>${last.toFixed(2)} {last > first ? "▲" : last < first ? "▼" : "—"}</span>
+        <span style={{color:"var(--text-dim)"}}>{data[data.length - 1].date}</span>
+      </div>
+    </div>
+  );
 }
 
 function CardColorIcons({ card }) {
@@ -901,7 +937,9 @@ export default function App() {
   const [filterRarity, setFilterRarity] = useState("");
   const [filterDeck, setFilterDeck] = useState("");
   const [filterColors, setFilterColors] = useState("");
+  const [filterCondition, setFilterCondition] = useState("");
   const [availableColors, setAvailableColors] = useState([]);
+  const [usdToBrl, setUsdToBrl] = useState(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -944,12 +982,12 @@ export default function App() {
   }
 
   const [quickAddModal, setQuickAddModal] = useState(false);
-  const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1 });
+  const [quickAddForm, setQuickAddForm] = useState({ set_code: "", collection_number: "", language: "EN", foil: false, quantity: 1, condition: "near_mint" });
   const [quickAddTab, setQuickAddTab] = useState("individual"); // "individual" | "lote"
 
   // Lote state
   const [batchEntries, setBatchEntries]       = useState([]);
-  const [batchGlobal, setBatchGlobal]         = useState({ language: "EN", deck_id: 0, foil: false });
+  const [batchGlobal, setBatchGlobal]         = useState({ language: "EN", deck_id: 0, foil: false, condition: "near_mint" });
   const [batchValidation, setBatchValidation] = useState({}); // { [id]: "loading"|"found"|"notfound" }
   const [batchInputSet, setBatchInputSet] = useState("");
   const [batchInputNum, setBatchInputNum] = useState("");
@@ -960,6 +998,7 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState(null);
 
   const [selectedCard, setSelectedCard] = useState(null);
+  const [priceHistory, setPriceHistory] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [detailFromDeck, setDetailFromDeck] = useState(false);
@@ -1121,6 +1160,7 @@ export default function App() {
       rarity: opts.filterRarity ?? filterRarity,
       colors: opts.filterColors ?? filterColors,
       typeFilter: opts.filterType ?? filterType,
+      conditionFilter: opts.filterCondition ?? filterCondition,
       deckId,
     });
     setCards(result.data ?? []);
@@ -1692,7 +1732,13 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType]);
+  useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType, filterCondition]);
+  useEffect(() => {
+    fetch("https://api.frankfurter.app/latest?from=USD&to=BRL")
+      .then(r => r.json())
+      .then(data => { if (data?.rates?.BRL) setUsdToBrl(data.rates.BRL); })
+      .catch(() => {});
+  }, []);
   useEffect(() => { if (authReady && authUser) loadDecks(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadBattles(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadWishlist(); }, [authReady, authUser]);
@@ -2034,10 +2080,12 @@ export default function App() {
     setDetailFromDeck(false);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setPriceHistory([]);
     setModalFlipped(false);
     try {
-      const data = await getCard(id);
+      const [data, history] = await Promise.all([getCard(id), getPriceHistory(id)]);
       setSelectedCard(data);
+      setPriceHistory(history ?? []);
     } finally {
       setLoadingDetail(false);
     }
@@ -2047,10 +2095,12 @@ export default function App() {
     setDetailFromDeck(true);
     setLoadingDetail(true);
     setSelectedCard(null);
+    setPriceHistory([]);
     setModalFlipped(false);
     try {
-      const data = await getCard(id);
+      const [data, history] = await Promise.all([getCard(id), getPriceHistory(id)]);
       setSelectedCard(data);
+      setPriceHistory(history ?? []);
     } finally {
       setLoadingDetail(false);
     }
@@ -2085,7 +2135,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist,
-      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition, notes: c.notes,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition || "near_mint", notes: c.notes,
     });
     setEditMode(true);
   }
@@ -2957,6 +3007,12 @@ export default function App() {
                       <div className="deck-list-meta">
                         {deck.set_code && <span className="deck-set-label">{deck.set_code.toUpperCase()}</span>}
                         <span className="total-badge">{deck.card_count} cartas</span>
+                        {deck.estimated_value_usd > 0 && (
+                          <span className="deck-value-badge">
+                            ${deck.estimated_value_usd.toFixed(2)}
+                            {usdToBrl ? <span className="deck-value-brl"> ≈R${Math.round(deck.estimated_value_usd * usdToBrl)}</span> : null}
+                          </span>
+                        )}
                         {deck.battle_total > 0 && (() => {
                           const rate = Math.round((deck.battle_wins / deck.battle_total) * 100);
                           const cls = rate >= 60 ? "wr-high" : rate >= 40 ? "wr-mid" : "wr-low";
@@ -5907,6 +5963,13 @@ export default function App() {
                 <option value="Battle">Batalha</option>
                 <option value="Legendary">Lendário</option>
               </select>
+              <select className="filter-select" value={filterCondition} onChange={(e) => { setFilterCondition(e.target.value); setPage(1); }}>
+                <option value="">Todas as condições</option>
+                <option value="mint">Mint</option>
+                <option value="near_mint">Near Mint</option>
+                <option value="played">Played</option>
+                <option value="damaged">Damaged</option>
+              </select>
             </div>
             {availableColors.length > 0 && (
               <div className="color-filter-bar">
@@ -5999,7 +6062,7 @@ export default function App() {
                     </div>
                     <div className="card-grid-meta">
                       {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
-                      {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}</span>}
+                      {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}{usdToBrl ? <span className="price-brl"> ≈R${(card.price_usd * usdToBrl).toFixed(0)}</span> : null}</span>}
                     </div>
                   </div>
                   <div className="card-grid-qty" onClick={(e) => e.stopPropagation()}>
@@ -6234,10 +6297,20 @@ export default function App() {
                     <div><span>Força/Resistência</span>{selectedCard.external.power}/{selectedCard.external.toughness}</div>
                   )}
                   {selectedCard.external?.prices?.usd && (
-                    <div><span>Preço (USD)</span>${selectedCard.external.prices.usd}{selectedCard.external.prices.usd_foil ? ` / foil $${selectedCard.external.prices.usd_foil}` : ""}</div>
+                    <div><span>Preço (USD)</span>
+                      ${selectedCard.external.prices.usd}
+                      {selectedCard.external.prices.usd_foil ? ` / foil $${selectedCard.external.prices.usd_foil}` : ""}
+                      {usdToBrl ? <span className="price-brl"> ≈R${(parseFloat(selectedCard.external.prices.usd) * usdToBrl).toFixed(2)}</span> : null}
+                    </div>
                   )}
                   {selectedCard.external?.prices?.eur && (
                     <div><span>Preço (EUR)</span>€{selectedCard.external.prices.eur}{selectedCard.external.prices.eur_foil ? ` / foil €${selectedCard.external.prices.eur_foil}` : ""}</div>
+                  )}
+                  {priceHistory.length >= 2 && (
+                    <div style={{gridColumn:"1/-1",paddingTop:"4px"}}>
+                      <span style={{fontSize:"11px",color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em"}}>Histórico de preço</span>
+                      <PriceSparkline data={priceHistory} />
+                    </div>
                   )}
                 </div>
 

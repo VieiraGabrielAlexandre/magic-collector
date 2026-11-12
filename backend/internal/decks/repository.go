@@ -14,6 +14,7 @@ func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
 		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color,
 		       COALESCE(SUM(c.quantity), 0) AS card_count,
+		       COALESCE(SUM(c.price_usd * c.quantity), 0) AS estimated_value_usd,
 		       COALESCE(d.evaluation, '') AS evaluation,
 		       COALESCE(DATE_FORMAT(d.evaluated_at, '%Y-%m-%dT%H:%i:%s'), '') AS evaluated_at,
 		       COALESCE(bs.wins,   0) AS battle_wins,
@@ -47,7 +48,8 @@ func (r *Repository) List() ([]Deck, error) {
 		var commanderInt int
 		if err := rows.Scan(
 			&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode,
-			&d.IconURI, &d.ThemeColor, &d.CardCount, &d.Evaluation, &d.EvaluatedAt,
+			&d.IconURI, &d.ThemeColor, &d.CardCount, &d.EstimatedValueUSD,
+			&d.Evaluation, &d.EvaluatedAt,
 			&d.BattleWins, &d.BattleLosses, &d.BattleDraws, &d.BattleTotal,
 		); err != nil {
 			return nil, err

@@ -43,7 +43,7 @@ export async function getMe() {
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors, typeFilter } = {}) {
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors, typeFilter, conditionFilter } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
   if (foil) params.set("foil", "1");
@@ -51,6 +51,7 @@ export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name"
   if (rarity) params.set("rarity", rarity);
   if (colors) params.set("colors", colors);
   if (typeFilter) params.set("type_filter", typeFilter);
+  if (conditionFilter) params.set("condition_filter", conditionFilter);
   const res = await authFetch(`${BASE_URL}/cards?${params}`);
   if (!res.ok) return { data: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 };
   return res.json();
@@ -89,6 +90,12 @@ export async function assignCardToDeck(cardId, deckId) {
     body: JSON.stringify({ deck_id: deckId }),
   });
   if (!res.ok) throw new Error("Erro ao atribuir deck");
+  return res.json();
+}
+
+export async function getPriceHistory(cardId) {
+  const res = await authFetch(`${BASE_URL}/cards/${cardId}/price-history`);
+  if (!res.ok) return [];
   return res.json();
 }
 

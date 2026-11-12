@@ -112,6 +112,7 @@ func main() {
 	api.PATCH("/cards/:id/quantity", handler.UpdateQuantity)
 	api.PATCH("/cards/:id/deck", handler.SetDeck)
 	api.PATCH("/cards/:id/commander", handler.SetCommander)
+	api.GET("/cards/:id/price-history", handler.GetPriceHistory)
 	api.DELETE("/cards/:id", handler.Delete)
 
 	api.GET("/decks", deckHandler.List)

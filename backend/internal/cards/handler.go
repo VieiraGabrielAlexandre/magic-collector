@@ -57,17 +57,18 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	params := ListParams{
-		Search:       c.Query("q"),
-		Page:         page,
-		PageSize:     pageSize,
-		Sort:         c.DefaultQuery("sort", "name"),
-		Order:        c.DefaultQuery("order", "asc"),
-		DeckIDFilter: deckIDFilter,
-		FoilOnly:     c.Query("foil") == "1",
-		FullArtOnly:  c.Query("full_art") == "1",
-		RarityFilter: c.Query("rarity"),
-		ColorsFilter: c.Query("colors"),
-		TypeFilter:   c.Query("type_filter"),
+		Search:          c.Query("q"),
+		Page:            page,
+		PageSize:        pageSize,
+		Sort:            c.DefaultQuery("sort", "name"),
+		Order:           c.DefaultQuery("order", "asc"),
+		DeckIDFilter:    deckIDFilter,
+		FoilOnly:        c.Query("foil") == "1",
+		FullArtOnly:     c.Query("full_art") == "1",
+		RarityFilter:    c.Query("rarity"),
+		ColorsFilter:    c.Query("colors"),
+		TypeFilter:      c.Query("type_filter"),
+		ConditionFilter: c.Query("condition_filter"),
 	}
 
 	result, err := h.service.List(params)
@@ -140,6 +141,18 @@ func (h *Handler) SetDeck(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+func (h *Handler) GetPriceHistory(c *gin.Context) {
+	history, err := h.service.GetPriceHistory(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar histórico"})
+		return
+	}
+	if history == nil {
+		history = []PricePoint{}
+	}
+	c.JSON(http.StatusOK, history)
 }
 
 func (h *Handler) SetCommander(c *gin.Context) {

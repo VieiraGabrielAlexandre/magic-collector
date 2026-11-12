@@ -65,6 +65,9 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 
 	card.PreRelease = input.PreRelease
 
+	if card.Condition == "" {
+		card.Condition = "near_mint"
+	}
 	if card.Quantity <= 0 {
 		card.Quantity = 1
 	}
@@ -240,6 +243,10 @@ func (s *Service) SetDeck(id string, deckID int) error {
 
 func (s *Service) SetCommander(id string, value bool) error {
 	return s.repository.SetCommander(id, value)
+}
+
+func (s *Service) GetPriceHistory(cardID string) ([]PricePoint, error) {
+	return s.repository.GetPriceHistory(cardID)
 }
 
 func (s *Service) ExportAll() ([]Card, error) {
@@ -448,6 +455,10 @@ func (s *Service) RefreshPrices(emptyOnly bool) (PriceRefreshResult, error) {
 			result.Failed++
 		} else {
 			result.Updated++
+			if price > 0 {
+				today := time.Now().Format("2006-01-02")
+				_ = s.repository.InsertPriceHistory(c.ID, price, today)
+			}
 		}
 	}
 

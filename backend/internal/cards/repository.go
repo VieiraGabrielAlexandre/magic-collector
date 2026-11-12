@@ -25,9 +25,10 @@ type ListParams struct {
 	DeckIDFilter *int   // nil = all; 0 = without deck; >0 = specific deck
 	FoilOnly     bool   // true = somente foil
 	FullArtOnly  bool   // true = somente full art
-	RarityFilter string // "" = todas; "L","C","U","R","M","T"
-	ColorsFilter string // "" = todas; "W" | "U,G" | "W,U,B" etc.
-	TypeFilter   string // "" = todos; busca parcial no type_line
+	RarityFilter     string // "" = todas; "L","C","U","R","M","T"
+	ColorsFilter     string // "" = todas; "W" | "U,G" | "W,U,B" etc.
+	TypeFilter       string // "" = todos; busca parcial no type_line
+	ConditionFilter  string // "" = todas; "mint" | "near_mint" | "played" | "damaged"
 }
 
 type ListResult struct {
@@ -105,6 +106,10 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.TypeFilter != "" {
 		clauses = append(clauses, "`type` LIKE ?")
 		args = append(args, "%"+params.TypeFilter+"%")
+	}
+	if params.ConditionFilter != "" {
+		clauses = append(clauses, "`condition` = ?")
+		args = append(args, params.ConditionFilter)
 	}
 	if params.ColorsFilter != "" {
 		if params.ColorsFilter == "none" {
@@ -866,6 +871,44 @@ func (r *Repository) ListForEval(deckID int) ([]EvalCardInfo, error) {
 		}
 		c.IsCommander = cmdInt == 1
 		result = append(result, c)
+	}
+	return result, nil
+}
+
+// ── Histórico de preço ────────────────────────────────────────────────────────
+
+type PricePoint struct {
+	Date     string  `json:"date"`
+	PriceUSD float64 `json:"price_usd"`
+}
+
+func (r *Repository) InsertPriceHistory(cardID int, priceUSD float64, date string) error {
+	_, err := r.db.Exec(
+		`INSERT INTO card_price_history (card_id, price_usd, recorded_at)
+		 VALUES (?, ?, ?)
+		 ON DUPLICATE KEY UPDATE price_usd = VALUES(price_usd)`,
+		cardID, priceUSD, date,
+	)
+	return err
+}
+
+func (r *Repository) GetPriceHistory(cardID string) ([]PricePoint, error) {
+	rows, err := r.db.Query(
+		`SELECT recorded_at, price_usd FROM card_price_history
+		 WHERE card_id = ? ORDER BY recorded_at ASC LIMIT 90`,
+		cardID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []PricePoint
+	for rows.Next() {
+		var p PricePoint
+		if err := rows.Scan(&p.Date, &p.PriceUSD); err != nil {
+			return nil, err
+		}
+		result = append(result, p)
 	}
 	return result, nil
 }
