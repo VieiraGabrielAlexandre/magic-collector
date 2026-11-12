@@ -985,6 +985,8 @@ export default function App() {
   const [deckColorFilter, setDeckColorFilter] = useState("");
   const [deckSetFilter, setDeckSetFilter] = useState("");
   const [deckNameSearch, setDeckNameSearch] = useState("");
+  const [deckNameInput, setDeckNameInput] = useState("");
+  const [deckCardsLoading, setDeckCardsLoading] = useState(false);
   const [deckPage, setDeckPage] = useState(1);
   const [deckAnomalyModal, setDeckAnomalyModal] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
@@ -1103,6 +1105,8 @@ export default function App() {
 
   const searchTimer = useRef(null);
   const deckSearchTimer = useRef(null);
+  const deckNameTimer = useRef(null);
+  const deckLoadIdRef = useRef(0);
 
   async function loadCards(opts = {}) {
     const deckId = (opts.filterDeck ?? filterDeck) === "" ? undefined : parseInt(opts.filterDeck ?? filterDeck);
@@ -1663,8 +1667,21 @@ export default function App() {
   }
 
   async function loadDeckCards(deckId) {
-    const dc = await listCards({ deckId, pageSize: 500 });
-    setDeckCards(dc.data ?? []);
+    const loadId = ++deckLoadIdRef.current;
+    setDeckCardsLoading(true);
+    try {
+      const first = await listCards({ deckId, pageSize: 20, page: 1, sort: "name", order: "asc" });
+      if (loadId !== deckLoadIdRef.current) return;
+      setDeckCards(first.data ?? []);
+      const totalPages = first.total_pages ?? 1;
+      for (let p = 2; p <= totalPages; p++) {
+        const page = await listCards({ deckId, pageSize: 20, page: p, sort: "name", order: "asc" });
+        if (loadId !== deckLoadIdRef.current) return;
+        setDeckCards(prev => [...prev, ...(page.data ?? [])]);
+      }
+    } finally {
+      if (loadId === deckLoadIdRef.current) setDeckCardsLoading(false);
+    }
   }
 
   async function loadUnassigned(pg = 1, q = "") {
@@ -2125,6 +2142,8 @@ export default function App() {
     setDeckTypeFilter("");
     setDeckColorFilter("");
     setDeckSetFilter("");
+    setDeckNameSearch("");
+    setDeckNameInput("");
     setDeckPage(1);
     await Promise.all([loadDeckCards(deck.id), loadUnassigned(1, "")]);
     if (deck.set_code && !deck.icon_uri) {
@@ -2642,6 +2661,7 @@ export default function App() {
                     <h3 className="section-title">
                       No deck <span className="total-badge">{deckTotalQuantity}</span>
                       <span className="unique-badge">{deckCards.length} únicas</span>
+                      {deckCardsLoading && <span className="deck-loading-dot" title="Carregando…">⟳</span>}
                       {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
                         <span className="unique-badge" style={{color:"var(--gold)"}}>
                           {filteredDeckCards.length} filtradas
@@ -2669,8 +2689,13 @@ export default function App() {
                         type="search"
                         className="deck-name-search"
                         placeholder="Filtrar por nome…"
-                        value={deckNameSearch}
-                        onChange={(e) => { setDeckNameSearch(e.target.value); setDeckPage(1); }}
+                        value={deckNameInput}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setDeckNameInput(v);
+                          clearTimeout(deckNameTimer.current);
+                          deckNameTimer.current = setTimeout(() => { setDeckNameSearch(v); setDeckPage(1); }, 250);
+                        }}
                       />
                       {deckTypeCounts.length > 0 && (
                         <div className="deck-filter-group">
@@ -2716,7 +2741,7 @@ export default function App() {
                       )}
                       {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
                         <button type="button" className="deck-filter-clear"
-                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckNameSearch(""); setDeckPage(1); }}>
+                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckNameSearch(""); setDeckNameInput(""); setDeckPage(1); }}>
                           ✕ Limpar filtros
                         </button>
                       )}

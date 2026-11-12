@@ -692,6 +692,13 @@ button.danger:hover:not(:disabled) {
   transition: background 0.15s;
 }
 .deck-filter-clear:hover { background: rgba(248,81,73,0.1); box-shadow: none; }
+.deck-loading-dot {
+  font-size: 13px;
+  color: var(--gold-dim);
+  animation: bev-spin 1s linear infinite;
+  display: inline-block;
+  margin-left: 4px;
+}
 .deck-name-search {
   width: 100%;
   background: var(--surface-2);
