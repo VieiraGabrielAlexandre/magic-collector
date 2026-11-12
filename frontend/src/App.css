@@ -3799,6 +3799,25 @@ input[type="radio"] {
   color: #e08080;
 }
 
+.collection-value-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(16, 100, 50, 0.20);
+  border: 1px solid rgba(74, 222, 128, 0.30);
+  color: #6ee7a0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.collection-value-brl {
+  opacity: 0.65;
+  font-weight: 400;
+}
+
 .deck-value-badge {
   display: inline-flex;
   align-items: center;
@@ -9136,4 +9155,129 @@ input[type="radio"] {
   .proxies-list .list-item { grid-template-columns: 40px 1fr auto; gap: 0.5rem; }
   .list-item-thumb { width: 40px; height: 56px; }
   .list-item-thumb-placeholder { width: 40px; height: 56px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STORAGE / ARMAZENAMENTO
+   ═══════════════════════════════════════════════════════════════════ */
+
+.storage-mgr-btn {
+  background: rgba(120,80,20,0.18);
+  border: 1px solid rgba(180,140,60,0.30);
+  color: #d4a84b;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.storage-mgr-btn:hover { background: rgba(120,80,20,0.32); }
+
+.storage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(120,80,20,0.20);
+  border: 1px solid rgba(180,140,60,0.25);
+  color: #c8963a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.modal-storage { max-width: 540px; }
+
+.storage-add-form .edit-grid { grid-template-columns: 1fr 1fr; }
+
+.storage-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+.storage-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+.storage-type-icon { font-size: 1.3rem; flex-shrink: 0; }
+.storage-list-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+}
+.storage-list-info strong { color: var(--text); }
+.storage-color-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.storage-card-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+.storage-desc { font-size: 11px; color: var(--text-muted); font-style: italic; }
+.storage-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.storage-actions button { font-size: 13px; padding: 3px 8px; border-radius: 6px; }
+
+/* Deckbox color picker */
+.deckbox-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.deckbox-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: transform 0.1s, border-color 0.1s;
+}
+.deckbox-swatch:hover { transform: scale(1.15); }
+.deckbox-swatch.selected { border-color: var(--gold); border-width: 3px; }
+.deckbox-swatch-none    { background: var(--card-bg); }
+.deckbox-swatch-preto   { background: #1a1a1a; }
+.deckbox-swatch-branco  { background: #f0f0f0; }
+.deckbox-swatch-vermelho{ background: #c0392b; }
+.deckbox-swatch-azul    { background: #2980b9; }
+.deckbox-swatch-verde   { background: #27ae60; }
+.deckbox-swatch-roxo    { background: #8e44ad; }
+.deckbox-swatch-marrom  { background: #795548; }
+.deckbox-swatch-laranja { background: #e67e22; }
+.deckbox-swatch-amarelo { background: #f1c40f; }
+.deckbox-swatch-cinza   { background: #7f8c8d; }
+.deckbox-swatch-rosa    { background: #e91e63; }
+.deckbox-swatch-transparente { background: transparent; border-style: dashed; color: var(--text-muted); font-size: 9px; }
+
+.deckbox-color-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
 }

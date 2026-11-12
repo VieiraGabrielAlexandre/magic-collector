@@ -58,6 +58,7 @@ type Card struct {
 	DoubleFaced      bool    `json:"double_faced"`
 	ImageURLBack     string  `json:"image_url_back"`
 	Proxy            bool    `json:"proxy"`
+	StorageID        int     `json:"storage_id"`
 }
 
 type PreviewCardInput struct {
@@ -92,6 +93,7 @@ type CreateCardInput struct {
 	Condition        string `json:"condition"`
 	Notes            string `json:"notes"`
 	Proxy            bool   `json:"proxy"`
+	StorageID        int    `json:"storage_id"`
 }
 
 type UpdateCardInput struct {
@@ -116,5 +118,6 @@ type UpdateCardInput struct {
 	Condition        string `json:"condition"`
 	Notes            string `json:"notes"`
 	Proxy            bool   `json:"proxy"`
+	StorageID        int    `json:"storage_id"`
 	Propagate        bool   `json:"propagate"`
 }

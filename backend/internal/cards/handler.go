@@ -170,6 +170,21 @@ func (h *Handler) SetCommander(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+func (h *Handler) SetStorage(c *gin.Context) {
+	var input struct {
+		StorageID int `json:"storage_id"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.service.SetStorage(c.Param("id"), input.StorageID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar armazenamento"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
 func (h *Handler) NormalizeRarities(c *gin.Context) {
 	result, err := h.service.NormalizeRarities()
 	if err != nil {

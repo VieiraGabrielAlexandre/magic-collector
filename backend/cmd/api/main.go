@@ -16,6 +16,7 @@ import (
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
 	"magic-collection-api/internal/lore"
+	"magic-collection-api/internal/storage"
 	"magic-collection-api/internal/wishlist"
 	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 
@@ -76,6 +77,9 @@ func main() {
 	tokenSvc := tokens.NewService(tokenRepo, mtgClient)
 	tokenHandler := tokens.NewHandler(tokenSvc)
 
+	storageRepo := storage.NewRepository(db)
+	storageHandler := storage.NewHandler(storageRepo)
+
 	authRepo := auth.NewRepository(db)
 	authSvc := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authSvc)
@@ -112,6 +116,7 @@ func main() {
 	api.PATCH("/cards/:id/quantity", handler.UpdateQuantity)
 	api.PATCH("/cards/:id/deck", handler.SetDeck)
 	api.PATCH("/cards/:id/commander", handler.SetCommander)
+	api.PATCH("/cards/:id/storage", handler.SetStorage)
 	api.GET("/cards/:id/price-history", handler.GetPriceHistory)
 	api.DELETE("/cards/:id", handler.Delete)
 
@@ -153,6 +158,11 @@ func main() {
 	api.POST("/tokens", tokenHandler.Create)
 	api.PATCH("/tokens/:id/quantity", tokenHandler.UpdateQuantity)
 	api.DELETE("/tokens/:id", tokenHandler.Delete)
+
+	api.GET("/storage", storageHandler.List)
+	api.POST("/storage", storageHandler.Create)
+	api.PUT("/storage/:id", storageHandler.Update)
+	api.DELETE("/storage/:id", storageHandler.Delete)
 
 	api.GET("/game-sessions", gameSessionHandler.List)
 	api.POST("/game-sessions", gameSessionHandler.Create)

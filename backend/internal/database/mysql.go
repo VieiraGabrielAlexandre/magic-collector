@@ -128,6 +128,17 @@ func Open(dsn string) (*sql.DB, error) {
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 	db.Exec(`ALTER TABLE wishlist_deck_cards ADD COLUMN acquired   TINYINT(1)   NOT NULL DEFAULT 0`)
 	db.Exec(`ALTER TABLE wishlist_decks ADD COLUMN linked_deck_id INT NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE cards  ADD COLUMN storage_id    INT          NOT NULL DEFAULT 0`)
+	db.Exec(`ALTER TABLE decks  ADD COLUMN deckbox_color VARCHAR(50)  NOT NULL DEFAULT ''`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS storage_locations (
+		id          INT          NOT NULL AUTO_INCREMENT,
+		name        VARCHAR(200) NOT NULL,
+		type        VARCHAR(50)  NOT NULL DEFAULT 'caixa',
+		color       VARCHAR(50)  NOT NULL DEFAULT '',
+		description TEXT,
+		created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
 	if err != nil {
 		return nil, err
 	}

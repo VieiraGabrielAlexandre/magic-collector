@@ -128,6 +128,7 @@ func (m *mockCardService) Update(id string, i UpdateCardInput) error  { return m
 func (m *mockCardService) Delete(id string) error                     { return m.deleteFn(id) }
 func (m *mockCardService) SetDeck(id string, deckID int) error        { return m.setDeckFn(id, deckID) }
 func (m *mockCardService) SetCommander(id string, value bool) error   { return nil }
+func (m *mockCardService) SetStorage(id string, storageID int) error  { return nil }
 func (m *mockCardService) GetPriceHistory(cardID string) ([]PricePoint, error) {
 	return nil, nil
 }

@@ -590,3 +590,40 @@ export async function getCardShowcase(slug) {
   if (!res.ok) throw new Error(json.error || "Showcase não encontrado");
   return json;
 }
+
+// ── Storage / Armazenamento ──────────────────────────────────────────────────
+
+export async function listStorage() {
+  const res = await authFetch(`${BASE_URL}/storage`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao carregar locais");
+  return json;
+}
+
+export async function createStorage(data) {
+  const res = await authFetch(`${BASE_URL}/storage`, { method: "POST", body: JSON.stringify(data) });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao criar local");
+  return json;
+}
+
+export async function updateStorage(id, data) {
+  const res = await authFetch(`${BASE_URL}/storage/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao atualizar local");
+  return json;
+}
+
+export async function deleteStorage(id) {
+  const res = await authFetch(`${BASE_URL}/storage/${id}`, { method: "DELETE" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao excluir local");
+  return json;
+}
+
+export async function setCardStorage(cardId, storageId) {
+  const res = await authFetch(`${BASE_URL}/cards/${cardId}/storage`, { method: "PATCH", body: JSON.stringify({ storage_id: storageId }) });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao atualizar armazenamento");
+  return json;
+}

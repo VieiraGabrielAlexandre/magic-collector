@@ -78,7 +78,8 @@ func (m *mockCardRepository) UpdateMTGID(id, mtgID string) error { return m.upda
 func (m *mockCardRepository) Delete(id string) error             { return m.deleteFn(id) }
 func (m *mockCardRepository) SetQuantity(id string, q int) error { return m.setQuantityFn(id, q) }
 func (m *mockCardRepository) SetDeck(id string, deckID int) error { return m.setDeckFn(id, deckID) }
-func (m *mockCardRepository) SetCommander(id string, value bool) error { return nil }
+func (m *mockCardRepository) SetCommander(id string, value bool) error   { return nil }
+func (m *mockCardRepository) SetStorage(id string, storageID int) error  { return nil }
 func (m *mockCardRepository) InsertPriceHistory(cardID int, priceUSD float64, date string) error {
 	return nil
 }

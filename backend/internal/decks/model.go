@@ -23,6 +23,7 @@ type Deck struct {
 	BattleDraws  int             `json:"battle_draws"`
 	BattleTotal       int             `json:"battle_total"`
 	EstimatedValueUSD float64         `json:"estimated_value_usd"`
+	DeckboxColor      string          `json:"deckbox_color"`
 	Commanders        []CommanderCard `json:"commanders,omitempty"`
 }
 
@@ -32,5 +33,6 @@ type DeckInput struct {
 	Commander   bool   `json:"commander"`
 	Colors      string `json:"colors"`
 	SetCode     string `json:"set_code"`
-	ThemeColor  string `json:"theme_color"`
+	ThemeColor   string `json:"theme_color"`
+	DeckboxColor string `json:"deckbox_color"`
 }

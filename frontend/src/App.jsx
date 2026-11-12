@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateStorage, updateTokenQuantity } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -944,6 +944,7 @@ export default function App() {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [priceRefreshing, setPriceRefreshing] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [priceRefreshResult, setPriceRefreshResult] = useState(null);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem("card-view-mode") || "list");
   const [confirmCard, setConfirmCard] = useState(null); // { found, card, formData }
@@ -1056,6 +1057,10 @@ export default function App() {
   const [wishlistAcquiring, setWishlistAcquiring] = useState(false);
   const [wishlistShowAcquired, setWishlistShowAcquired] = useState(true);
   // deck-wish states
+  const [storageLocations, setStorageLocations] = useState([]);
+  const [storageModal, setStorageModal] = useState(false);
+  const [storageForm, setStorageForm] = useState({ name: "", type: "caixa", color: "", description: "" });
+  const [storageEditing, setStorageEditing] = useState(null);
   const [deckWishList, setDeckWishList] = useState([]);
   const [showDeckWishAdd, setShowDeckWishAdd] = useState(false);
   const [deckWishForm, setDeckWishForm] = useState(EMPTY_DECK_WISH_FORM);
@@ -1178,6 +1183,40 @@ export default function App() {
   async function loadBattles() {
     const data = await listBattles();
     setBattles(data ?? []);
+  }
+
+  async function loadStorage() {
+    const data = await listStorage().catch(() => []);
+    setStorageLocations(data ?? []);
+  }
+
+  async function handleStorageSave() {
+    if (!storageForm.name.trim()) return;
+    if (storageEditing) {
+      await updateStorage(storageEditing.id, storageForm);
+    } else {
+      await createStorage(storageForm);
+    }
+    setStorageForm({ name: "", type: "caixa", color: "", description: "" });
+    setStorageEditing(null);
+    loadStorage();
+  }
+
+  async function handleStorageDelete(id) {
+    if (!window.confirm("Remover este local? As cartas vinculadas ficarão sem local.")) return;
+    await deleteStorage(id);
+    loadStorage();
+  }
+
+  function handleStorageEdit(loc) {
+    setStorageEditing(loc);
+    setStorageForm({ name: loc.name, type: loc.type, color: loc.color, description: loc.description });
+  }
+
+  async function handleCardStorageChange(cardId, storageId) {
+    await setCardStorage(cardId, storageId);
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, storage_id: storageId } : c));
+    if (deckCards) setDeckCards(prev => prev.map(c => c.id === cardId ? { ...c, storage_id: storageId } : c));
   }
 
   async function loadTokensList() {
@@ -1740,6 +1779,12 @@ export default function App() {
       .catch(() => {});
   }, []);
   useEffect(() => { if (authReady && authUser) loadDecks(); }, [authReady, authUser]);
+  useEffect(() => { if (authReady && authUser) loadStorage(); }, [authReady, authUser]);
+  useEffect(() => {
+    if (authReady && authUser && !stats) {
+      getCollectionStats().then(s => setStats(s)).catch(() => {});
+    }
+  }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadBattles(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadWishlist(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadDeckWishList(); }, [authReady, authUser]);
@@ -2135,7 +2180,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist,
-      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition || "near_mint", notes: c.notes,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition || "near_mint", notes: c.notes, storage_id: c.storage_id ?? 0,
     });
     setEditMode(true);
   }
@@ -2179,6 +2224,7 @@ export default function App() {
       colors: editDeckModal.colors || "",
       set_code: editDeckModal.set_code || "",
       theme_color: editDeckModal.theme_color || "",
+      deckbox_color: editDeckModal.deckbox_color || "",
     });
     setEditDeckModal(null);
     loadDecks();
@@ -2381,6 +2427,110 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url; a.download = "colecao.csv"; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleExportCardsPDF() {
+    setPdfExporting(true);
+    try {
+      const allCards = [];
+      let page = 1;
+      while (true) {
+        const result = await listCards({
+          q: search, page, pageSize: 500,
+          sort, order,
+          foilOnly: filterFoil, fullArtOnly: filterFullArt,
+          rarity: filterRarity,
+          deckId: filterDeck !== "" ? filterDeck : undefined,
+          colors: filterColors, type: filterType, conditionFilter: filterCondition,
+        });
+        const batch = result.data ?? [];
+        if (batch.length === 0) break;
+        allCards.push(...batch);
+        if (allCards.length >= (result.total ?? 0)) break;
+        page++;
+      }
+
+      if (allCards.length === 0) {
+        alert("Nenhuma carta encontrada com os filtros atuais.");
+        return;
+      }
+
+      const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const totalQty = allCards.reduce((s, c) => s + (c.quantity || 1), 0);
+
+      const cells = allCards.map(card => {
+        const loc = card.storage_id > 0 ? storageLocations.find(s => s.id === card.storage_id) : null;
+        return `<div class="card-cell">
+          ${card.image_url
+            ? `<img src="${esc(card.image_url)}" alt="${esc(card.name)}" />`
+            : `<div class="no-img">${esc(card.name)}<br/><small>${esc(card.set_code)} #${esc(card.collection_number)}</small></div>`
+          }
+          <div class="card-info">
+            <span class="card-name" title="${esc(card.name)}">${esc(card.name)}</span>
+            <span class="card-badges">
+              <span class="card-qty">${card.quantity}×</span>
+              ${card.price_usd > 0 ? `<span class="card-price">$${Number(card.price_usd).toFixed(2)}</span>` : ''}
+              ${card.foil ? '<span class="card-foil">✦ Foil</span>' : ''}
+              ${loc ? `<span class="card-storage">📦 ${esc(loc.name)}</span>` : ''}
+            </span>
+          </div>
+        </div>`;
+      }).join("");
+
+      const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Coleção MTG</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; background: #fff; color: #111; }
+    header { font-size: 8pt; color: #555; margin-bottom: 4mm; padding-bottom: 2mm; border-bottom: 0.4mm solid #ccc; display: flex; justify-content: space-between; align-items: baseline; }
+    header strong { color: #111; font-size: 9pt; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+    .card-cell { break-inside: avoid; border: 0.3mm solid #ccc; border-radius: 2mm; overflow: hidden; }
+    .card-cell img { width: 100%; display: block; }
+    .no-img { width: 100%; aspect-ratio: 63/88; background: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3mm; text-align: center; font-size: 8pt; color: #666; gap: 2mm; }
+    .card-info { padding: 1.5mm 2mm; background: #f5f5f5; border-top: 0.3mm solid #ddd; display: flex; align-items: flex-start; justify-content: space-between; gap: 2mm; }
+    .card-name { font-size: 7pt; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; color: #111; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 0.8mm; flex-shrink: 0; }
+    .card-qty { font-size: 7.5pt; font-weight: 700; color: #222; }
+    .card-price { font-size: 6.5pt; color: #2e7d32; font-weight: 600; }
+    .card-foil { font-size: 6.5pt; font-weight: 600; color: #9a6e00; }
+    .card-storage { font-size: 6pt; color: #666; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Magic: The Gathering — Coleção</span>
+    <strong>${allCards.length} cartas · ${totalQty} cópias · ${new Date().toLocaleDateString("pt-BR")}</strong>
+  </header>
+  <div class="grid">${cells}</div>
+  <script>
+    (function(){
+      var imgs=document.querySelectorAll("img"),n=imgs.length,done=0;
+      function tryPrint(){if(++done>=n)window.print();}
+      if(n===0){window.print();return;}
+      imgs.forEach(function(img){
+        if(img.complete&&img.naturalWidth>0)tryPrint();
+        else{img.addEventListener("load",tryPrint);img.addEventListener("error",tryPrint);}
+      });
+    })();
+  </script>
+</body>
+</html>`;
+
+      const win = window.open("", "_blank");
+      if (!win) { alert("Permita popups para gerar o PDF."); return; }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } catch (e) {
+      alert("Erro ao gerar PDF: " + e.message);
+    } finally {
+      setPdfExporting(false);
+    }
   }
 
   async function handleExportXLSX() {
@@ -2992,6 +3142,7 @@ export default function App() {
                       <div className="deck-list-name">
                         <strong>{deck.name}</strong>
                         {deck.commander && <span className="commander-badge">CMD</span>}
+                        {deck.deckbox_color && <span className="deckbox-color-badge deckbox-swatch-{deck.deckbox_color}" title={`Deckbox: ${deck.deckbox_color}`} style={{ background: deck.deckbox_color.startsWith("#") ? deck.deckbox_color : undefined }}>📦 {deck.deckbox_color}</span>}
                         <ColorPips colors={deck.colors} />
                       </div>
                       {deck.commanders?.length > 0 && (
@@ -5461,6 +5612,17 @@ export default function App() {
                 </div>
               </div>
               <DeckColorSelect value={editDeckModal.theme_color || ""} onChange={(v) => setEditDeckModal({ ...editDeckModal, theme_color: v })} />
+              <label>Cor da Deckbox
+                <div className="deckbox-color-picker">
+                  {["","preto","branco","vermelho","azul","verde","roxo","marrom","laranja","amarelo","cinza","rosa","transparente"].map(c => (
+                    <button key={c} type="button"
+                      className={`deckbox-swatch deckbox-swatch-${c || "none"}${(editDeckModal.deckbox_color || "") === c ? " selected" : ""}`}
+                      title={c || "sem cor"}
+                      onClick={() => setEditDeckModal({ ...editDeckModal, deckbox_color: c })}
+                    >{c ? "" : "✕"}</button>
+                  ))}
+                </div>
+              </label>
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditDeckModal(null)}>Cancelar</button>
                 <button type="submit" className="save-btn">Salvar</button>
@@ -5863,13 +6025,21 @@ export default function App() {
         {/* ── LISTA ── */}
           <div className="list-header">
             <div className="list-header-top">
-              <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span></h2>
+              <h2>Minha coleção <span className="total-badge">{totalQuantity} cartas</span><span className="unique-badge">{total} únicas</span>{stats?.estimated_value_usd > 0 && (
+                  <span className="collection-value-badge" title="Valor estimado da coleção">
+                    💰 ${stats.estimated_value_usd.toFixed(2)}
+                    {usdToBrl ? <span className="collection-value-brl"> ≈R${Math.round(stats.estimated_value_usd * usdToBrl)}</span> : null}
+                  </span>
+                )}</h2>
               <div className="toolbar-group">
                 <button type="button" className="quick-add-btn-toolbar" onClick={() => setQuickAddModal(true)}>
                   ✦ Cadastrar Carta
                 </button>
                 <button type="button" className="tokens-tab-btn" onClick={() => setActiveTab("tokens")}>
                   🎭 Tokens
+                </button>
+                <button type="button" className="storage-mgr-btn" onClick={() => setStorageModal(true)}>
+                  📦 Armazenamento
                 </button>
                 <button type="button" className={`stats-toggle-btn${statsOpen ? " active" : ""}`} onClick={handleOpenStats}>
                   📊 Stats
@@ -5901,6 +6071,8 @@ export default function App() {
                   items={[
                     { label: "↓ CSV", onClick: handleExportCSV },
                     { label: "↓ XLSX", onClick: handleExportXLSX },
+                    { separator: true },
+                    { label: pdfExporting ? "⏳ Gerando PDF…" : "🖨 PDF de cartas (filtro atual)", onClick: handleExportCardsPDF, disabled: pdfExporting },
                   ]}
                 />
               </div>
@@ -6063,6 +6235,10 @@ export default function App() {
                     <div className="card-grid-meta">
                       {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                       {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}{usdToBrl ? <span className="price-brl"> ≈R${(card.price_usd * usdToBrl).toFixed(0)}</span> : null}</span>}
+                      {card.storage_id > 0 && storageLocations.length > 0 && (() => {
+                        const loc = storageLocations.find(s => s.id === card.storage_id);
+                        return loc ? <span className="storage-badge" title={loc.name} style={loc.color ? { '--sb-color': loc.color } : {}}>📦 {loc.name}</span> : null;
+                      })()}
                     </div>
                   </div>
                   <div className="card-grid-qty" onClick={(e) => e.stopPropagation()}>
@@ -6403,6 +6579,16 @@ export default function App() {
                   <label className="checkbox-label proxy-checkbox"><input type="checkbox" checked={editForm.proxy || false} onChange={(e) => setEditForm({ ...editForm, proxy: e.target.checked })} />⚠ Proxy</label>
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
+                {storageLocations.length > 0 && (
+                  <label>Armazenamento
+                    <select value={editForm.storage_id ?? 0} onChange={(e) => setEditForm({ ...editForm, storage_id: Number(e.target.value) })}>
+                      <option value={0}>— sem local —</option>
+                      {storageLocations.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label>Observações<textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} /></label>
                 <label className="checkbox-label propagate-label">
                   <input type="checkbox" checked={propagate} onChange={(e) => setPropagate(e.target.checked)} />
@@ -6417,6 +6603,60 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ── MODAL ARMAZENAMENTO ── */}
+      {storageModal && (
+        <div className="modal-overlay" onClick={() => { setStorageModal(false); setStorageEditing(null); setStorageForm({ name: "", type: "caixa", color: "", description: "" }); }}>
+          <div className="modal modal-storage" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" aria-label="Fechar" onClick={() => { setStorageModal(false); setStorageEditing(null); setStorageForm({ name: "", type: "caixa", color: "", description: "" }); }}>✕</button>
+            <h2>📦 Locais de Armazenamento</h2>
+            <form className="storage-add-form" onSubmit={(e) => { e.preventDefault(); handleStorageSave(); }}>
+              <div className="edit-grid">
+                <label>Nome *
+                  <input required value={storageForm.name} onChange={(e) => setStorageForm({ ...storageForm, name: e.target.value })} placeholder="Ex: Pasta A, Caixa Commander" />
+                </label>
+                <label>Tipo
+                  <select value={storageForm.type} onChange={(e) => setStorageForm({ ...storageForm, type: e.target.value })}>
+                    <option value="caixa">Caixa</option>
+                    <option value="pasta">Pasta</option>
+                    <option value="sleeve">Sleeve</option>
+                    <option value="deckbox">Deckbox</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </label>
+                <label>Cor / Identificação
+                  <input value={storageForm.color} onChange={(e) => setStorageForm({ ...storageForm, color: e.target.value })} placeholder="Ex: azul, vermelho, #3a86ff" />
+                </label>
+                <label>Descrição
+                  <input value={storageForm.description} onChange={(e) => setStorageForm({ ...storageForm, description: e.target.value })} placeholder="Opcional" />
+                </label>
+              </div>
+              <div className="modal-actions" style={{ marginTop: 8 }}>
+                {storageEditing && <button type="button" onClick={() => { setStorageEditing(null); setStorageForm({ name: "", type: "caixa", color: "", description: "" }); }}>Cancelar edição</button>}
+                <button type="submit" className="save-btn">{storageEditing ? "Salvar alteração" : "+ Adicionar"}</button>
+              </div>
+            </form>
+            <div className="storage-list">
+              {storageLocations.length === 0 && <p className="empty">Nenhum local cadastrado.</p>}
+              {storageLocations.map(loc => (
+                <div key={loc.id} className="storage-list-item">
+                  <span className="storage-type-icon">{loc.type === "pasta" ? "📁" : loc.type === "sleeve" ? "🃏" : loc.type === "deckbox" ? "📦" : "📦"}</span>
+                  <div className="storage-list-info">
+                    <strong>{loc.name}</strong>
+                    {loc.color && <span className="storage-color-tag" style={{ background: loc.color.startsWith("#") ? loc.color : undefined }}>{loc.color}</span>}
+                    <span className="storage-card-count">{loc.card_count} carta{loc.card_count !== 1 ? "s" : ""}</span>
+                    {loc.description && <span className="storage-desc">{loc.description}</span>}
+                  </div>
+                  <div className="storage-actions">
+                    <button type="button" onClick={() => handleStorageEdit(loc)}>✎</button>
+                    <button type="button" className="danger" onClick={() => handleStorageDelete(loc.id)}>✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── FAB MOBILE ── */}
       {activeTab === "collection" && (
         <button type="button" className="mobile-fab" onClick={() => setQuickAddModal(true)} aria-label="Adicionar carta" title="Busca Rápida">+</button>

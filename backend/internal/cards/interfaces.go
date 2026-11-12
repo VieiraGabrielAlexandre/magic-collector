@@ -14,6 +14,7 @@ type cardRepository interface {
 	SetQuantity(id string, quantity int) error
 	SetDeck(id string, deckID int) error
 	SetCommander(id string, value bool) error
+	SetStorage(id string, storageID int) error
 	ListAll() ([]Card, error)
 	ListAllForPriceRefresh() ([]CardForPriceRefresh, error)
 	ListEmptyPricesForRefresh() ([]CardForPriceRefresh, error)
@@ -55,6 +56,7 @@ type cardService interface {
 	Delete(id string) error
 	SetDeck(id string, deckID int) error
 	SetCommander(id string, value bool) error
+	SetStorage(id string, storageID int) error
 	NormalizeRarities() (NormalizeRarityResult, error)
 	RefreshColors() (RefreshColorsResult, error)
 	ListColorCombos() ([]ColorCombo, error)

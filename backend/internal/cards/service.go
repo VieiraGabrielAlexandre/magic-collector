@@ -245,6 +245,10 @@ func (s *Service) SetCommander(id string, value bool) error {
 	return s.repository.SetCommander(id, value)
 }
 
+func (s *Service) SetStorage(id string, storageID int) error {
+	return s.repository.SetStorage(id, storageID)
+}
+
 func (s *Service) GetPriceHistory(cardID string) ([]PricePoint, error) {
 	return s.repository.GetPriceHistory(cardID)
 }
