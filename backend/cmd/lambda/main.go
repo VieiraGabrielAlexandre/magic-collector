@@ -18,6 +18,7 @@ import (
 	game_sessions "magic-collection-api/internal/game_sessions"
 	"magic-collection-api/internal/importer"
 	"magic-collection-api/internal/lore"
+	"magic-collection-api/internal/reports"
 	"magic-collection-api/internal/storage"
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
@@ -92,6 +93,12 @@ func main() {
 	authSvc := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authSvc)
 
+	reportRepo := reports.NewRepository(db)
+	reportHandler := reports.NewHandler(reportRepo).WithSessionCheck(func(token string) bool {
+		_, _, err := authSvc.GetSession(token)
+		return err == nil
+	})
+
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -136,6 +143,7 @@ func main() {
 	api.DELETE("/decks/:id", deckHandler.Delete)
 	api.PATCH("/decks/:id/icon", deckHandler.FetchIcon)
 	api.POST("/decks/:id/evaluate", deckHandler.Evaluate)
+	api.GET("/decks/:id/validate", deckHandler.Validate)
 	api.POST("/decks/import-precon", importerHandler.ImportPrecon)
 	api.POST("/decks/import-list", importerHandler.ImportDeckList)
 	api.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
@@ -185,6 +193,11 @@ func main() {
 	api.POST("/game-sessions/:id/finish", gameSessionHandler.Finish)
 	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
 	api.POST("/game-sessions/:id/players/:player_id/revive", gameSessionHandler.RevivePlayer)
+
+	// Reports: próprio middleware que aceita SERVICE_TOKEN ou sessão normal.
+	reportsGroup := router.Group("/", reportHandler.Middleware())
+	reportsGroup.GET("/reports/collection", reportHandler.Get)
+	reportsGroup.GET("/reports/collection/schema", reportHandler.Schema)
 
 	// algnhsa converte eventos Lambda Function URL (formato HTTP API v2)
 	// para chamadas net/http que o Gin processa normalmente.

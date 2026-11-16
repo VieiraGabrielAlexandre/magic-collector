@@ -197,6 +197,13 @@ export async function listDecks() {
   return res.json();
 }
 
+export async function validateDeck(id) {
+  const res = await authFetch(`${BASE_URL}/decks/${id}/validate`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao validar deck");
+  return json;
+}
+
 export async function createDeck(data) {
   const res = await authFetch(`${BASE_URL}/decks`, {
     method: "POST",

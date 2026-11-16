@@ -56,7 +56,7 @@ var allowedSortFields = map[string]string{
 // `condition` e `type` são palavras reservadas no MySQL e precisam de backticks.
 const selectCols = `id, mtg_id, name, color, ` + "`type`" + `, subtitle, collection_number,
 	       rarity, set_code, mana_cost, colors, language, year,
-	       artist, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, image_url, full_art, double_faced, image_url_back, proxy, storage_id`
+	       artist, foil, quantity, ` + "`condition`" + `, notes, prerelease, commander, precon_deck, deck_id, price_usd, COALESCE(DATE_FORMAT(price_updated_at,'%Y-%m-%dT%H:%i:%s'),'') AS price_updated_at, image_url, full_art, double_faced, image_url_back, proxy, storage_id`
 
 func (r *Repository) List(params ListParams) (ListResult, error) {
 	if params.Page < 1 {
@@ -84,9 +84,15 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 			clauses = append(clauses, "collection_number = ?")
 			args = append(args, num)
 		} else {
-			clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
 			like := "%" + params.Search + "%"
-			args = append(args, like, like, like, like, like, like)
+			// FULLTEXT para buscas de palavra única com 3+ chars; LIKE para o restante.
+			if len(params.Search) >= 3 && !strings.ContainsAny(params.Search, " \t") {
+				clauses = append(clauses, "(MATCH(name) AGAINST(? IN BOOLEAN MODE) OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
+				args = append(args, params.Search+"*", like, like, like, like, like)
+			} else {
+				clauses = append(clauses, "(name LIKE ? OR set_code LIKE ? OR color LIKE ? OR `type` LIKE ? OR artist LIKE ? OR collection_number LIKE ?)")
+				args = append(args, like, like, like, like, like, like)
+			}
 		}
 	}
 	if params.DeckIDFilter != nil {
@@ -162,7 +168,7 @@ func (r *Repository) List(params ListParams) (ListResult, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.PriceUpdatedAt, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
 		)
 		if err != nil {
 			return ListResult{}, err
@@ -249,7 +255,7 @@ func (r *Repository) GetByID(id string) (*Card, error) {
 		&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 		&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 		&c.Colors, &c.Language, &c.Year, &c.Artist,
-		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
+		&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.PriceUpdatedAt, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
 	)
 	if err != nil {
 		return nil, err
@@ -365,7 +371,7 @@ func (r *Repository) ListAll() ([]Card, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.PriceUpdatedAt, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
 		)
 		if err != nil {
 			return nil, err
@@ -395,7 +401,7 @@ func (r *Repository) ListProxies() ([]Card, error) {
 			&c.ID, &c.MTGID, &c.Name, &c.Color, &c.Type, &c.Subtitle,
 			&c.CollectionNumber, &c.Rarity, &c.SetCode, &c.ManaCost,
 			&c.Colors, &c.Language, &c.Year, &c.Artist,
-			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
+			&foilInt, &c.Quantity, &c.Condition, &c.Notes, &prereleaseInt, &commanderInt, &c.PreconDeck, &c.DeckID, &c.PriceUSD, &c.PriceUpdatedAt, &c.ImageURL, &fullArtInt, &c.DoubleFaced, &c.ImageURLBack, &proxyInt, &c.StorageID,
 		)
 		if err != nil {
 			return nil, err
@@ -467,12 +473,12 @@ func (r *Repository) listForPriceRefresh(emptyOnly bool) ([]CardForPriceRefresh,
 }
 
 func (r *Repository) UpdatePrice(id int, price float64) error {
-	_, err := r.db.Exec(`UPDATE cards SET price_usd = ? WHERE id = ?`, price, id)
+	_, err := r.db.Exec(`UPDATE cards SET price_usd = ?, price_updated_at = NOW() WHERE id = ?`, price, id)
 	return err
 }
 
 func (r *Repository) UpdatePriceAndMTGID(id int, mtgID string, price float64) error {
-	_, err := r.db.Exec(`UPDATE cards SET price_usd = ?, mtg_id = ? WHERE id = ?`, price, mtgID, id)
+	_, err := r.db.Exec(`UPDATE cards SET price_usd = ?, price_updated_at = NOW(), mtg_id = ? WHERE id = ?`, price, mtgID, id)
 	return err
 }
 

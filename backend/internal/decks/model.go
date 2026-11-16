@@ -36,3 +36,19 @@ type DeckInput struct {
 	ThemeColor   string `json:"theme_color"`
 	DeckboxColor string `json:"deckbox_color"`
 }
+
+// ValidationIssue descreve um problema encontrado durante a validação do deck.
+type ValidationIssue struct {
+	Code     string `json:"code"`
+	Message  string `json:"message"`
+	CardID   int    `json:"card_id,omitempty"`
+	CardName string `json:"card_name,omitempty"`
+}
+
+// DeckValidation é o resultado de GET /decks/:id/validate.
+type DeckValidation struct {
+	DeckID    int               `json:"deck_id"`
+	Valid     bool              `json:"valid"`
+	CardCount int               `json:"card_count"`
+	Issues    []ValidationIssue `json:"issues"`
+}

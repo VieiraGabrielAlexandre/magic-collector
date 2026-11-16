@@ -78,3 +78,12 @@ func (h *Handler) Evaluate(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, deck)
 }
+
+func (h *Handler) Validate(c *gin.Context) {
+	result, err := h.svc.Validate(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao validar deck"})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}

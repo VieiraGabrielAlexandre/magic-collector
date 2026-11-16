@@ -14,6 +14,7 @@ type deckRepository interface {
 	UpdateIcon(id, iconURI string) error
 	UpdateEvaluation(id, evaluation string) error
 	Delete(id string) error
+	Validate(deckID string) (DeckValidation, error)
 }
 
 // deckMtgClient abstrai chamadas à Scryfall para o Service.
@@ -39,4 +40,5 @@ type deckService interface {
 	Delete(id string) error
 	FetchIcon(id string) (string, error)
 	EvaluateDeck(id string) (*Deck, error)
+	Validate(id string) (DeckValidation, error)
 }

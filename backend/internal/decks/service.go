@@ -55,6 +55,10 @@ func (s *Service) Delete(id string) error {
 	return s.repo.Delete(id)
 }
 
+func (s *Service) Validate(id string) (DeckValidation, error) {
+	return s.repo.Validate(id)
+}
+
 func (s *Service) FetchIcon(id string) (string, error) {
 	deck, err := s.repo.GetByID(id)
 	if err != nil {

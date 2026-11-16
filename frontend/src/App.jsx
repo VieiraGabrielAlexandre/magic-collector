@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateStorage, updateTokenQuantity } from "./services/api";
+import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -30,6 +30,37 @@ function toggleColor(colors, code) {
   const set = new Set((colors || "").split(",").filter(Boolean));
   if (set.has(code)) set.delete(code); else set.add(code);
   return [...set].join(",");
+}
+
+const PRICE_STALE_DAYS = 30;
+function isPriceStale(card) {
+  if (!card.price_usd || card.price_usd <= 0) return false;
+  if (!card.price_updated_at) return true;
+  return new Date(card.price_updated_at) < new Date(Date.now() - PRICE_STALE_DAYS * 86400000);
+}
+
+function colorGlowClass(colorsJSON) {
+  try {
+    const arr = JSON.parse(colorsJSON || "[]");
+    if (!arr || arr.length === 0) return "glow-c";
+    if (arr.length > 1) return "glow-multi";
+    return `glow-${arr[0].toLowerCase()}`;
+  } catch { return "glow-c"; }
+}
+
+function cardTypeClass(typeLine) {
+  if (!typeLine) return "";
+  const t = typeLine.toLowerCase();
+  if (t.includes("planeswalker")) return "type-pw";
+  if (t.includes("basic") && t.includes("land")) return "type-land-basic";
+  if (t.includes("land")) return "type-land";
+  if (t.includes("creature")) return "type-creature";
+  if (t.includes("instant")) return "type-instant";
+  if (t.includes("sorcery")) return "type-sorcery";
+  if (t.includes("artifact")) return "type-artifact";
+  if (t.includes("enchantment")) return "type-enchantment";
+  if (t.includes("battle")) return "type-battle";
+  return "";
 }
 
 function ColorPips({ colors }) {
@@ -572,6 +603,7 @@ const DECK_THEME_COLORS = [
   { id: "brown",     label: "Marrom",          bg: "#160c04", border: "#5a3010", text: "#c09060", swatch: "#6a3c14" },
   { id: "sand",      label: "Areia",           bg: "#1c1408", border: "#7a6020", text: "#d8c080", swatch: "#907830" },
   { id: "bone",      label: "Marfim",          bg: "#1c1608", border: "#6a5828", text: "#e0d8b0", swatch: "#7a6830" },
+  { id: "yellow",    label: "Amarelo",         bg: "#1c1400", border: "#7a6020", text: "#f8e080", swatch: "#f6c100" },
   // ── Rosa / Roxo ──
   { id: "rose",      label: "Rosa",            bg: "#280a18", border: "#8a1e50", text: "#f080b0", swatch: "#a02860" },
   { id: "lilac",     label: "Lilás",           bg: "#140a1c", border: "#6048a0", text: "#d0b0f0", swatch: "#7058b0" },
@@ -945,6 +977,17 @@ export default function App() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [priceRefreshing, setPriceRefreshing] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+
+  function loadScript(src) {
+    if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
   const [priceRefreshResult, setPriceRefreshResult] = useState(null);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem("card-view-mode") || "list");
   const [confirmCard, setConfirmCard] = useState(null); // { found, card, formData }
@@ -1006,7 +1049,7 @@ export default function App() {
   const [editForm, setEditForm] = useState({});
   const [propagate, setPropagate] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("collection");
+  const [activeTab, setActiveTab] = useState("stats");
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [decks, setDecks] = useState([]);
   const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
@@ -1021,6 +1064,8 @@ export default function App() {
   const [unassignedTotal, setUnassignedTotal] = useState(0);
   const [deckSearch, setDeckSearch] = useState("");
   const [deckInnerTab, setDeckInnerTab] = useState("cards");
+  const [deckValidation, setDeckValidation] = useState(null);
+  const [deckValidating, setDeckValidating] = useState(false);
   const [deckTypeFilter, setDeckTypeFilter] = useState("");
   const [deckColorFilter, setDeckColorFilter] = useState("");
   const [deckSetFilter, setDeckSetFilter] = useState("");
@@ -1822,6 +1867,27 @@ export default function App() {
   useEffect(() => {
     if (activeTab === "proxies") loadProxies();
   }, [activeTab]);
+
+  // ── Dashboard de estatísticas ────────────────────────────────────────────
+  const [statsData, setStatsData] = useState(null);
+  const [statsDecks, setStatsDecks] = useState([]);
+  const [dashLoading, setDashLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "stats" && !statsData) loadStats();
+  }, [activeTab]);
+
+  async function loadStats() {
+    setDashLoading(true);
+    try {
+      const [s, d] = await Promise.all([getCollectionStats(), listDecks()]);
+      setStatsData(s);
+      setStatsDecks(d ?? []);
+    } finally {
+      setDashLoading(false);
+    }
+  }
+
   useEffect(() => { if (authReady && authUser) loadGameSessions(); }, [authReady, authUser]);
 
   useEffect(() => {
@@ -2230,10 +2296,24 @@ export default function App() {
     loadDecks();
   }
 
+  async function handleValidateDeck(id) {
+    setDeckValidating(true);
+    setDeckValidation(null);
+    try {
+      const result = await validateDeck(id);
+      setDeckValidation(result);
+    } catch {
+      setDeckValidation({ error: true });
+    } finally {
+      setDeckValidating(false);
+    }
+  }
+
   async function handleManageDeck(deck) {
     setManagingDeck(deck);
     setDeckSearch("");
     setDeckInnerTab("cards");
+    setDeckValidation(null);
     setUnassignedPage(1);
     setDeckTypeFilter("");
     setDeckColorFilter("");
@@ -2521,13 +2601,99 @@ export default function App() {
 </body>
 </html>`;
 
-      const win = window.open("", "_blank");
-      if (!win) { alert("Permita popups para gerar o PDF."); return; }
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
+      // Blob URL evita bloqueio de popup — abre a página HTML para print
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (e) {
       alert("Erro ao gerar PDF: " + e.message);
+    } finally {
+      setPdfExporting(false);
+    }
+  }
+
+  async function handleExportListPDF() {
+    setPdfExporting(true);
+    try {
+      // Carrega jsPDF + autotable dinamicamente do CDN
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js");
+
+      const { jsPDF } = window.jspdf;
+      const allCards = [];
+      let page = 1;
+      while (true) {
+        const result = await listCards({ q: search, page, pageSize: 500, sort, order, foilOnly: filterFoil, fullArtOnly: filterFullArt, rarity: filterRarity, deckId: filterDeck !== "" ? filterDeck : undefined, colors: filterColors, type: filterType, conditionFilter: filterCondition });
+        const batch = result.data ?? [];
+        if (batch.length === 0) break;
+        allCards.push(...batch);
+        if (allCards.length >= (result.total ?? 0)) break;
+        page++;
+      }
+      if (allCards.length === 0) { alert("Nenhuma carta encontrada."); return; }
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const totalQty = allCards.reduce((s, c) => s + (c.quantity || 1), 0);
+      const totalValue = allCards.reduce((s, c) => s + (c.price_usd || 0) * (c.quantity || 1), 0);
+
+      doc.setFontSize(13);
+      doc.setTextColor(60, 40, 10);
+      doc.text("Magic Collector — Lista da Coleção", 14, 14);
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(`${allCards.length} cartas · ${totalQty} cópias · Valor: US$ ${totalValue.toFixed(2)} · ${new Date().toLocaleDateString("pt-BR")}`, 14, 20);
+
+      const rarityLabel = { M: "Mítica", R: "Rara", U: "Incomum", C: "Comum", L: "Terreno", T: "Token" };
+      const rows = allCards.map(c => {
+        const loc = c.storage_id > 0 ? storageLocations.find(s => s.id === c.storage_id) : null;
+        const stale = isPriceStale(c);
+        return [
+          c.name,
+          (c.set_code || "—").toUpperCase(),
+          c.collection_number || "—",
+          rarityLabel[c.rarity] || c.rarity || "—",
+          c.quantity,
+          c.price_usd > 0 ? `$${c.price_usd.toFixed(2)}${stale ? " ⏰" : ""}` : "—",
+          c.foil ? "✦" : "",
+          loc ? loc.name : "—",
+        ];
+      });
+
+      doc.autoTable({
+        startY: 24,
+        head: [["Nome", "Set", "Nº", "Raridade", "Qtd", "Preço USD", "Foil", "Local"]],
+        body: rows,
+        theme: "grid",
+        styles: { fontSize: 7.5, cellPadding: 1.5 },
+        headStyles: { fillColor: [60, 40, 10], textColor: 240, fontStyle: "bold" },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 14, halign: "center" },
+          2: { cellWidth: 12, halign: "center" },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 10, halign: "center" },
+          5: { cellWidth: 24, halign: "right" },
+          6: { cellWidth: 10, halign: "center" },
+          7: { cellWidth: "auto" },
+        },
+        didDrawPage: (data) => {
+          const pg = doc.internal.getNumberOfPages();
+          doc.setFontSize(7);
+          doc.setTextColor(150);
+          doc.text(`Pág. ${data.pageNumber}/${pg}`, data.settings.margin.left, doc.internal.pageSize.height - 5);
+        },
+      });
+
+      doc.save(`colecao-lista-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      alert("Erro ao gerar Lista PDF: " + e.message);
     } finally {
       setPdfExporting(false);
     }
@@ -2781,12 +2947,13 @@ export default function App() {
           icon="🃏"
           label="Coleção"
           tabs={[
-            { id: "collection", icon: "🃏", label: "Coleção"    },
-            { id: "decks",      icon: "🗂",  label: "Decks"      },
-            { id: "tokens",     icon: "🎭",  label: "Tokens"     },
-            { id: "proxies",    icon: "⚠",  label: "Proxies"    },
-            { id: "wishlist",   icon: "🎯",  label: "Desejados"  },
-            { id: "analyze",    icon: "🧬",  label: "Análise IA" },
+            { id: "collection", icon: "🃏", label: "Coleção"       },
+            { id: "decks",      icon: "🗂",  label: "Decks"         },
+            { id: "tokens",     icon: "🎭",  label: "Tokens"        },
+            { id: "proxies",    icon: "⚠",  label: "Proxies"       },
+            { id: "wishlist",   icon: "🎯",  label: "Desejados"     },
+            { id: "analyze",    icon: "🧬",  label: "Análise IA"    },
+            { id: "stats",      icon: "📊",  label: "Estatísticas"  },
           ]}
           activeTab={activeTab}
           onSelect={setActiveTab}
@@ -2852,6 +3019,15 @@ export default function App() {
                 🤖 Avaliação IA
                 {managingDeck.evaluated_at && <span className="eval-badge">✓</span>}
               </button>
+              {managingDeck.commander && (
+                <button type="button" className={`deck-inner-tab${deckInnerTab === "validate" ? " active" : ""}`}
+                  onClick={() => { setDeckInnerTab("validate"); if (!deckValidation) handleValidateDeck(managingDeck.id); }}>
+                  ✅ Validar
+                  {deckValidation && !deckValidation.error && (
+                    <span className={`validate-status-dot ${deckValidation.valid ? "dot-valid" : "dot-invalid"}`} />
+                  )}
+                </button>
+              )}
             </div>
 
             {deckInnerTab === "cards" && (
@@ -3081,6 +3257,58 @@ export default function App() {
                     <p className="eval-empty-sub">A IA irá analisar todas as cartas e gerar uma avaliação estratégica completa.</p>
                     <button type="button" className="eval-generate-btn" onClick={handleEvaluate} disabled={evaluating}>
                       ✨ Gerar Avaliação com IA
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {deckInnerTab === "validate" && managingDeck.commander && (
+              <div className="validate-panel">
+                {deckValidating ? (
+                  <div className="eval-loading">
+                    <div className="eval-spinner">⚙</div>
+                    <p className="eval-loading-text">Verificando regras Commander…</p>
+                  </div>
+                ) : deckValidation?.error ? (
+                  <div className="validate-error">
+                    <p>Erro ao validar o deck. Tente novamente.</p>
+                    <button type="button" className="eval-generate-btn" onClick={() => handleValidateDeck(managingDeck.id)}>↺ Tentar novamente</button>
+                  </div>
+                ) : deckValidation ? (
+                  <div className="validate-result">
+                    <div className={`validate-banner ${deckValidation.valid ? "banner-valid" : "banner-invalid"}`}>
+                      <span className="validate-icon">{deckValidation.valid ? "✅" : "❌"}</span>
+                      <div className="validate-banner-text">
+                        <strong>{deckValidation.valid ? "Deck válido!" : `${deckValidation.issues.length} problema${deckValidation.issues.length !== 1 ? "s" : ""} encontrado${deckValidation.issues.length !== 1 ? "s" : ""}`}</strong>
+                        <span>{deckValidation.card_count} cartas no deck (Commander exige 100)</span>
+                      </div>
+                      <button type="button" className="validate-rerun-btn" onClick={() => handleValidateDeck(managingDeck.id)}>↺ Reverificar</button>
+                    </div>
+                    {deckValidation.issues.length > 0 && (
+                      <ul className="validate-issues">
+                        {deckValidation.issues.map((issue, i) => (
+                          <li key={i} className={`validate-issue validate-issue-${issue.code}`}>
+                            <span className="validate-issue-icon">
+                              {issue.code === "not_commander_deck" ? "🏷️" :
+                               issue.code === "wrong_count" ? "🔢" :
+                               issue.code === "no_commander" ? "👑" :
+                               issue.code === "not_singleton" ? "📋" :
+                               issue.code === "color_violation" ? "🎨" : "⚠️"}
+                            </span>
+                            <span className="validate-issue-msg">{issue.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="eval-empty">
+                    <div className="eval-empty-icon">✅</div>
+                    <p>Verificação de regras Commander</p>
+                    <p className="eval-empty-sub">Checa: 100 cartas, comandante definido, singleton, identidade de cor.</p>
+                    <button type="button" className="eval-generate-btn" onClick={() => handleValidateDeck(managingDeck.id)}>
+                      Validar Deck
                     </button>
                   </div>
                 )}
@@ -6021,6 +6249,183 @@ export default function App() {
         </section>
       )}
 
+      {/* ── DASHBOARD DE ESTATÍSTICAS ───────────────────────────────────── */}
+      {activeTab === "stats" && (
+        <section className="stats-dashboard">
+          <div className="stats-dash-header">
+            <h2>📊 Estatísticas da Coleção</h2>
+            <button type="button" className="stats-dash-refresh" onClick={loadStats} disabled={dashLoading}>
+              {dashLoading ? "⟳ Carregando…" : "↺ Atualizar"}
+            </button>
+          </div>
+
+          {dashLoading && !statsData && (
+            <div className="stats-dash-loading">
+              <div className="eval-spinner">⚙</div>
+              <p>Calculando estatísticas…</p>
+            </div>
+          )}
+
+          {statsData && (() => {
+            const totalUnique = statsData.unique_cards || 0;
+            const totalQty = statsData.total_quantity || 0;
+            const totalValue = statsData.estimated_value_usd || 0;
+            const foilQty = statsData.foil_quantity || 0;
+            const byRarity = statsData.by_rarity || [];
+            const byColor = statsData.by_color || [];
+
+            const rarityLabel = { M: "Míticas", R: "Raras", U: "Incomuns", C: "Comuns", L: "Terrenos", T: "Tokens", "?": "Sem rarity" };
+            const rarityColor = { M: "#e87b00", R: "#c89b3c", U: "#8ab4d4", C: "#b0acaa", L: "#6db86d", T: "#a07cd0", "?": "#666" };
+            const colorHex = { W: "#f0e8c8", U: "#3a86d4", B: "#b0a0c8", R: "#e04830", G: "#2ea850", Multi: "#c89b3c", C: "#909090" };
+            const colorLabel = { W: "Branco", U: "Azul", B: "Preto", R: "Vermelho", G: "Verde", Multi: "Multi", C: "Incolor" };
+
+            const maxRarityQty = Math.max(...byRarity.map(r => r.quantity || 0), 1);
+            const maxColorCnt = Math.max(...byColor.map(c => c.count || 0), 1);
+
+            const topDecks = [...statsDecks]
+              .filter(d => d.estimated_value_usd > 0)
+              .sort((a, b) => b.estimated_value_usd - a.estimated_value_usd)
+              .slice(0, 8);
+            const maxDeckVal = Math.max(...topDecks.map(d => d.estimated_value_usd), 1);
+
+            const battleDecks = [...statsDecks]
+              .filter(d => d.battle_total > 0)
+              .sort((a, b) => b.battle_total - a.battle_total)
+              .slice(0, 8);
+
+            return (
+              <>
+                {/* Tiles */}
+                <div className="stats-tiles">
+                  <div className="stats-tile">
+                    <span className="stats-tile-num">{totalQty.toLocaleString("pt-BR")}</span>
+                    <span className="stats-tile-label">Cartas (cópias)</span>
+                  </div>
+                  <div className="stats-tile">
+                    <span className="stats-tile-num">{totalUnique.toLocaleString("pt-BR")}</span>
+                    <span className="stats-tile-label">Únicas</span>
+                  </div>
+                  <div className="stats-tile stats-tile-gold">
+                    <span className="stats-tile-num">US$ {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="stats-tile-label">Valor estimado</span>
+                  </div>
+                  <div className="stats-tile">
+                    <span className="stats-tile-num">{foilQty.toLocaleString("pt-BR")}</span>
+                    <span className="stats-tile-label">Foils</span>
+                  </div>
+                  <div className="stats-tile">
+                    <span className="stats-tile-num">{statsDecks.length}</span>
+                    <span className="stats-tile-label">Decks</span>
+                  </div>
+                </div>
+
+                <div className="stats-charts-row">
+                  {/* Raridades */}
+                  {byRarity.length > 0 && (
+                    <div className="stats-chart-card">
+                      <h3 className="stats-chart-title">Distribuição por Raridade</h3>
+                      <div className="stats-bar-list">
+                        {byRarity.map(r => (
+                          <div key={r.rarity} className="stats-bar-row">
+                            <span className="stats-bar-label" style={{ color: rarityColor[r.rarity] || "#aaa" }}>
+                              {rarityLabel[r.rarity] || r.rarity}
+                            </span>
+                            <div className="stats-bar-track">
+                              <div className="stats-bar-fill"
+                                style={{ width: `${Math.round((r.quantity / maxRarityQty) * 100)}%`, background: rarityColor[r.rarity] || "#aaa" }} />
+                            </div>
+                            <span className="stats-bar-val">{(r.quantity || 0).toLocaleString("pt-BR")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cores */}
+                  {byColor.length > 0 && (
+                    <div className="stats-chart-card">
+                      <h3 className="stats-chart-title">Cartas por Cor</h3>
+                      <div className="stats-bar-list">
+                        {byColor.map(c => (
+                          <div key={c.color} className="stats-bar-row">
+                            <span className="stats-bar-label" style={{ color: colorHex[c.color] || "#aaa" }}>
+                              {colorLabel[c.color] || c.color}
+                            </span>
+                            <div className="stats-bar-track">
+                              <div className="stats-bar-fill"
+                                style={{ width: `${Math.round((c.count / maxColorCnt) * 100)}%`, background: colorHex[c.color] || "#aaa" }} />
+                            </div>
+                            <span className="stats-bar-val">{(c.count || 0).toLocaleString("pt-BR")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="stats-charts-row">
+                  {/* Top decks por valor */}
+                  {topDecks.length > 0 && (
+                    <div className="stats-chart-card">
+                      <h3 className="stats-chart-title">Top Decks por Valor</h3>
+                      <div className="stats-bar-list">
+                        {topDecks.map((d, i) => (
+                          <div key={d.id} className="stats-bar-row">
+                            <span className="stats-bar-label stats-bar-label-deck" title={d.name}>
+                              {["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣"][i]} {d.name.length > 18 ? d.name.slice(0, 17) + "…" : d.name}
+                            </span>
+                            <div className="stats-bar-track">
+                              <div className="stats-bar-fill stats-bar-gold"
+                                style={{ width: `${Math.round((d.estimated_value_usd / maxDeckVal) * 100)}%` }} />
+                            </div>
+                            <span className="stats-bar-val">US$ {d.estimated_value_usd.toFixed(0)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Desempenho por deck */}
+                  {battleDecks.length > 0 && (
+                    <div className="stats-chart-card">
+                      <h3 className="stats-chart-title">Desempenho em Batalhas</h3>
+                      <div className="stats-bar-list">
+                        {battleDecks.map(d => {
+                          const total = d.battle_total || 1;
+                          const wPct = Math.round((d.battle_wins / total) * 100);
+                          const lPct = Math.round((d.battle_losses / total) * 100);
+                          const dPct = 100 - wPct - lPct;
+                          return (
+                            <div key={d.id} className="stats-bar-row">
+                              <span className="stats-bar-label stats-bar-label-deck" title={d.name}>
+                                {d.name.length > 18 ? d.name.slice(0, 17) + "…" : d.name}
+                              </span>
+                              <div className="stats-bar-track stats-bar-stacked">
+                                {wPct > 0 && <div className="stats-bar-seg stats-seg-win" style={{ width: `${wPct}%` }} title={`${d.battle_wins}V`} />}
+                                {lPct > 0 && <div className="stats-bar-seg stats-seg-loss" style={{ width: `${lPct}%` }} title={`${d.battle_losses}D`} />}
+                                {dPct > 0 && <div className="stats-bar-seg stats-seg-draw" style={{ width: `${dPct}%` }} title={`${d.battle_draws}E`} />}
+                              </div>
+                              <span className="stats-bar-val stats-wl-val">
+                                <span className="stats-seg-win">{d.battle_wins}V</span> <span className="stats-seg-loss">{d.battle_losses}D</span>
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div className="stats-wl-legend">
+                          <span className="stats-seg-win">■ Vitórias</span>
+                          <span className="stats-seg-loss">■ Derrotas</span>
+                          <span className="stats-seg-draw">■ Empates</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </section>
+      )}
+
       {activeTab === "collection" && <section className="card list-section collection-full">
         {/* ── LISTA ── */}
           <div className="list-header">
@@ -6072,7 +6477,8 @@ export default function App() {
                     { label: "↓ CSV", onClick: handleExportCSV },
                     { label: "↓ XLSX", onClick: handleExportXLSX },
                     { separator: true },
-                    { label: pdfExporting ? "⏳ Gerando PDF…" : "🖨 PDF de cartas (filtro atual)", onClick: handleExportCardsPDF, disabled: pdfExporting },
+                    { label: pdfExporting ? "⏳ Gerando PDF…" : "🖨 PDF de cartas (com imagens)", onClick: handleExportCardsPDF, disabled: pdfExporting },
+                    { label: pdfExporting ? "⏳ Gerando PDF…" : "📄 Lista PDF (download direto)", onClick: handleExportListPDF, disabled: pdfExporting },
                   ]}
                 />
               </div>
@@ -6202,10 +6608,11 @@ export default function App() {
 
           {viewMode === "grid" ? (
             <div className="cards-grid">
-              {cards.map((card) => (
+              {cards.map((card, index) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()} ${colorGlowClass(card.colors)} ${cardTypeClass(card.type)}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}`}
+                  style={{ '--i': index % 16 }}
                   onClick={() => handleDetails(card.id)}
                   title={card.name}
                 >
@@ -6234,7 +6641,7 @@ export default function App() {
                     </div>
                     <div className="card-grid-meta">
                       {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
-                      {card.price_usd > 0 && <span className="price-tag">${card.price_usd.toFixed(2)}{usdToBrl ? <span className="price-brl"> ≈R${(card.price_usd * usdToBrl).toFixed(0)}</span> : null}</span>}
+                      {card.price_usd > 0 && <span className={`price-tag${isPriceStale(card) ? " price-stale" : ""}`} title={isPriceStale(card) ? (card.price_updated_at ? "Preço desatualizado há mais de 30 dias" : "Preço nunca atualizado via refresh") : undefined}>{isPriceStale(card) && <span className="price-stale-icon">⏰</span>}${card.price_usd.toFixed(2)}{usdToBrl ? <span className="price-brl"> ≈R${(card.price_usd * usdToBrl).toFixed(0)}</span> : null}</span>}
                       {card.storage_id > 0 && storageLocations.length > 0 && (() => {
                         const loc = storageLocations.find(s => s.id === card.storage_id);
                         return loc ? <span className="storage-badge" title={loc.name} style={loc.color ? { '--sb-color': loc.color } : {}}>📦 {loc.name}</span> : null;
@@ -6282,7 +6689,9 @@ export default function App() {
                       <div className="list-item-meta">
                         <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
                         {card.price_usd > 0 && (
-                          <span className="price-tag">${card.price_usd.toFixed(2)}</span>
+                          <span className={`price-tag${isPriceStale(card) ? " price-stale" : ""}`} title={isPriceStale(card) ? (card.price_updated_at ? "Preço desatualizado há mais de 30 dias" : "Preço nunca atualizado via refresh") : undefined}>
+                            {isPriceStale(card) && <span className="price-stale-icon">⏰</span>}${card.price_usd.toFixed(2)}
+                          </span>
                         )}
                       </div>
                       <small>{card.type || "—"}{card.subtitle ? ` — ${card.subtitle}` : ""}</small>
@@ -6393,8 +6802,9 @@ export default function App() {
 
       {/* ── MODAL DETALHES ── */}
       {(selectedCard || loadingDetail) && (
-        <div className="modal-overlay" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay modal-overlay-card-detail" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>
+          <div className={`modal modal-card-detail rarity-detail-${(selectedCard?.local?.rarity || "c").toLowerCase()} ${cardTypeClass(selectedCard?.local?.type) || ""}`} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-rarity-strip" />
             <button className="modal-close" aria-label="Fechar" onClick={() => { setSelectedCard(null); setEditMode(false); setDetailFromDeck(false); }}>✕</button>
 
             {loadingDetail && <p className="empty">Carregando...</p>}
@@ -6403,14 +6813,23 @@ export default function App() {
               const backImg = selectedCard.external?.back_image_url || selectedCard.local?.image_url_back || "";
               const frontImg = selectedCard.external?.image_url || selectedCard.local?.image_url || "";
               const isDFC = !!(selectedCard.local?.double_faced || selectedCard.external?.double_faced || backImg);
-              const displayImg = isDFC && modalFlipped ? backImg : frontImg;
               const backName = selectedCard.external?.back_name || "";
+              const isFoil = selectedCard.local?.foil;
               return (
               <>
                 <div className="modal-top">
-                  {displayImg && (
-                    <div className="modal-card-img-wrap">
-                      <img src={displayImg} alt={selectedCard.local.name} className={`modal-card-img${isDFC && modalFlipped ? " dfc-back" : ""}`} />
+                  {(frontImg || backImg) && (
+                    <div className={`modal-card-img-wrap${isFoil ? " img-is-foil" : ""}`}>
+                      <div className={`dfc-3d-container${isDFC ? " is-dfc-card" : ""}${isDFC && modalFlipped ? " flipped" : ""}`}>
+                        <div className="dfc-3d-front">
+                          <img src={frontImg} alt={selectedCard.local.name} className="modal-card-img" />
+                        </div>
+                        {isDFC && backImg && (
+                          <div className="dfc-3d-back">
+                            <img src={backImg} alt={backName || selectedCard.local.name} className="modal-card-img" />
+                          </div>
+                        )}
+                      </div>
                       {isDFC && backImg && (
                         <button type="button" className="dfc-flip-btn" title="Virar carta"
                           onClick={() => setModalFlipped(f => !f)}>
@@ -6419,7 +6838,13 @@ export default function App() {
                       )}
                     </div>
                   )}
-                  <div>
+                  {/* ── right column ───────────────────────── */}
+                  <div className="modal-card-info">
+                    {(() => {
+                      const r = (selectedCard.local.rarity || "c").toLowerCase();
+                      const rarityLabel = { m: "Mítica", r: "Rara", u: "Incomum", c: "Comum", l: "Terreno", t: "Token" }[r] || r.toUpperCase();
+                      return <span className={`modal-rarity-badge rarity-${r}`}>{rarityLabel}</span>;
+                    })()}
                     <h2>
                       {isDFC && modalFlipped && backName
                         ? backName
@@ -6430,78 +6855,111 @@ export default function App() {
                     {selectedCard.external?.printed_name && !modalFlipped && (
                       <p className="modal-en-name">{selectedCard.external.name}</p>
                     )}
-                    <p className="modal-subtitle">
-                      {selectedCard.external?.printed_type || selectedCard.external?.type || selectedCard.local.type}
-                      {selectedCard.local.subtitle ? ` — ${selectedCard.local.subtitle}` : ""}
+
+                    <div className="modal-type-mana-row">
+                      {(selectedCard.external?.mana_cost || selectedCard.local.mana_cost) && (
+                        <span className="modal-mana-cost-text">{selectedCard.external?.mana_cost || selectedCard.local.mana_cost}</span>
+                      )}
+                      <span className="modal-type-line-text">
+                        {selectedCard.external?.printed_type || selectedCard.external?.type || selectedCard.local.type}
+                        {selectedCard.local.subtitle ? ` — ${selectedCard.local.subtitle}` : ""}
+                      </span>
+                    </div>
+
+                    <p className="modal-set-line">
+                      {selectedCard.external?.set_name || selectedCard.local.set_code}
+                      {selectedCard.local.set_code && selectedCard.external?.set_name ? ` (${selectedCard.local.set_code})` : ""}
+                      {selectedCard.local.collection_number ? ` · #${selectedCard.local.collection_number}` : ""}
+                      {selectedCard.local.language ? ` · ${selectedCard.local.language.toUpperCase()}` : ""}
+                      {selectedCard.local.year ? ` · ${selectedCard.local.year}` : ""}
                     </p>
-                    {selectedCard.external?.set_name && (
-                      <p className="modal-set-name">{selectedCard.external.set_name} ({selectedCard.local.set_code})</p>
+
+                    {(selectedCard.external?.printed_text || selectedCard.external?.text || selectedCard.external?.flavor_text) && (
+                      <div className="modal-oracle-box">
+                        {(selectedCard.external?.printed_text || selectedCard.external?.text) && (
+                          <p className="modal-oracle-text">
+                            {selectedCard.external.printed_text || selectedCard.external.text}
+                          </p>
+                        )}
+                        {selectedCard.external?.flavor_text && (
+                          <>
+                            {(selectedCard.external?.printed_text || selectedCard.external?.text) && (
+                              <div className="modal-oracle-sep" />
+                            )}
+                            <p className="modal-oracle-flavor"><em>{selectedCard.external.flavor_text}</em></p>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedCard.external?.power && (
+                      <div className="modal-pt-badge">
+                        {selectedCard.external.power} / {selectedCard.external.toughness}
+                      </div>
                     )}
                   </div>
                 </div>
 
-                <div className="modal-divider" />
-                <div className="modal-grid">
-                  <div className="modal-grid-cell-color">
+                {/* ── compact stats strip ─────────────────── */}
+                <div className="modal-stats-strip">
+                  <div className="modal-stat-pill">
                     <span>Cor</span>
                     <span className="modal-color-icons">
                       <CardColorIcons card={selectedCard.local} />
                       {!parseCardColorIcons(selectedCard.local).length && (selectedCard.local.color || "—")}
                     </span>
                   </div>
-                  <div><span>Raridade</span>{selectedCard.external?.rarity || selectedCard.local.rarity || "—"}</div>
-                  <div><span>Coleção</span>{selectedCard.local.set_code || "—"}</div>
-                  <div><span>Nº</span>{selectedCard.local.collection_number || "—"}</div>
-                  <div><span>Idioma</span>{selectedCard.local.language || "—"}</div>
-                  <div><span>Ano</span>{selectedCard.local.year || "—"}</div>
-                  <div><span>Artista</span>{selectedCard.external?.artist || selectedCard.local.artist || "—"}</div>
-                  <div><span>Custo</span>{selectedCard.external?.mana_cost || selectedCard.local.mana_cost || "—"}</div>
-                  <div><span>Quantidade</span>{selectedCard.local.quantity}</div>
-                  <div><span>Condição</span>{selectedCard.local.condition || "—"}</div>
-                  <div><span>Foil</span>{selectedCard.local.foil ? "Sim" : "Não"}</div>
-                  <div><span>Full Art</span>{selectedCard.local.full_art ? <span className="full-art-badge">◈ Sim</span> : "Não"}</div>
+                  {(selectedCard.external?.artist || selectedCard.local.artist) && (
+                    <div className="modal-stat-pill"><span>Artista</span>{selectedCard.external?.artist || selectedCard.local.artist}</div>
+                  )}
+                  {selectedCard.local.condition && (
+                    <div className="modal-stat-pill"><span>Condição</span>{selectedCard.local.condition}</div>
+                  )}
+                  <div className="modal-stat-pill"><span>Qtd.</span>{selectedCard.local.quantity}</div>
+                  {selectedCard.local.foil && (
+                    <div className="modal-stat-pill modal-stat-foil">✦ Foil</div>
+                  )}
+                  {selectedCard.local.full_art && (
+                    <div className="modal-stat-pill"><span className="full-art-badge">◈ Full Art</span></div>
+                  )}
                   {selectedCard.local.deck_id > 0 && (() => {
                     const d = decks.find(dd => dd.id === selectedCard.local.deck_id);
                     return d ? (
-                      <div>
+                      <div className="modal-stat-pill">
                         <span>Deck</span>
                         <span className="modal-deck-badge" style={getDeckBadgeStyle(d.theme_color)}>{d.name}</span>
                       </div>
                     ) : null;
                   })()}
-                  {selectedCard.external?.power && (
-                    <div><span>Força/Resistência</span>{selectedCard.external.power}/{selectedCard.external.toughness}</div>
-                  )}
                   {selectedCard.external?.prices?.usd && (
-                    <div><span>Preço (USD)</span>
-                      ${selectedCard.external.prices.usd}
-                      {selectedCard.external.prices.usd_foil ? ` / foil $${selectedCard.external.prices.usd_foil}` : ""}
-                      {usdToBrl ? <span className="price-brl"> ≈R${(parseFloat(selectedCard.external.prices.usd) * usdToBrl).toFixed(2)}</span> : null}
+                    <div className="modal-stat-pill modal-stat-price">
+                      <span>Preço</span>
+                      <span>
+                        ${selectedCard.external.prices.usd}
+                        {selectedCard.external.prices.usd_foil ? <small> / foil ${selectedCard.external.prices.usd_foil}</small> : ""}
+                        {usdToBrl ? <span className="price-brl"> ≈R${(parseFloat(selectedCard.external.prices.usd) * usdToBrl).toFixed(2)}</span> : null}
+                      </span>
                     </div>
                   )}
                   {selectedCard.external?.prices?.eur && (
-                    <div><span>Preço (EUR)</span>€{selectedCard.external.prices.eur}{selectedCard.external.prices.eur_foil ? ` / foil €${selectedCard.external.prices.eur_foil}` : ""}</div>
-                  )}
-                  {priceHistory.length >= 2 && (
-                    <div style={{gridColumn:"1/-1",paddingTop:"4px"}}>
-                      <span style={{fontSize:"11px",color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em"}}>Histórico de preço</span>
-                      <PriceSparkline data={priceHistory} />
-                    </div>
+                    <div className="modal-stat-pill"><span>EUR</span>€{selectedCard.external.prices.eur}{selectedCard.external.prices.eur_foil ? <small> foil €{selectedCard.external.prices.eur_foil}</small> : ""}</div>
                   )}
                 </div>
 
-                {(selectedCard.external?.printed_text || selectedCard.external?.text) && (
-                  <p className="modal-notes">
-                    <strong>Texto:</strong>{" "}
-                    {selectedCard.external.printed_text || selectedCard.external.text}
-                  </p>
+                {priceHistory.length >= 2 && (
+                  <div className="modal-price-history">
+                    <span>Histórico de preço</span>
+                    <PriceSparkline data={priceHistory} />
+                  </div>
                 )}
-                {selectedCard.external?.flavor_text && (
-                  <p className="modal-flavor"><em>{selectedCard.external.flavor_text}</em></p>
-                )}
+
                 {selectedCard.local.notes && (
-                  <p className="modal-notes"><strong>Observações:</strong> {selectedCard.local.notes}</p>
+                  <div className="modal-user-notes">
+                    <span>Observações</span>
+                    {selectedCard.local.notes}
+                  </div>
                 )}
+
                 {selectedCard.external?.scryfall_uri && (
                   <a className="scryfall-link" href={selectedCard.external.scryfall_uri} target="_blank" rel="noreferrer">
                     Ver no Scryfall ↗

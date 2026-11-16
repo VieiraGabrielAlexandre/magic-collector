@@ -9281,3 +9281,1106 @@ input[type="radio"] {
   border: 1px solid var(--border);
   color: var(--text-muted);
 }
+
+/* =============================================
+   VISUAL POLISH — ANIMATIONS & GLOW EFFECTS
+   ============================================= */
+
+/* --- Color-matched hover glow variables --- */
+.glow-w  { --hover-glow: rgba(255, 250, 200, 0.30); }
+.glow-u  { --hover-glow: rgba(80,  150, 255, 0.35); }
+.glow-b  { --hover-glow: rgba(160, 100, 220, 0.30); }
+.glow-r  { --hover-glow: rgba(255,  80,  60, 0.35); }
+.glow-g  { --hover-glow: rgba( 60, 200,  80, 0.30); }
+.glow-multi { --hover-glow: rgba(220, 180,  40, 0.40); }
+.glow-c  { --hover-glow: rgba(180, 170, 160, 0.20); }
+
+.card-grid-item:hover {
+  box-shadow:
+    0 12px 32px rgba(0,0,0,0.7),
+    0 0 20px var(--hover-glow, rgba(180,140,60,0.20)),
+    0 0 0 1px var(--gold-dim);
+}
+
+/* --- Staggered card appear animation --- */
+@keyframes card-appear {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+/* animation added to existing .card-grid-item via cascade */
+.cards-grid .card-grid-item {
+  animation: card-appear 0.28s ease both;
+  animation-delay: calc(var(--i, 0) * 25ms);
+}
+
+/* --- Mythic pulse --- */
+@keyframes mythic-pulse {
+  0%   { box-shadow: 0 0 6px  rgba(230,100,20,0.20), 0 0 0 1px rgba(230,100,20,0.10); }
+  50%  { box-shadow: 0 0 18px rgba(230,100,20,0.45), 0 0 0 1px rgba(230,100,20,0.30); }
+  100% { box-shadow: 0 0 6px  rgba(230,100,20,0.20), 0 0 0 1px rgba(230,100,20,0.10); }
+}
+
+.cards-grid .card-grid-item.item-r-m {
+  animation: card-appear 0.28s ease both, mythic-pulse 3s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 180ms);
+}
+
+/* --- Modal spring entry --- */
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: scale(0.93) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal-overlay {
+  animation: overlay-fade-in 0.18s ease both;
+}
+
+.modal {
+  animation: modal-panel-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* --- Tab content fade --- */
+@keyframes section-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.list-section {
+  animation: section-fade-in 0.22s ease both;
+}
+
+/* --- Button press scale feedback --- */
+button:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+/* --- Commander card glow in deck view --- */
+@keyframes commander-pulse {
+  0%   { box-shadow: 0 0 8px  rgba(220,160,40,0.30); }
+  50%  { box-shadow: 0 0 22px rgba(220,160,40,0.60); }
+  100% { box-shadow: 0 0 8px  rgba(220,160,40,0.30); }
+}
+
+.deck-card-commander {
+  animation: commander-pulse 2.8s ease-in-out infinite;
+}
+
+/* --- Respect reduced motion preference --- */
+@media (prefers-reduced-motion: reduce) {
+  .cards-grid .card-grid-item,
+  .cards-grid .card-grid-item.item-r-m,
+  .modal-overlay,
+  .modal,
+  .list-section,
+  .deck-card-commander {
+    animation: none !important;
+    transition: none !important;
+  }
+  button:not(:disabled):active {
+    transform: none;
+  }
+}
+
+/* =============================================
+   CARD TYPE EFFECTS — per type × rarity
+   ============================================= */
+
+/* --- Planeswalker: multi-color spark energy cycle --- */
+@keyframes pw-spark {
+  0%   { box-shadow: 0 0 12px rgba(80,160,255,0.55), 0 0 28px rgba(220,100,255,0.30); border-color: rgba(100,180,255,0.50); }
+  25%  { box-shadow: 0 0 12px rgba(255,200,60,0.55),  0 0 28px rgba(80,220,180,0.30);  border-color: rgba(255,210,80,0.50); }
+  50%  { box-shadow: 0 0 12px rgba(200,80,255,0.55),  0 0 28px rgba(255,160,60,0.30);  border-color: rgba(180,80,255,0.50); }
+  75%  { box-shadow: 0 0 12px rgba(60,220,120,0.55),  0 0 28px rgba(255,80,120,0.30);  border-color: rgba(60,210,120,0.50); }
+  100% { box-shadow: 0 0 12px rgba(80,160,255,0.55),  0 0 28px rgba(220,100,255,0.30); border-color: rgba(100,180,255,0.50); }
+}
+.cards-grid .card-grid-item.type-pw {
+  animation: card-appear 0.28s ease both, pw-spark 4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), 0s;
+}
+
+/* --- Basic Land: gentle earth pulse --- */
+@keyframes land-basic-pulse {
+  0%   { box-shadow: 0 0 6px rgba(70,145,55,0.20); border-color: rgba(80,150,60,0.25); }
+  50%  { box-shadow: 0 0 16px rgba(70,160,55,0.45), 0 0 5px rgba(140,105,50,0.25); border-color: rgba(80,155,60,0.55); }
+  100% { box-shadow: 0 0 6px rgba(70,145,55,0.20); border-color: rgba(80,150,60,0.25); }
+}
+.cards-grid .card-grid-item.type-land-basic {
+  animation: card-appear 0.28s ease both, land-basic-pulse 5.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 600ms);
+}
+
+/* --- Non-basic Land: teal mana pulse --- */
+@keyframes land-pulse {
+  0%   { box-shadow: 0 0 8px rgba(35,175,155,0.25); border-color: rgba(40,180,160,0.30); }
+  50%  { box-shadow: 0 0 20px rgba(35,200,175,0.55), 0 0 6px rgba(100,225,205,0.30); border-color: rgba(40,200,180,0.60); }
+  100% { box-shadow: 0 0 8px rgba(35,175,155,0.25); border-color: rgba(40,180,160,0.30); }
+}
+.cards-grid .card-grid-item.type-land {
+  animation: card-appear 0.28s ease both, land-pulse 3.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 400ms);
+}
+
+/* --- Creature: double heartbeat --- */
+@keyframes creature-beat {
+  0%   { box-shadow: 0 0 5px rgba(200,75,75,0.15); }
+  8%   { box-shadow: 0 0 16px rgba(225,75,75,0.50); }
+  16%  { box-shadow: 0 0 5px rgba(200,75,75,0.15); }
+  24%  { box-shadow: 0 0 10px rgba(200,75,75,0.32); }
+  32%  { box-shadow: 0 0 5px rgba(200,75,75,0.15); }
+  100% { box-shadow: 0 0 5px rgba(200,75,75,0.15); }
+}
+.cards-grid .card-grid-item.type-creature {
+  animation: card-appear 0.28s ease both, creature-beat 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 300ms);
+}
+
+/* --- Instant: lightning flash --- */
+@keyframes instant-flash {
+  0%   { border-color: rgba(100,175,255,0.20); box-shadow: none; }
+  5%   { border-color: rgba(140,215,255,0.85); box-shadow: 0 0 18px rgba(100,205,255,0.65); }
+  10%  { border-color: rgba(100,175,255,0.20); box-shadow: none; }
+  16%  { border-color: rgba(120,200,255,0.50); box-shadow: 0 0 8px rgba(100,205,255,0.30); }
+  22%  { border-color: rgba(100,175,255,0.20); box-shadow: none; }
+  100% { border-color: rgba(100,175,255,0.20); box-shadow: none; }
+}
+.cards-grid .card-grid-item.type-instant {
+  animation: card-appear 0.28s ease both, instant-flash 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 220ms);
+}
+
+/* --- Sorcery: deep mystic slow swirl --- */
+@keyframes sorcery-flow {
+  0%   { box-shadow: 0 0 8px rgba(125,55,220,0.25), 0 0 2px rgba(195,75,180,0.15); border-color: rgba(140,60,220,0.25); }
+  50%  { box-shadow: 0 0 22px rgba(165,55,245,0.50), 0 0 9px rgba(220,75,200,0.35); border-color: rgba(165,60,240,0.55); }
+  100% { box-shadow: 0 0 8px rgba(125,55,220,0.25), 0 0 2px rgba(195,75,180,0.15); border-color: rgba(140,60,220,0.25); }
+}
+.cards-grid .card-grid-item.type-sorcery {
+  animation: card-appear 0.28s ease both, sorcery-flow 4.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 450ms);
+}
+
+/* --- Artifact: metallic chrome gleam --- */
+@keyframes artifact-gleam {
+  0%   { border-color: rgba(175,180,200,0.25); box-shadow: 0 0 5px rgba(195,210,230,0.15); }
+  50%  { border-color: rgba(220,228,245,0.65); box-shadow: 0 0 18px rgba(210,222,245,0.45), 0 0 5px rgba(255,255,255,0.22); }
+  100% { border-color: rgba(175,180,200,0.25); box-shadow: 0 0 5px rgba(195,210,230,0.15); }
+}
+.cards-grid .card-grid-item.type-artifact {
+  animation: card-appear 0.28s ease both, artifact-gleam 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 350ms);
+}
+
+/* --- Enchantment: ethereal white-gold shimmer --- */
+@keyframes enchant-aura {
+  0%   { box-shadow: 0 0 8px rgba(255,235,155,0.20); border-color: rgba(255,218,115,0.20); }
+  50%  { box-shadow: 0 0 24px rgba(255,235,155,0.48), 0 0 9px rgba(200,165,255,0.28); border-color: rgba(255,218,115,0.55); }
+  100% { box-shadow: 0 0 8px rgba(255,235,155,0.20); border-color: rgba(255,218,115,0.20); }
+}
+.cards-grid .card-grid-item.type-enchantment {
+  animation: card-appear 0.28s ease both, enchant-aura 5.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 500ms);
+}
+
+/* --- Battle: aggressive war energy --- */
+@keyframes battle-clash {
+  0%   { box-shadow: 0 0 8px rgba(218,58,38,0.32); border-color: rgba(220,80,40,0.32); }
+  35%  { box-shadow: 0 0 24px rgba(240,78,18,0.65), 0 0 9px rgba(255,200,48,0.42); border-color: rgba(240,98,18,0.65); }
+  65%  { box-shadow: 0 0 10px rgba(218,58,38,0.38); border-color: rgba(220,80,40,0.38); }
+  100% { box-shadow: 0 0 8px rgba(218,58,38,0.32); border-color: rgba(220,80,40,0.32); }
+}
+.cards-grid .card-grid-item.type-battle {
+  animation: card-appear 0.28s ease both, battle-clash 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), 0s;
+}
+
+/* =============================================
+   RARITY ENHANCEMENTS
+   ============================================= */
+
+/* Rare: gold border shimmer */
+@keyframes rare-gold-shimmer {
+  0%   { border-top-color: rgba(215,165,38,0.60); }
+  50%  { border-top-color: rgba(255,208,75,1.00); box-shadow: 0 -3px 14px rgba(215,165,38,0.55); }
+  100% { border-top-color: rgba(215,165,38,0.60); }
+}
+.cards-grid .card-grid-item.item-r-r {
+  animation: card-appear 0.28s ease both, rare-gold-shimmer 2.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 200ms);
+}
+
+/* Uncommon: silver/steel border pulse */
+@keyframes uncommon-silver {
+  0%   { border-top-color: rgba(135,168,210,0.55); }
+  50%  { border-top-color: rgba(178,210,255,0.95); box-shadow: 0 -2px 10px rgba(135,168,210,0.40); }
+  100% { border-top-color: rgba(135,168,210,0.55); }
+}
+.cards-grid .card-grid-item.item-r-u {
+  animation: card-appear 0.28s ease both, uncommon-silver 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), calc(var(--i, 0) * 150ms);
+}
+
+/* Token: ghost dashed outline */
+.cards-grid .card-grid-item.item-r-t {
+  border-style: dashed;
+  border-color: rgba(175,145,255,0.38);
+  opacity: 0.88;
+}
+
+/* Mythic Planeswalker: turbo spark */
+.cards-grid .card-grid-item.item-r-m.type-pw {
+  animation: card-appear 0.28s ease both, pw-spark 2.2s ease-in-out infinite, mythic-pulse 3s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), 0s, 0s;
+}
+
+/* Mythic Creature: strong heartbeat + orange glow */
+.cards-grid .card-grid-item.item-r-m.type-creature {
+  animation: card-appear 0.28s ease both, creature-beat 1.6s ease-in-out infinite, mythic-pulse 3s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), 0s, 0s;
+}
+
+/* Rare Planeswalker: gold spark */
+.cards-grid .card-grid-item.item-r-r.type-pw {
+  animation: card-appear 0.28s ease both, pw-spark 3s ease-in-out infinite, rare-gold-shimmer 2.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 25ms), 0s, 0s;
+}
+
+/* =============================================
+   REDUCED MOTION — disable all type/rarity effects
+   ============================================= */
+@media (prefers-reduced-motion: reduce) {
+  .cards-grid .card-grid-item.type-pw,
+  .cards-grid .card-grid-item.type-land-basic,
+  .cards-grid .card-grid-item.type-land,
+  .cards-grid .card-grid-item.type-creature,
+  .cards-grid .card-grid-item.type-instant,
+  .cards-grid .card-grid-item.type-sorcery,
+  .cards-grid .card-grid-item.type-artifact,
+  .cards-grid .card-grid-item.type-enchantment,
+  .cards-grid .card-grid-item.type-battle,
+  .cards-grid .card-grid-item.item-r-r,
+  .cards-grid .card-grid-item.item-r-u,
+  .cards-grid .card-grid-item.item-r-m.type-pw,
+  .cards-grid .card-grid-item.item-r-m.type-creature,
+  .cards-grid .card-grid-item.item-r-r.type-pw {
+    animation: none !important;
+    border-style: solid !important;
+    opacity: 1 !important;
+  }
+}
+
+/* =============================================
+   CARD DETAIL MODAL — enhanced visual
+   ============================================= */
+
+/* Overlay dedicated to card detail */
+.modal-overlay-card-detail {
+  background: rgba(0, 0, 0, 0.90);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Modal container override */
+.modal-card-detail {
+  max-width: 780px;
+  padding: 0 0 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: 0;
+}
+
+/* ── Rarity strip ─────────────────────────────── */
+.modal-rarity-strip {
+  height: 4px;
+  border-radius: 16px 16px 0 0;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.modal-card-detail.rarity-detail-m .modal-rarity-strip {
+  background: linear-gradient(90deg, #c0540a, #f97316, #fbbf24, #f97316, #c0540a);
+  box-shadow: 0 0 16px rgba(249,115,22,0.60);
+}
+.modal-card-detail.rarity-detail-r .modal-rarity-strip {
+  background: linear-gradient(90deg, #92610a, #d4a017, #fcd34d, #d4a017, #92610a);
+  box-shadow: 0 0 12px rgba(212,160,23,0.50);
+}
+.modal-card-detail.rarity-detail-u .modal-rarity-strip {
+  background: linear-gradient(90deg, #2d5a8e, #5b8dd9, #93c5fd, #5b8dd9, #2d5a8e);
+  box-shadow: 0 0 10px rgba(93,141,217,0.40);
+}
+.modal-card-detail.rarity-detail-c .modal-rarity-strip {
+  background: linear-gradient(90deg, transparent, rgba(160,160,165,0.4), transparent);
+}
+.modal-card-detail.rarity-detail-l .modal-rarity-strip {
+  background: linear-gradient(90deg, #2d5a1b, #4a8c2a, #86efac, #4a8c2a, #2d5a1b);
+  box-shadow: 0 0 10px rgba(74,140,42,0.40);
+}
+.modal-card-detail.rarity-detail-t .modal-rarity-strip {
+  background: linear-gradient(90deg, #4a2d7a, #7c3aed, #c4b5fd, #7c3aed, #4a2d7a);
+}
+
+/* ── Type-matched border glow ─────────────────── */
+.modal-card-detail.type-pw {
+  box-shadow: 0 0 0 1px rgba(100,180,255,0.25), 0 0 40px rgba(100,180,255,0.12), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-creature {
+  box-shadow: 0 0 0 1px rgba(200,75,75,0.20), 0 0 30px rgba(200,75,75,0.08), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-instant {
+  box-shadow: 0 0 0 1px rgba(100,175,255,0.22), 0 0 28px rgba(100,175,255,0.10), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-sorcery {
+  box-shadow: 0 0 0 1px rgba(140,60,220,0.22), 0 0 30px rgba(140,60,220,0.10), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-artifact {
+  box-shadow: 0 0 0 1px rgba(190,195,215,0.25), 0 0 28px rgba(190,195,215,0.10), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-enchantment {
+  box-shadow: 0 0 0 1px rgba(255,218,115,0.22), 0 0 32px rgba(255,218,115,0.10), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-land-basic,
+.modal-card-detail.type-land {
+  box-shadow: 0 0 0 1px rgba(70,160,55,0.22), 0 0 28px rgba(70,160,55,0.10), 0 24px 64px rgba(0,0,0,0.75);
+}
+.modal-card-detail.type-battle {
+  box-shadow: 0 0 0 1px rgba(220,60,40,0.25), 0 0 30px rgba(220,60,40,0.12), 0 24px 64px rgba(0,0,0,0.75);
+}
+
+/* ── Inner padding wrapper ────────────────────── */
+.modal-card-detail .modal-close {
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+}
+
+.modal-card-detail .modal-top {
+  padding: 24px 28px 20px;
+  gap: 24px;
+}
+
+.modal-card-detail .modal-divider {
+  margin: 0 28px;
+}
+
+.modal-card-detail .modal-grid {
+  padding: 0 28px;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.modal-card-detail .modal-notes,
+.modal-card-detail .modal-flavor,
+.modal-card-detail .scryfall-link,
+.modal-card-detail .modal-actions {
+  padding: 0 28px;
+}
+
+/* ── Card image: 3D flip container ───────────── */
+.modal-card-img-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 240px;
+}
+
+@keyframes card-img-appear {
+  from { opacity: 0; transform: perspective(900px) rotateY(-8deg) scale(0.92) translateY(10px); }
+  to   { opacity: 1; transform: perspective(900px) rotateY(0deg)  scale(1)    translateY(0); }
+}
+
+.modal-card-img-wrap .dfc-3d-container {
+  width: 100%;
+  animation: card-img-appear 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation-delay: 0.08s;
+}
+
+/* 3D perspective flip */
+.dfc-3d-container.is-dfc-card {
+  perspective: 900px;
+  transform-style: preserve-3d;
+}
+
+.dfc-3d-container.is-dfc-card .dfc-3d-front,
+.dfc-3d-container.is-dfc-card .dfc-3d-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.65s ease;
+}
+
+.dfc-3d-container.is-dfc-card .dfc-3d-back {
+  transform: rotateY(180deg);
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  opacity: 0;
+}
+
+.dfc-3d-container.is-dfc-card.flipped .dfc-3d-front {
+  transform: rotateY(-180deg);
+  opacity: 0;
+}
+
+.dfc-3d-container.is-dfc-card.flipped .dfc-3d-back {
+  transform: rotateY(0deg);
+  opacity: 1;
+}
+
+.dfc-3d-front img,
+.dfc-3d-back img {
+  width: 100%;
+  display: block;
+}
+
+/* Non-DFC: single image */
+.dfc-3d-container:not(.is-dfc-card) .dfc-3d-front img {
+  width: 100%;
+  display: block;
+}
+
+/* Base image style */
+.modal-card-img {
+  width: 100%;
+  border-radius: 14px;
+  display: block;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,155,60,0.22);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.modal-card-img:hover {
+  transform: scale(1.03) translateY(-3px);
+  box-shadow: 0 16px 52px rgba(0,0,0,0.70), 0 0 0 1px rgba(200,155,60,0.35);
+}
+
+/* Foil shimmer on modal image */
+@keyframes modal-foil-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.modal-card-img-wrap.img-is-foil .modal-card-img {
+  box-shadow: 0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,155,60,0.35), 0 0 20px rgba(200,180,60,0.20);
+}
+
+.modal-card-img-wrap.img-is-foil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255,255,255,0.08) 35%,
+    rgba(200,180,60,0.15) 45%,
+    rgba(255,255,255,0.08) 55%,
+    transparent 70%
+  );
+  background-size: 300% 100%;
+  animation: modal-foil-shimmer 3s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Rarity badge in title area ────────────────── */
+.modal-rarity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.modal-rarity-badge.rarity-m { background: rgba(249,115,22,0.15); color: var(--r-m); border: 1px solid rgba(249,115,22,0.30); }
+.modal-rarity-badge.rarity-r { background: rgba(212,160,23,0.15); color: var(--r-r); border: 1px solid rgba(212,160,23,0.30); }
+.modal-rarity-badge.rarity-u { background: rgba(93,141,217,0.15); color: var(--r-u); border: 1px solid rgba(93,141,217,0.30); }
+.modal-rarity-badge.rarity-c { background: rgba(140,140,145,0.12); color: var(--text-dim); border: 1px solid var(--border-dim); }
+.modal-rarity-badge.rarity-l { background: rgba(74,140,42,0.15); color: #86efac; border: 1px solid rgba(74,140,42,0.30); }
+.modal-rarity-badge.rarity-t { background: rgba(124,58,237,0.15); color: #c4b5fd; border: 1px solid rgba(124,58,237,0.30); }
+
+/* ── Data grid: staggered fade-in ──────────────── */
+@keyframes stat-cell-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.modal-card-detail .modal-grid > div {
+  animation: stat-cell-in 0.22s ease both;
+}
+.modal-card-detail .modal-grid > div:nth-child(1)  { animation-delay: 0.10s; }
+.modal-card-detail .modal-grid > div:nth-child(2)  { animation-delay: 0.13s; }
+.modal-card-detail .modal-grid > div:nth-child(3)  { animation-delay: 0.16s; }
+.modal-card-detail .modal-grid > div:nth-child(4)  { animation-delay: 0.19s; }
+.modal-card-detail .modal-grid > div:nth-child(5)  { animation-delay: 0.22s; }
+.modal-card-detail .modal-grid > div:nth-child(6)  { animation-delay: 0.25s; }
+.modal-card-detail .modal-grid > div:nth-child(7)  { animation-delay: 0.28s; }
+.modal-card-detail .modal-grid > div:nth-child(8)  { animation-delay: 0.31s; }
+.modal-card-detail .modal-grid > div:nth-child(9)  { animation-delay: 0.34s; }
+.modal-card-detail .modal-grid > div:nth-child(10) { animation-delay: 0.37s; }
+.modal-card-detail .modal-grid > div:nth-child(11) { animation-delay: 0.40s; }
+.modal-card-detail .modal-grid > div:nth-child(12) { animation-delay: 0.43s; }
+
+/* ── Title section ─────────────────────────────── */
+.modal-card-detail .modal-top h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  margin-top: 4px;
+}
+
+.modal-card-detail .modal-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 2px 0 6px;
+}
+
+/* Flavor text: styled as MTG rulebook */
+.modal-card-detail .modal-flavor {
+  border-left: 2px solid var(--gold-dim);
+  padding: 10px 16px;
+  background: rgba(200,155,60,0.04);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* Abilities text box */
+.modal-card-detail .modal-notes {
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+/* ── Responsive ────────────────────────────────── */
+@media (max-width: 680px) {
+  .modal-card-detail {
+    padding: 0 0 20px;
+    max-height: 92dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 20px 20px 0 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-card-detail .modal-top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 16px 16px;
+    gap: 16px;
+  }
+
+  .modal-card-img-wrap {
+    width: 180px;
+  }
+
+  .modal-card-detail .modal-grid {
+    padding: 0 16px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .modal-card-detail .modal-notes,
+  .modal-card-detail .modal-flavor,
+  .modal-card-detail .scryfall-link,
+  .modal-card-detail .modal-actions,
+  .modal-card-detail .modal-divider {
+    padding: 0 16px;
+  }
+
+  .modal-card-detail .modal-top h2 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 400px) {
+  .modal-card-img-wrap {
+    width: 155px;
+  }
+
+  .modal-card-detail .modal-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    font-size: 12px;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .modal-card-img-wrap .dfc-3d-container {
+    animation: none !important;
+  }
+  .dfc-3d-container.is-dfc-card .dfc-3d-front,
+  .dfc-3d-container.is-dfc-card .dfc-3d-back {
+    transition: none !important;
+  }
+  .modal-card-img-wrap.img-is-foil::after {
+    animation: none !important;
+  }
+  .modal-card-detail .modal-grid > div {
+    animation: none !important;
+  }
+}
+
+/* =============================================
+   CARD DETAIL — SCRYFALL-INSPIRED LAYOUT
+   ============================================= */
+
+/* Right column: flows naturally */
+.modal-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Mana cost + type line inline */
+.modal-type-mana-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.modal-mana-cost-text {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--gold-dim);
+  background: rgba(200,155,60,0.10);
+  border: 1px solid rgba(200,155,60,0.20);
+  border-radius: 20px;
+  padding: 2px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.modal-type-line-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* Set · number · language · year */
+.modal-set-line {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* ── Oracle text box ────────────────────────── */
+.modal-oracle-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(200,155,60,0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.modal-oracle-text {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+  white-space: pre-line;
+}
+
+.modal-oracle-sep {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,155,60,0.15), transparent);
+  margin: 0;
+  border: none;
+}
+
+.modal-oracle-flavor {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  font-style: italic;
+  margin: 0;
+}
+
+/* P/T badge */
+.modal-pt-badge {
+  display: inline-flex;
+  align-self: flex-end;
+  align-items: center;
+  padding: 3px 12px;
+  border: 1px solid rgba(200,155,60,0.30);
+  border-radius: 20px;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-light);
+  background: rgba(200,155,60,0.08);
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+/* ── Compact stats strip ────────────────────── */
+.modal-stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 14px 28px 0;
+  align-items: center;
+}
+
+.modal-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.modal-stat-pill > span:first-child {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.modal-stat-pill .modal-color-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.modal-stat-foil {
+  background: rgba(200,155,60,0.10);
+  border-color: rgba(200,155,60,0.30);
+  color: var(--gold-light);
+  font-weight: 600;
+}
+
+.modal-stat-price {
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-stat-price small {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Price history row */
+.modal-price-history {
+  padding: 4px 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-price-history > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* User notes */
+.modal-user-notes {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-line;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-user-notes > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* Scryfall link + actions padding in new layout */
+.modal-card-detail .modal-price-history,
+.modal-card-detail .modal-user-notes {
+  margin: 0 28px;
+}
+
+/* Override old grid padding rules (no longer used) */
+.modal-card-detail .modal-grid { display: none; }
+.modal-card-detail .modal-divider { display: none; }
+.modal-card-detail .modal-notes { display: none; }
+.modal-card-detail .modal-flavor { display: none; }
+
+/* ── Responsive ─────────────────────────────── */
+@media (max-width: 680px) {
+  .modal-card-detail .modal-top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 16px 16px;
+  }
+
+  .modal-card-info {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .modal-type-mana-row {
+    justify-content: center;
+  }
+
+  .modal-pt-badge {
+    align-self: center;
+  }
+
+  .modal-stats-strip {
+    padding: 12px 16px 0;
+    justify-content: center;
+  }
+
+  .modal-card-detail .modal-price-history,
+  .modal-card-detail .modal-user-notes {
+    margin: 0 16px;
+  }
+
+  .modal-card-detail .scryfall-link,
+  .modal-card-detail .modal-actions {
+    padding: 0 16px;
+  }
+}
+
+@media (max-width: 400px) {
+  .modal-stats-strip {
+    gap: 5px;
+  }
+
+  .modal-stat-pill {
+    font-size: 11px;
+    padding: 3px 9px;
+  }
+}
+
+/* ── Reduced motion ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .modal-card-detail .modal-grid > div {
+    animation: none !important;
+  }
+}
+
+/* ── Modal detail mobile: bottom-sheet + scroll ── */
+@media (max-width: 680px) {
+  .modal-overlay-card-detail {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-overlay-card-detail .modal-card-detail {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VALIDAÇÃO COMMANDER
+   ═══════════════════════════════════════════════════════════════ */
+
+.validate-panel {
+  padding: 1.5rem;
+  max-width: 760px;
+}
+
+.validate-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+.banner-valid { background: rgba(46,168,80,.12); border: 1px solid #2ea850; }
+.banner-invalid { background: rgba(224,72,48,.12); border: 1px solid #e04830; }
+
+.validate-icon { font-size: 1.75rem; flex-shrink: 0; }
+.validate-banner-text { flex: 1; }
+.validate-banner-text strong { display: block; font-size: 1rem; color: var(--text); margin-bottom: .2rem; }
+.validate-banner-text span { font-size: .82rem; color: var(--text-muted); }
+
+.validate-rerun-btn {
+  font-size: .78rem; padding: .35rem .75rem;
+  background: var(--surface-3); border: 1px solid var(--gold-dim);
+  color: var(--gold-light); border-radius: 6px; cursor: pointer;
+  flex-shrink: 0;
+}
+.validate-rerun-btn:hover { background: var(--surface-2); }
+
+.validate-issues {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: .5rem;
+}
+.validate-issue {
+  display: flex; align-items: flex-start; gap: .6rem;
+  padding: .7rem 1rem; border-radius: 8px;
+  background: var(--surface-2); border-left: 3px solid var(--gold-dim);
+}
+.validate-issue-not_commander_deck,
+.validate-issue-no_commander { border-left-color: #c89b3c; }
+.validate-issue-wrong_count { border-left-color: #3a86d4; }
+.validate-issue-not_singleton { border-left-color: #e87b00; }
+.validate-issue-color_violation { border-left-color: #e04830; }
+
+.validate-issue-icon { font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+.validate-issue-msg { font-size: .85rem; color: var(--text); line-height: 1.4; }
+
+.validate-status-dot {
+  display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-left: .4rem; vertical-align: middle;
+}
+.dot-valid { background: #2ea850; box-shadow: 0 0 4px #2ea85088; }
+.dot-invalid { background: #e04830; box-shadow: 0 0 4px #e0483088; }
+
+.validate-error { padding: 2rem; text-align: center; color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD DE ESTATÍSTICAS
+   ═══════════════════════════════════════════════════════════════ */
+
+.stats-dashboard {
+  padding: 1.5rem 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.stats-dash-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1.5rem; gap: 1rem;
+}
+.stats-dash-header h2 { margin: 0; font-size: 1.25rem; color: var(--gold-light); }
+.stats-dash-refresh {
+  font-size: .78rem; padding: .35rem .85rem;
+  background: var(--surface-2); border: 1px solid var(--gold-dim);
+  color: var(--gold-light); border-radius: 7px; cursor: pointer;
+}
+.stats-dash-refresh:disabled { opacity: .5; cursor: default; }
+.stats-dash-loading { text-align: center; padding: 3rem; color: var(--text-muted); }
+
+.stats-tiles {
+  display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.5rem;
+}
+.stats-tile {
+  flex: 1 1 140px;
+  background: var(--surface-2); border: 1px solid var(--surface-3);
+  border-radius: 10px; padding: 1rem 1.25rem;
+  display: flex; flex-direction: column; gap: .3rem;
+}
+.stats-tile-gold { border-color: var(--gold-dim); }
+.stats-tile-num {
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--gold-light); letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stats-tile-gold .stats-tile-num { color: var(--gold-vivid); }
+.stats-tile-label { font-size: .75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.stats-charts-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem; margin-bottom: 1.25rem;
+}
+.stats-chart-card {
+  background: var(--surface-2); border: 1px solid var(--surface-3);
+  border-radius: 10px; padding: 1.25rem;
+}
+.stats-chart-title {
+  margin: 0 0 1rem; font-size: .88rem; font-weight: 600;
+  color: var(--gold-light); text-transform: uppercase; letter-spacing: .06em;
+}
+
+.stats-bar-list { display: flex; flex-direction: column; gap: .55rem; }
+.stats-bar-row { display: flex; align-items: center; gap: .6rem; }
+.stats-bar-label {
+  width: 80px; min-width: 80px; font-size: .78rem;
+  color: var(--text-muted); text-align: right;
+}
+.stats-bar-label-deck {
+  width: 150px; min-width: 150px; text-align: left;
+  color: var(--text); white-space: nowrap; overflow: hidden;
+}
+.stats-bar-track {
+  flex: 1; height: 10px; background: var(--surface-3); border-radius: 5px; overflow: hidden;
+}
+.stats-bar-fill {
+  height: 100%; border-radius: 5px; opacity: .9;
+  transition: width .4s cubic-bezier(.4,0,.2,1);
+}
+.stats-bar-gold { background: var(--gold) !important; }
+.stats-bar-val {
+  width: 60px; min-width: 60px; font-size: .75rem;
+  color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+
+/* Stacked bars for battles */
+.stats-bar-stacked { display: flex; gap: 2px; }
+.stats-bar-seg {
+  height: 100%; border-radius: 3px;
+  transition: width .4s cubic-bezier(.4,0,.2,1);
+}
+.stats-seg-win { background: #2ea850; color: #2ea850; }
+.stats-seg-loss { background: #e04830; color: #e04830; }
+.stats-seg-draw { background: #8ab4d4; color: #8ab4d4; }
+
+.stats-wl-val { display: flex; gap: .4rem; font-size: .72rem; }
+.stats-wl-legend {
+  display: flex; gap: 1rem; margin-top: .5rem;
+  font-size: .72rem; color: var(--text-muted);
+}
+
+@media (max-width: 600px) {
+  .stats-tiles { gap: .5rem; }
+  .stats-tile { flex: 1 1 calc(50% - .25rem); padding: .75rem; }
+  .stats-tile-num { font-size: 1.1rem; }
+  .stats-bar-label-deck { width: 100px; min-width: 100px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INDICADOR DE PREÇO DESATUALIZADO (Q1)
+   ═══════════════════════════════════════════════════════════════ */
+
+.price-stale {
+  opacity: .75;
+  outline: 1px dashed rgba(200,155,60,.4);
+  border-radius: 3px;
+}
+.price-stale-icon {
+  font-size: .7em;
+  margin-right: .2em;
+  opacity: .85;
+  vertical-align: middle;
+}

@@ -54,6 +54,7 @@ type Card struct {
 	Condition        string  `json:"condition"`
 	Notes            string  `json:"notes"`
 	PriceUSD         float64 `json:"price_usd"`
+	PriceUpdatedAt   string  `json:"price_updated_at"` // NULL = nunca atualizado via refresh
 	ImageURL         string  `json:"image_url"`
 	DoubleFaced      bool    `json:"double_faced"`
 	ImageURLBack     string  `json:"image_url_back"`

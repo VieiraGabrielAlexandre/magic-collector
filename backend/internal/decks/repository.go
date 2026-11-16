@@ -1,6 +1,12 @@
 package decks
 
-import "database/sql"
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type Repository struct {
 	db *sql.DB
@@ -134,4 +140,124 @@ func (r *Repository) UpdateEvaluation(id, evaluation string) error {
 func (r *Repository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM decks WHERE id=?`, id)
 	return err
+}
+
+// Validate executa as regras de Commander:
+//  1. Deck marcado como Commander
+//  2. Exatamente 100 cartas (soma de quantity)
+//  3. Pelo menos 1 carta marcada como commander = 1
+//  4. Singleton: quantity > 1 apenas para Basic Lands
+//  5. Identidade de cor: cores das cartas devem ser subconjunto das cores do deck
+func (r *Repository) Validate(deckID string) (DeckValidation, error) {
+	idInt, _ := strconv.Atoi(deckID)
+	v := DeckValidation{DeckID: idInt, Issues: []ValidationIssue{}}
+
+	var deckColors string
+	var isCommander int
+	if err := r.db.QueryRow(
+		`SELECT COALESCE(colors,''), commander FROM decks WHERE id = ?`, deckID,
+	).Scan(&deckColors, &isCommander); err != nil {
+		return v, err
+	}
+
+	if isCommander == 0 {
+		v.Issues = append(v.Issues, ValidationIssue{
+			Code:    "not_commander_deck",
+			Message: "Deck não está marcado como Commander",
+		})
+	}
+
+	// Contagem total de cartas
+	if err := r.db.QueryRow(
+		`SELECT COALESCE(SUM(quantity), 0) FROM cards WHERE deck_id = ?`, deckID,
+	).Scan(&v.CardCount); err != nil {
+		return v, err
+	}
+	if v.CardCount != 100 {
+		v.Issues = append(v.Issues, ValidationIssue{
+			Code:    "wrong_count",
+			Message: fmt.Sprintf("Deck tem %d cartas (Commander exige exatamente 100)", v.CardCount),
+		})
+	}
+
+	// Carta comandante definida
+	var cmdCount int
+	if err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM cards WHERE deck_id = ? AND commander = 1`, deckID,
+	).Scan(&cmdCount); err != nil {
+		return v, err
+	}
+	if cmdCount == 0 {
+		v.Issues = append(v.Issues, ValidationIssue{
+			Code:    "no_commander",
+			Message: "Nenhuma carta marcada como comandante",
+		})
+	}
+
+	// Regra singleton: quantity > 1 para não-Basic Land
+	sRows, err := r.db.Query(`
+		SELECT id, name, quantity FROM cards
+		WHERE deck_id = ? AND quantity > 1 AND (` + "`type`" + ` NOT LIKE '%Basic Land%' OR ` + "`type`" + ` IS NULL)
+	`, deckID)
+	if err != nil {
+		return v, err
+	}
+	defer sRows.Close()
+	for sRows.Next() {
+		var cid int
+		var cname string
+		var qty int
+		if sRows.Scan(&cid, &cname, &qty) == nil {
+			v.Issues = append(v.Issues, ValidationIssue{
+				Code:     "not_singleton",
+				Message:  fmt.Sprintf("%s: %d cópias (permitido: 1)", cname, qty),
+				CardID:   cid,
+				CardName: cname,
+			})
+		}
+	}
+
+	// Identidade de cor
+	if isCommander == 1 && deckColors != "" {
+		allowed := map[string]bool{"C": true}
+		for _, c := range strings.Split(deckColors, ",") {
+			c = strings.TrimSpace(c)
+			if c != "" {
+				allowed[c] = true
+			}
+		}
+
+		cRows, err := r.db.Query(`
+			SELECT id, name, COALESCE(colors,'[]') FROM cards
+			WHERE deck_id = ?
+		`, deckID)
+		if err == nil {
+			defer cRows.Close()
+			for cRows.Next() {
+				var cid int
+				var cname, colorsJSON string
+				if cRows.Scan(&cid, &cname, &colorsJSON) != nil {
+					continue
+				}
+				var codes []string
+				if json.Unmarshal([]byte(colorsJSON), &codes) != nil {
+					continue
+				}
+				for _, code := range codes {
+					if !allowed[code] {
+						v.Issues = append(v.Issues, ValidationIssue{
+							Code:     "color_violation",
+							Message:  fmt.Sprintf("%s: cor '%s' está fora da identidade do deck", cname, code),
+							CardID:   cid,
+							CardName: cname,
+						})
+						break
+					}
+				}
+			}
+		}
+	}
+
+	v.Valid = len(v.Issues) == 0
+	return v, nil
 }
