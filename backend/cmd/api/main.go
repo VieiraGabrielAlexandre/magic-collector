@@ -16,8 +16,12 @@ import (
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
 	"magic-collection-api/internal/lore"
+	"encoding/json"
+	"io"
+	"net/http"
 	"magic-collection-api/internal/reports"
 	"magic-collection-api/internal/storage"
+	"magic-collection-api/internal/trade"
 	"magic-collection-api/internal/wishlist"
 	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 
@@ -85,6 +89,9 @@ func main() {
 	authSvc := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authSvc)
 
+	tradeRepo := trade.NewRepository(db)
+	tradeHandler := trade.NewHandler(tradeRepo)
+
 	reportRepo := reports.NewRepository(db)
 	reportHandler := reports.NewHandler(reportRepo).WithSessionCheck(func(token string) bool {
 		_, _, err := authSvc.GetSession(token)
@@ -96,6 +103,21 @@ func main() {
 	// ── Rotas públicas ───────────────────────────────────────────────────
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
+	})
+	router.GET("/exchange-rate", func(c *gin.Context) {
+		resp, err := http.Get("https://api.frankfurter.app/latest?from=USD&to=BRL")
+		if err != nil {
+			c.JSON(502, gin.H{"error": "falha ao buscar taxa de câmbio"})
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		var data map[string]interface{}
+		if err := json.Unmarshal(body, &data); err != nil {
+			c.JSON(502, gin.H{"error": "resposta inválida"})
+			return
+		}
+		c.JSON(200, data)
 	})
 	lore.RegisterRoutes(router)
 	router.POST("/auth/login", authHandler.Login)
@@ -110,6 +132,7 @@ func main() {
 	api.POST("/cards/refresh-colors", handler.RefreshColors)
 	api.POST("/cards/normalize-rarities", handler.NormalizeRarities)
 	api.GET("/cards/stats", handler.Stats)
+	api.GET("/cards/duplicates", handler.Duplicates)
 	api.GET("/cards/export", handler.Export)
 	api.GET("/cards/proxies", handler.ListProxies)
 	api.POST("/cards/preview", handler.Preview)
@@ -139,6 +162,7 @@ func main() {
 	api.POST("/decks/:id/import-cards", importerHandler.ImportCardsIntoDeck)
 
 	api.GET("/battles", battleHandler.List)
+	api.GET("/battles/stats", battleHandler.Stats)
 	api.POST("/battles", battleHandler.Create)
 	api.DELETE("/battles/:id", battleHandler.Delete)
 
@@ -183,6 +207,14 @@ func main() {
 	api.POST("/game-sessions/:id/finish", gameSessionHandler.Finish)
 	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
 	api.POST("/game-sessions/:id/players/:player_id/revive", gameSessionHandler.RevivePlayer)
+	api.PATCH("/game-sessions/:id/duration", gameSessionHandler.UpdateDuration)
+
+	api.GET("/trade/gainers", tradeHandler.Gainers)
+	api.GET("/trade/losers", tradeHandler.Losers)
+	api.GET("/trade/stable", tradeHandler.Stable)
+	api.GET("/trade/suggestions", tradeHandler.Suggestions)
+	api.GET("/trade/price-spikes", tradeHandler.PriceSpikes)
+	api.GET("/trade/portfolio-history", tradeHandler.PortfolioHistory)
 
 	// Reports: próprio middleware que aceita SERVICE_TOKEN ou sessão normal.
 	reportsGroup := router.Group("/", reportHandler.Middleware())

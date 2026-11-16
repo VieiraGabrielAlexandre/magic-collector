@@ -692,6 +692,16 @@ type AnalysisCard struct {
 
 // ── Estatísticas da coleção ─────────────────────────────────────────────
 
+type TopCard struct {
+	ID       int     `json:"id"`
+	Name     string  `json:"name"`
+	PriceUSD float64 `json:"price_usd"`
+	ImageURL string  `json:"image_url"`
+	SetCode  string  `json:"set_code"`
+	Rarity   string  `json:"rarity"`
+	Foil     bool    `json:"foil"`
+}
+
 type CollectionStats struct {
 	TotalQuantity  int            `json:"total_quantity"`
 	UniqueCards    int            `json:"unique_cards"`
@@ -699,9 +709,11 @@ type CollectionStats struct {
 	FoilQuantity   int            `json:"foil_quantity"`
 	EstimatedValue float64        `json:"estimated_value_usd"`
 	PricedCards    int            `json:"priced_cards"`
+	CardsThisWeek  int            `json:"cards_this_week"`
 	ByRarity       []RarityCount  `json:"by_rarity"`
 	ByColor        []ColorCount   `json:"by_color"`
 	TopSets        []SetCount     `json:"top_sets"`
+	TopCards       []TopCard      `json:"top_cards"`
 }
 
 type RarityCount struct {
@@ -719,6 +731,31 @@ type SetCount struct {
 	SetCode  string `json:"set_code"`
 	Count    int    `json:"count"`
 	Quantity int    `json:"quantity"`
+}
+
+func (r *Repository) GetDuplicates() ([]int, error) {
+	rows, err := r.db.Query(`
+		SELECT DISTINCT c1.id
+		FROM cards c1
+		WHERE c1.mtg_id != ''
+		AND EXISTS (
+			SELECT 1 FROM cards c2
+			WHERE c2.mtg_id = c1.mtg_id AND c2.id != c1.id
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (r *Repository) GetStats() (CollectionStats, error) {
@@ -797,6 +834,25 @@ func (r *Repository) GetStats() (CollectionStats, error) {
 	for _, code := range []string{"W", "U", "B", "R", "G", "C"} {
 		if n, ok := colorMap[code]; ok {
 			s.ByColor = append(s.ByColor, ColorCount{Color: code, Count: n})
+		}
+	}
+
+	// Cartas adicionadas nos últimos 7 dias
+	r.db.QueryRow(`SELECT COUNT(*) FROM cards WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`).Scan(&s.CardsThisWeek)
+
+	// Top 3 cartas mais valiosas
+	topRows, err := r.db.Query(`
+		SELECT id, name, price_usd, COALESCE(image_url,''), COALESCE(set_code,''), COALESCE(rarity,''), foil
+		FROM cards WHERE price_usd > 0 ORDER BY price_usd DESC LIMIT 3`)
+	if err == nil {
+		defer topRows.Close()
+		for topRows.Next() {
+			var tc TopCard
+			var foilInt int
+			if err := topRows.Scan(&tc.ID, &tc.Name, &tc.PriceUSD, &tc.ImageURL, &tc.SetCode, &tc.Rarity, &foilInt); err == nil {
+				tc.Foil = foilInt == 1
+				s.TopCards = append(s.TopCards, tc)
+			}
 		}
 	}
 

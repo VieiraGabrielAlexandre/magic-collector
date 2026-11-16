@@ -273,6 +273,18 @@ func (h *Handler) Stats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func (h *Handler) Duplicates(c *gin.Context) {
+	ids, err := h.service.GetDuplicates()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar duplicatas"})
+		return
+	}
+	if ids == nil {
+		ids = []int{}
+	}
+	c.JSON(http.StatusOK, gin.H{"ids": ids})
+}
+
 func (h *Handler) Export(c *gin.Context) {
 	cards, err := h.service.ExportAll()
 	if err != nil {

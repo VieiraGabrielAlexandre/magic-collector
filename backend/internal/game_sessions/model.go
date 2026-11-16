@@ -10,8 +10,9 @@ type GameSession struct {
 	StartingLife int      `json:"starting_life"`
 	CreatedAt    string   `json:"created_at"`
 	UpdatedAt    string   `json:"updated_at"`
-	EndedAt      *string  `json:"ended_at"`
-	Players      []Player `json:"players"`
+	EndedAt         *string  `json:"ended_at"`
+	DurationSeconds int      `json:"duration_seconds"`
+	Players         []Player `json:"players"`
 }
 
 type Player struct {

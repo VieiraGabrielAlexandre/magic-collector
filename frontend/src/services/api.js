@@ -167,6 +167,12 @@ export async function getCollectionStats() {
   return res.json();
 }
 
+export async function getCardDuplicates() {
+  const res = await authFetch(`${BASE_URL}/cards/duplicates`);
+  if (!res.ok) return { ids: [] };
+  return res.json();
+}
+
 export async function suggestDecks(params = {}) {
   const res = await authFetch(`${BASE_URL}/cards/suggest-decks`, {
     method: "POST",
@@ -270,6 +276,12 @@ export async function importPrecon(data) {
 export async function listBattles() {
   const res = await authFetch(`${BASE_URL}/battles`);
   if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getBattleStats() {
+  const res = await authFetch(`${BASE_URL}/battles/stats`);
+  if (!res.ok) return null;
   return res.json();
 }
 
@@ -633,4 +645,64 @@ export async function setCardStorage(cardId, storageId) {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Erro ao atualizar armazenamento");
   return json;
+}
+
+// ── Trade ────────────────────────────────────────────────────────────────────
+
+export async function getTradeGainers(minPct = 10) {
+  const res = await authFetch(`${BASE_URL}/trade/gainers?min_pct=${minPct}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar valorizações");
+  return json;
+}
+
+export async function getTradeLosers(maxPct = -10) {
+  const res = await authFetch(`${BASE_URL}/trade/losers?max_pct=${maxPct}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar desvalorizações");
+  return json;
+}
+
+export async function getTradeStable() {
+  const res = await authFetch(`${BASE_URL}/trade/stable`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar cartas estáveis");
+  return json;
+}
+
+export async function getTradeSuggestions(minPrice = 2) {
+  const res = await authFetch(`${BASE_URL}/trade/suggestions?min_price=${minPrice}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar sugestões");
+  return json;
+}
+
+export async function getCardPriceHistory(cardId) {
+  const res = await authFetch(`${BASE_URL}/cards/${cardId}/price-history`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar histórico");
+  return json;
+}
+
+export async function getPriceSpikes(threshold = 20) {
+  const res = await authFetch(`${BASE_URL}/trade/price-spikes?threshold=${threshold}`);
+  if (!res.ok) return { spikes: [], count: 0, threshold };
+  return res.json();
+}
+
+export async function getPortfolioHistory() {
+  const res = await authFetch(`${BASE_URL}/trade/portfolio-history`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "Erro ao buscar histórico do portfólio");
+  return json.points ?? [];
+}
+
+export async function updateSessionDuration(sessionId, durationSeconds) {
+  const res = await authFetch(`${BASE_URL}/game-sessions/${sessionId}/duration`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ duration_seconds: durationSeconds }),
+  });
+  if (!res.ok) return false;
+  return true;
 }

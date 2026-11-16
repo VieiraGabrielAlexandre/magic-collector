@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCollectionStats, getGameSession, getMe, getPriceHistory, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
+import { acquireWishlistDeck, getBattleStats, getCardDuplicates, getPriceSpikes, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCardPriceHistory, getCollectionStats, getGameSession, getMe, getPriceHistory, getPortfolioHistory, getTradeGainers, getTradeLosers, getTradeStable, getTradeSuggestions, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateSessionDuration, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -668,7 +668,7 @@ function DropdownMenu({ label, items, open, onToggle }) {
   );
 }
 
-function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onToggle }) {
+function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onToggle, badge }) {
   const isGroupActive = tabs.some(t => t.id === activeTab);
   const isOpen = openId === groupId;
   const containerRef = useRef(null);
@@ -721,6 +721,7 @@ function NavGroup({ groupId, icon, label, tabs, activeTab, onSelect, openId, onT
       >
         <span className="tab-icon">{activeItem ? activeItem.icon : icon}</span>
         <span className="tab-label">{activeItem ? activeItem.label : label}</span>
+        {badge > 0 && <span className="nav-badge" title={`${badge} alerta${badge !== 1 ? "s" : ""} de preço`}>{badge}</span>}
         <span className="nav-group-chevron">{isOpen ? "▲" : "▼"}</span>
       </button>
 
@@ -907,6 +908,247 @@ function DeckColorSelect({ value, onChange }) {
 
 const PLAYER_COLORS = ['#3b82f6','#a855f7','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4','#84cc16'];
 
+// ── Gráfico de linha SVG interativo para histórico de preço ──────────────────
+function PriceChart({ history, width = 320, height = 90, label }) {
+  const [hovered, setHovered] = useState(null);
+
+  if (!history || history.length < 2) {
+    return <div className="price-chart-empty">Dados insuficientes para o gráfico</div>;
+  }
+
+  const prices = history.map(p => p.price_usd);
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 0.01;
+  const pad = { t: 18, r: 10, b: 22, l: 46 };
+  const cW = width - pad.l - pad.r;
+  const cH = height - pad.t - pad.b;
+  const sx = i => (i / (history.length - 1)) * cW;
+  const sy = v => cH - ((v - minP) / range) * cH;
+  const pts = history.map((p, i) => `${sx(i)},${sy(p.price_usd)}`).join(' ');
+  const area = `M 0,${cH} ` + history.map((p, i) => `L ${sx(i)},${sy(p.price_usd)}`).join(' ') + ` L ${cW},${cH} Z`;
+  const isUp = prices[prices.length - 1] >= prices[0];
+  const lineColor = isUp ? '#4caf76' : '#e04830';
+  const gradId = `pcg-${(label || 'c').replace(/\W/g, '').slice(0, 12)}`;
+
+  // índices de min/max global (para sempre rotular)
+  const minIdx = prices.indexOf(minP);
+  const maxIdx = prices.indexOf(maxP);
+  const alwaysLabel = new Set([0, history.length - 1, minIdx, maxIdx]);
+
+  return (
+    <svg width={width} height={height} className="price-chart-svg" aria-label={label || "Histórico de preço"}>
+      <g transform={`translate(${pad.l},${pad.t})`}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* axes */}
+        <line x1="0" y1="0" x2="0" y2={cH} stroke="var(--border)" strokeWidth="1" />
+        <line x1="0" y1={cH} x2={cW} y2={cH} stroke="var(--border)" strokeWidth="1" />
+        {/* area + line */}
+        <path d={area} fill={`url(#${gradId})`} />
+        <polyline points={pts} fill="none" stroke={lineColor} strokeWidth="1.8"
+          strokeLinejoin="round" strokeLinecap="round" />
+        {/* Y labels */}
+        <text x="-4" y={cH} textAnchor="end" fontSize="9" fill="var(--text-muted)">${minP.toFixed(2)}</text>
+        <text x="-4" y="8" textAnchor="end" fontSize="9" fill="var(--text-muted)">${maxP.toFixed(2)}</text>
+        {/* X labels */}
+        <text x="0" y={cH + 15} textAnchor="start" fontSize="8" fill="var(--text-muted)">{history[0].date.slice(5)}</text>
+        <text x={cW} y={cH + 15} textAnchor="end" fontSize="8" fill="var(--text-muted)">{history[history.length - 1].date.slice(5)}</text>
+
+        {/* dots + permanent labels for key points + hover tooltip */}
+        {history.map((p, i) => {
+          const x = sx(i); const y = sy(p.price_usd);
+          const isH = hovered === i;
+          const always = alwaysLabel.has(i);
+          // label position: above if bottom half, below if top half
+          const labelY = y > cH / 2 ? y - 7 : y + 14;
+          const labelAnchor = x > cW * 0.75 ? "end" : x < cW * 0.25 ? "start" : "middle";
+          // tooltip box: flip left near right edge
+          const ttX = x + cW * 0.65 > cW ? x - 72 : x + 8;
+          const ttY = y < 22 ? y + 6 : y - 30;
+          return (
+            <g key={i} style={{ cursor: 'crosshair' }}
+               onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+              {/* larger hit area */}
+              <rect x={x - 8} y={y - 8} width={16} height={16} fill="transparent" />
+              {/* dot */}
+              <circle cx={x} cy={y} r={isH ? 4.5 : always ? 3 : 2}
+                fill={isH ? '#fff' : always ? lineColor : lineColor}
+                stroke={lineColor} strokeWidth={isH ? 2 : 1.2}
+                opacity={always || isH ? 1 : 0.55}
+              />
+              {/* permanent value label for key points (not while hovering a different point) */}
+              {always && hovered === null && (
+                <text x={x} y={labelY} textAnchor={labelAnchor}
+                  fontSize="9" fontWeight="700" fill={lineColor}
+                  style={{ paintOrder: 'stroke', stroke: 'var(--bg,#111)', strokeWidth: 3 }}>
+                  ${p.price_usd.toFixed(2)}
+                </text>
+              )}
+              {/* hover tooltip */}
+              {isH && (
+                <g>
+                  <rect x={ttX} y={ttY} width={70} height={28} rx="5"
+                    fill="var(--surface,#1e1e1e)" stroke={lineColor} strokeWidth="1" opacity="0.97" />
+                  <text x={ttX + 6} y={ttY + 11} fontSize="8" fill="var(--text-muted,#aaa)">{p.date}</text>
+                  <text x={ttX + 6} y={ttY + 22} fontSize="10" fontWeight="700" fill={lineColor}>
+                    ${p.price_usd.toFixed(2)}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
+
+const rarityColor = { M: "var(--r-m)", R: "var(--r-r)", U: "var(--r-u)", C: "var(--r-c)", L: "var(--r-l)", T: "var(--r-t)" };
+
+function parseCMC(manaCost) {
+  if (!manaCost) return 0;
+  let total = 0;
+  for (const sym of (manaCost.match(/\{([^}]+)\}/g) || [])) {
+    const inner = sym.slice(1, -1);
+    if (/^\d+$/.test(inner)) total += parseInt(inner);
+    else if (!/^[XYZ]$/.test(inner) && inner !== 'C') total += 1;
+  }
+  return Math.min(total, 7);
+}
+
+function getCardMainType(type) {
+  if (!type) return 'Other';
+  const t = type.toLowerCase();
+  if (t.includes('land'))         return 'Land';
+  if (t.includes('creature'))     return 'Creature';
+  if (t.includes('planeswalker')) return 'Planeswalker';
+  if (t.includes('instant'))      return 'Instant';
+  if (t.includes('sorcery'))      return 'Sorcery';
+  if (t.includes('artifact'))     return 'Artifact';
+  if (t.includes('enchantment'))  return 'Enchantment';
+  return 'Other';
+}
+
+function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 0 }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (!value) { setDisplay(0); return; }
+    const start = Date.now();
+    const duration = 800;
+    const from = 0;
+    function tick() {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(from + (value - from) * eased);
+      if (progress < 1) requestAnimationFrame(tick);
+      else setDisplay(value);
+    }
+    requestAnimationFrame(tick);
+  }, [value]);
+  const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString('pt-BR');
+  return <span>{prefix}{formatted}{suffix}</span>;
+}
+
+function ManaCurveChart({ cards }) {
+  const counts = Array(8).fill(0);
+  for (const c of cards) {
+    if (c.type && c.type.toLowerCase().includes('land')) continue;
+    const cmc = parseCMC(c.mana_cost);
+    counts[cmc] = (counts[cmc] || 0) + (c.quantity || 1);
+  }
+  const max = Math.max(...counts, 1);
+  const labels = ['0','1','2','3','4','5','6','7+'];
+  const COLOR_STEPS = ['#4a9eff','#4a9eff','#9b6bff','#c97aff','#ff7a4a','#ff4a4a','#cc3333','#aa2222'];
+  return (
+    <div className="mc-chart">
+      {counts.map((n, i) => (
+        <div key={i} className="mc-bar-col">
+          <div className="mc-count">{n > 0 ? n : ''}</div>
+          <div className="mc-bar-wrap">
+            <div className="mc-bar" style={{ height: `${(n / max) * 100}%`, background: COLOR_STEPS[i] }} />
+          </div>
+          <div className="mc-label">{labels[i]}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeckTypeChart({ cards }) {
+  const counts = {};
+  for (const c of cards) {
+    const t = getCardMainType(c.type);
+    counts[t] = (counts[t] || 0) + (c.quantity || 1);
+  }
+  const order = ['Creature','Land','Instant','Sorcery','Artifact','Enchantment','Planeswalker','Other'];
+  const typeColors = { Creature:'#4a9eff', Land:'#7cbb6a', Instant:'#c97aff', Sorcery:'#ff7a4a', Artifact:'#aaaaaa', Enchantment:'#f0c040', Planeswalker:'#ff4a9e', Other:'#666' };
+  const total = Object.values(counts).reduce((a,b)=>a+b,0) || 1;
+  return (
+    <div className="mc-type-chart">
+      {order.filter(t => counts[t]).map(t => (
+        <div key={t} className="mc-type-row">
+          <span className="mc-type-label">{t}</span>
+          <div className="mc-type-bar-wrap">
+            <div className="mc-type-bar" style={{ width: `${(counts[t]/total)*100}%`, background: typeColors[t] }} />
+          </div>
+          <span className="mc-type-count">{counts[t]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MovementRow({ item, onHistory }) {
+  const up = item.direction === "up";
+  return (
+    <tr className="trade-row" onClick={() => onHistory(item)}>
+      <td className="trade-cell-name">
+        {item.image_url && <img src={item.image_url} alt="" className="trade-thumb" />}
+        <div>
+          <div className="trade-name">{item.name}{item.foil && <span className="foil-text"> ✦</span>}</div>
+          <div className="trade-meta">
+            <span className="trade-set">{(item.set_code||"").toUpperCase()}</span>
+            {item.rarity && <span className="rarity" style={{color: rarityColor[item.rarity]}}>{item.rarity}</span>}
+            <span className="trade-qty">×{item.quantity}</span>
+          </div>
+        </div>
+      </td>
+      <td className="trade-cell-price trade-price-prev">${item.prev_price.toFixed(2)}</td>
+      <td className="trade-cell-price trade-price-curr">${item.current_price.toFixed(2)}</td>
+      <td className={`trade-cell-pct ${up ? "trade-up" : "trade-down"}`}>
+        {up ? "▲" : "▼"} {Math.abs(item.change_pct).toFixed(1)}%
+      </td>
+      <td className="trade-cell-hist"><button type="button" className="trade-hist-btn" onClick={e => { e.stopPropagation(); onHistory(item); }}>📊</button></td>
+    </tr>
+  );
+}
+
+function MovementTable({ data, loading, emptyMsg, onHistory }) {
+  if (loading) return <div className="trade-loading">Carregando…</div>;
+  if (!data) return null;
+  if (data.length === 0) return <div className="trade-empty">{emptyMsg}</div>;
+  return (
+    <div className="trade-table-wrap">
+      <table className="trade-table">
+        <thead><tr>
+          <th>Carta</th>
+          <th>Anterior</th>
+          <th>Atual</th>
+          <th>Variação</th>
+          <th></th>
+        </tr></thead>
+        <tbody>{data.map(item => <MovementRow key={item.card_id} item={item} onHistory={onHistory} />)}</tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────────────
   const [authUser, setAuthUser] = useState(null);
@@ -977,6 +1219,43 @@ export default function App() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [priceRefreshing, setPriceRefreshing] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+
+  // ── Multi-select ─────────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedCards, setSelectedCards] = useState(new Set());
+  const [lastSelectedIdx, setLastSelectedIdx] = useState(-1);
+  const [bulkDeckModal, setBulkDeckModal] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null);
+
+  // ── Saved filters ─────────────────────────────────────────────────────────
+  const [savedFilters, setSavedFilters] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("magic_saved_filters") || "[]"); } catch { return []; }
+  });
+  const [saveFilterName, setSaveFilterName] = useState("");
+  const [showSaveFilter, setShowSaveFilter] = useState(false);
+
+  // ── Duplicates ───────────────────────────────────────────────────────────
+  const [duplicateIds, setDuplicateIds] = useState(new Set());
+
+  // ── Trade states ─────────────────────────────────────────────────────────
+
+  const [tradeGainers, setTradeGainers] = useState(null);
+  const [tradeLosers, setTradeLosers] = useState(null);
+  const [tradeStable, setTradeStable] = useState(null);
+  const [tradeSuggestions, setTradeSuggestions] = useState(null);
+  const [portfolioHistory, setPortfolioHistory] = useState(null);
+  const [tradeLoading, setTradeLoading] = useState(false);
+  // ── Price spike alerts ────────────────────────────────────────────────────
+  const [priceSpikes, setPriceSpikes] = useState(null);
+  const [spikeThreshold, setSpikeThreshold] = useState(() => {
+    try { return Number(localStorage.getItem("magic_spike_threshold") || "20"); } catch { return 20; }
+  });
+  const [spikeDismissed, setSpikeDismissed] = useState(false);
+  const [tradeHistoryCard, setTradeHistoryCard] = useState(null);
+  const [tradeHistoryData, setTradeHistoryData] = useState(null);
+  const [tradeHistoryLoading, setTradeHistoryLoading] = useState(false);
+  const [tradeHistorySearch, setTradeHistorySearch] = useState("");
+  const [tradeMinPrice, setTradeMinPrice] = useState(2);
 
   function loadScript(src) {
     if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve();
@@ -1049,7 +1328,7 @@ export default function App() {
   const [editForm, setEditForm] = useState({});
   const [propagate, setPropagate] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("stats");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [decks, setDecks] = useState([]);
   const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
@@ -1142,6 +1421,11 @@ export default function App() {
   const [gameSessions, setGameSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [sessionView, setSessionView] = useState("list");
+  // ── Turn timer ───────────────────────────────────────────────────────────
+  const [turnTimerActive, setTurnTimerActive] = useState(false);
+  const [turnStartTs, setTurnStartTs] = useState(null);
+  const [turnElapsed, setTurnElapsed] = useState(0);
+  const [turnNumber, setTurnNumber] = useState(1);
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
   const [sessionPlayers, setSessionPlayers] = useState([{ ...EMPTY_PLAYER_ROW }, { ...EMPTY_PLAYER_ROW }]);
   const [sessionLoading, setSessionLoading] = useState(false);
@@ -1228,6 +1512,37 @@ export default function App() {
   async function loadBattles() {
     const data = await listBattles();
     setBattles(data ?? []);
+  }
+
+  async function loadBattleStats() {
+    setBattleStatsLoading(true);
+    try {
+      const s = await getBattleStats();
+      setBattleStats(s);
+    } finally {
+      setBattleStatsLoading(false);
+    }
+  }
+
+  // ── Turn timer helpers ────────────────────────────────────────────────────
+  function startTurnTimer() {
+    setTurnStartTs(Date.now());
+    setTurnElapsed(0);
+    setTurnNumber(1);
+    setTurnTimerActive(true);
+  }
+
+  function stopTurnTimer() {
+    setTurnTimerActive(false);
+    setTurnStartTs(null);
+    setTurnElapsed(0);
+    setTurnNumber(1);
+  }
+
+  function nextTurn() {
+    setTurnStartTs(Date.now());
+    setTurnElapsed(0);
+    setTurnNumber(n => n + 1);
   }
 
   async function loadStorage() {
@@ -1765,9 +2080,13 @@ export default function App() {
 
   async function handleFinishSession() {
     if (!activeSession) return;
+    if (sessionTimerSecs > 0) {
+      await updateSessionDuration(activeSession.id, sessionTimerSecs).catch(() => {});
+    }
     const session = await finishGameSession(activeSession.id);
     setActiveSession(session);
     setShowGameSummary(true);
+    stopTurnTimer();
     await loadGameSessions();
   }
 
@@ -1818,9 +2137,9 @@ export default function App() {
 
   useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType, filterCondition]);
   useEffect(() => {
-    fetch("https://api.frankfurter.app/latest?from=USD&to=BRL")
+    fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL")
       .then(r => r.json())
-      .then(data => { if (data?.rates?.BRL) setUsdToBrl(data.rates.BRL); })
+      .then(data => { const rate = parseFloat(data?.USDBRL?.bid); if (rate > 0) setUsdToBrl(rate); })
       .catch(() => {});
   }, []);
   useEffect(() => { if (authReady && authUser) loadDecks(); }, [authReady, authUser]);
@@ -1831,6 +2150,17 @@ export default function App() {
     }
   }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadBattles(); }, [authReady, authUser]);
+  useEffect(() => {
+    if (authReady && authUser && activeTab === "battles" && !battleStats) loadBattleStats();
+  }, [authReady, authUser, activeTab]);
+
+  useEffect(() => {
+    if (!turnTimerActive || !turnStartTs) return;
+    const interval = setInterval(() => {
+      setTurnElapsed(Math.floor((Date.now() - turnStartTs) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [turnTimerActive, turnStartTs]);
   useEffect(() => { if (authReady && authUser) loadWishlist(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadDeckWishList(); }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadDeckWishAllCards(deckWishList); }, [deckWishList.length]);
@@ -1870,12 +2200,33 @@ export default function App() {
 
   // ── Dashboard de estatísticas ────────────────────────────────────────────
   const [statsData, setStatsData] = useState(null);
+  const [dashBattles, setDashBattles] = useState(null);
+  const [battleStats, setBattleStats] = useState(null);
+  const [battleStatsLoading, setBattleStatsLoading] = useState(false);
   const [statsDecks, setStatsDecks] = useState([]);
   const [dashLoading, setDashLoading] = useState(false);
 
   useEffect(() => {
-    if (activeTab === "stats" && !statsData) loadStats();
+    if ((activeTab === "dashboard" || activeTab === "stats") && !statsData) loadStats();
+    if (activeTab === "dashboard" && !dashBattles) listBattles().then(b => setDashBattles((b||[]).slice(0,5))).catch(() => setDashBattles([]));
+    if (activeTab === "trade-gainers"     && !tradeGainers)     { setTradeLoading(true); getTradeGainers().then(setTradeGainers).catch(() => setTradeGainers([])).finally(() => setTradeLoading(false)); }
+    if (activeTab === "trade-losers"      && !tradeLosers)      { setTradeLoading(true); getTradeLosers().then(setTradeLosers).catch(() => setTradeLosers([])).finally(() => setTradeLoading(false)); }
+    if (activeTab === "trade-stable"      && !tradeStable)      { setTradeLoading(true); getTradeStable().then(setTradeStable).catch(() => setTradeStable([])).finally(() => setTradeLoading(false)); }
+    if (activeTab === "trade-suggestions" && !tradeSuggestions) { setTradeLoading(true); getTradeSuggestions(tradeMinPrice).then(setTradeSuggestions).catch(() => setTradeSuggestions([])).finally(() => setTradeLoading(false)); }
+    if (activeTab === "trade-history"     && !portfolioHistory) { setTradeLoading(true); getPortfolioHistory().then(setPortfolioHistory).catch(() => setPortfolioHistory([])).finally(() => setTradeLoading(false)); }
   }, [activeTab]);
+
+  async function openTradeHistory(card) {
+    setActiveTab("trade-history");
+    setTradeHistoryCard(card);
+    setTradeHistoryData(null);
+    setTradeHistoryLoading(true);
+    try {
+      const data = await getCardPriceHistory(card.card_id ?? card.id);
+      setTradeHistoryData(data);
+    } catch { setTradeHistoryData([]); }
+    finally { setTradeHistoryLoading(false); }
+  }
 
   async function loadStats() {
     setDashLoading(true);
@@ -1889,6 +2240,21 @@ export default function App() {
   }
 
   useEffect(() => { if (authReady && authUser) loadGameSessions(); }, [authReady, authUser]);
+  useEffect(() => {
+    if (authReady && authUser) {
+      getCardDuplicates().then(r => setDuplicateIds(new Set(r?.ids || []))).catch(() => {});
+    }
+  }, [authReady, authUser]);
+
+  useEffect(() => {
+    if (authReady && authUser) {
+      getPriceSpikes(spikeThreshold).then(r => setPriceSpikes(r)).catch(() => {});
+    }
+  }, [authReady, authUser]);
+
+  function reloadSpikes(threshold) {
+    getPriceSpikes(threshold).then(r => { setPriceSpikes(r); setSpikeDismissed(false); }).catch(() => {});
+  }
 
   useEffect(() => {
     function onFsChange() {
@@ -2221,6 +2587,105 @@ export default function App() {
     await deleteCard(id);
     setSelectedCard(null);
     loadCards();
+  }
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  function handleCardSelect(cardId, index, e) {
+    e.stopPropagation();
+    setSelectedCards(prev => {
+      const next = new Set(prev);
+      if (e.shiftKey && lastSelectedIdx >= 0) {
+        const lo = Math.min(index, lastSelectedIdx);
+        const hi = Math.max(index, lastSelectedIdx);
+        cards.slice(lo, hi + 1).forEach(c => next.add(c.id));
+      } else {
+        if (next.has(cardId)) next.delete(cardId); else next.add(cardId);
+      }
+      return next;
+    });
+    setLastSelectedIdx(index);
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedCards(new Set());
+    setLastSelectedIdx(-1);
+  }
+
+  async function handleBulkDelete() {
+    if (!window.confirm(`Deletar ${selectedCards.size} cartas selecionadas?`)) return;
+    const ids = [...selectedCards];
+    setBulkProgress({ done: 0, total: ids.length, action: 'delete' });
+    for (let i = 0; i < ids.length; i++) {
+      await deleteCard(ids[i]).catch(() => {});
+      setBulkProgress({ done: i + 1, total: ids.length, action: 'delete' });
+    }
+    setBulkProgress(null);
+    exitSelectMode();
+    loadCards();
+    getCardDuplicates().then(r => setDuplicateIds(new Set(r?.ids || []))).catch(() => {});
+  }
+
+  async function handleBulkMoveToDeck(deckId) {
+    const ids = [...selectedCards];
+    setBulkDeckModal(false);
+    setBulkProgress({ done: 0, total: ids.length, action: 'move' });
+    for (let i = 0; i < ids.length; i++) {
+      await assignCardToDeck(ids[i], deckId).catch(() => {});
+      setBulkProgress({ done: i + 1, total: ids.length, action: 'move' });
+    }
+    setBulkProgress(null);
+    exitSelectMode();
+    loadCards();
+  }
+
+  function handleBulkExport() {
+    const sel = cards.filter(c => selectedCards.has(c.id));
+    const header = ['ID','Nome','Set','Nº','Raridade','Cor','Foil','Qtd','Preço USD','Condição'];
+    const rows = sel.map(c => [c.id, c.name, c.set_code, c.collection_number, c.rarity, c.color, c.foil?'Sim':'Não', c.quantity, c.price_usd||'', c.condition].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+    const csv = [header.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = 'selecao_cartas.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── Saved filters ─────────────────────────────────────────────────────────
+  const hasActiveFilters = filterDeck !== "" || filterFoil !== "" || filterRarity !== "" || filterColors !== "" || filterType !== "" || filterCondition !== "" || filterFullArt || search !== "";
+
+  function getCurrentFilter() {
+    return { name: saveFilterName, q: search, filterDeck, filterFoil, filterFullArt, filterRarity, filterColors, filterType, filterCondition, sort, order };
+  }
+
+  function applySavedFilter(f) {
+    if (f.q !== undefined) setSearch(f.q);
+    if (f.filterDeck !== undefined) setFilterDeck(f.filterDeck);
+    if (f.filterFoil !== undefined) setFilterFoil(f.filterFoil);
+    if (f.filterFullArt !== undefined) setFilterFullArt(f.filterFullArt);
+    if (f.filterRarity !== undefined) setFilterRarity(f.filterRarity);
+    if (f.filterColors !== undefined) setFilterColors(f.filterColors);
+    if (f.filterType !== undefined) setFilterType(f.filterType);
+    if (f.filterCondition !== undefined) setFilterCondition(f.filterCondition);
+    if (f.sort !== undefined) setSort(f.sort);
+    if (f.order !== undefined) setOrder(f.order);
+    setPage(1);
+  }
+
+  function saveCurrentFilter() {
+    if (!saveFilterName.trim()) return;
+    const f = { ...getCurrentFilter(), name: saveFilterName.trim() };
+    const updated = [...savedFilters, f];
+    setSavedFilters(updated);
+    try { localStorage.setItem("magic_saved_filters", JSON.stringify(updated)); } catch {}
+    setSaveFilterName("");
+    setShowSaveFilter(false);
+  }
+
+  function deleteSavedFilter(idx) {
+    const updated = savedFilters.filter((_, i) => i !== idx);
+    setSavedFilters(updated);
+    try { localStorage.setItem("magic_saved_filters", JSON.stringify(updated)); } catch {}
   }
 
   async function handleQuantityChange(cardId, delta) {
@@ -2935,6 +3400,7 @@ export default function App() {
       {/* ── LORE: full-screen overlay, outside main app ── */}
       {activeTab === "lore" && <LorePage onClose={() => setActiveTab("collection")} />}
 
+
       <main className="app">
       <section className="hero">
         <h1>Magic Collector</h1>
@@ -2942,6 +3408,14 @@ export default function App() {
       </section>
 
       <nav className="tabs" role="tablist" aria-label="Navegação principal">
+        <button
+          type="button"
+          className={`tab dashboard-standalone-tab${activeTab === "dashboard" ? " active" : ""}`}
+          onClick={() => setActiveTab("dashboard")}
+        >
+          <span className="tab-icon">🏠</span>
+          <span className="tab-label">Dashboard</span>
+        </button>
         <NavGroup
           groupId="colecao"
           icon="🃏"
@@ -2973,6 +3447,23 @@ export default function App() {
           openId={openNavGroup}
           onToggle={setOpenNavGroup}
         />
+        <NavGroup
+          groupId="trade"
+          icon="💱"
+          label="Trade"
+          badge={!spikeDismissed && priceSpikes?.count > 0 ? priceSpikes.count : 0}
+          tabs={[
+            { id: "trade-gainers",     icon: "📈", label: "Valorizaram"    },
+            { id: "trade-losers",      icon: "📉", label: "Desvalorizaram" },
+            { id: "trade-stable",      icon: "➡️",  label: "Estáveis"       },
+            { id: "trade-suggestions", icon: "🤝", label: "Para Trade"     },
+            { id: "trade-history",     icon: "📊", label: "Histórico"      },
+          ]}
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          openId={openNavGroup}
+          onToggle={setOpenNavGroup}
+        />
         <button
           type="button"
           className={`tab lore-standalone-tab${activeTab === "lore" ? " active" : ""}`}
@@ -2982,6 +3473,316 @@ export default function App() {
           <span className="tab-label">Lore</span>
         </button>
       </nav>
+
+      {/* ══════════════════════ TRADE ══════════════════════ */}
+      {["trade-gainers","trade-losers","trade-stable","trade-suggestions","trade-history"].includes(activeTab) && (
+        <section className="trade-section">
+          {/* ── Alerta de pico de preço ── */}
+          {priceSpikes && priceSpikes.count > 0 && !spikeDismissed && (
+            <div className="spike-alert-banner">
+              <div className="spike-alert-left">
+                <span className="spike-alert-icon">🔔</span>
+                <div className="spike-alert-text">
+                  <strong>{priceSpikes.count} carta{priceSpikes.count !== 1 ? "s" : ""} com pico de preço</strong>
+                  <span className="spike-alert-sub">Subiram ≥{priceSpikes.threshold}% desde a última atualização</span>
+                </div>
+              </div>
+              <div className="spike-alert-right">
+                <div className="spike-alert-cards">
+                  {(priceSpikes.spikes || []).slice(0, 4).map(s => (
+                    <div key={s.card_id} className="spike-mini-card" title={`${s.name} +${Math.round(s.change_pct)}%`}>
+                      {s.image_url
+                        ? <img src={s.image_url} alt={s.name} className="spike-mini-img" />
+                        : <span className="spike-mini-placeholder">{s.rarity}</span>}
+                      <span className="spike-mini-pct">+{Math.round(s.change_pct)}%</span>
+                    </div>
+                  ))}
+                  {priceSpikes.count > 4 && <span className="spike-more">+{priceSpikes.count - 4}</span>}
+                </div>
+                <div className="spike-alert-controls">
+                  <label className="spike-threshold-label">
+                    Limiar:
+                    <input
+                      type="number" min="5" max="200" step="5"
+                      className="spike-threshold-input"
+                      value={spikeThreshold}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        setSpikeThreshold(v);
+                        try { localStorage.setItem("magic_spike_threshold", String(v)); } catch {}
+                      }}
+                      onBlur={() => reloadSpikes(spikeThreshold)}
+                      onKeyDown={e => e.key === "Enter" && reloadSpikes(spikeThreshold)}
+                    />%
+                  </label>
+                  <button type="button" className="spike-dismiss-btn" onClick={() => setSpikeDismissed(true)} title="Dispensar alertas">✕</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {priceSpikes && priceSpikes.count === 0 && !spikeDismissed && activeTab === "trade-gainers" && (
+            <div className="spike-clear-banner">
+              ✅ Nenhum pico de preço ≥{spikeThreshold}% desde a última atualização
+              <span className="spike-clear-controls">
+                <label>Limiar:
+                  <input type="number" min="5" max="200" step="5" className="spike-threshold-input sm"
+                    value={spikeThreshold}
+                    onChange={e => { const v=Number(e.target.value); setSpikeThreshold(v); try{localStorage.setItem("magic_spike_threshold",String(v));}catch{} }}
+                    onBlur={() => reloadSpikes(spikeThreshold)}
+                    onKeyDown={e => e.key==="Enter" && reloadSpikes(spikeThreshold)}
+                  />%
+                </label>
+              </span>
+            </div>
+          )}
+
+          {activeTab === "trade-gainers" && (
+            <div className="trade-content">
+              <h2 className="trade-title">📈 Valorizaram</h2>
+              <div className="trade-section-desc">Cartas que mais valorizaram desde o primeiro registro. Clique em 📊 para ver o histórico completo.</div>
+              <MovementTable data={tradeGainers} loading={tradeLoading} emptyMsg="Nenhuma carta com valorização ≥10% registrada ainda." onHistory={openTradeHistory} />
+            </div>
+          )}
+          {activeTab === "trade-losers" && (
+            <div className="trade-content">
+              <h2 className="trade-title">📉 Desvalorizaram</h2>
+              <div className="trade-section-desc">Cartas que mais desvalorizaram. Bom para adquirir ou remover do deck.</div>
+              <MovementTable data={tradeLosers} loading={tradeLoading} emptyMsg="Nenhuma carta com queda ≥10% registrada ainda." onHistory={openTradeHistory} />
+            </div>
+          )}
+          {activeTab === "trade-stable" && (
+            <div className="trade-content">
+              <h2 className="trade-title">➡️ Estáveis</h2>
+              <div className="trade-section-desc">Cartas com variação inferior a 5% — valor previsível, bom para trades seguros.</div>
+              <MovementTable data={tradeStable} loading={tradeLoading} emptyMsg="Nenhuma carta estável com histórico suficiente." onHistory={openTradeHistory} />
+            </div>
+          )}
+          {activeTab === "trade-suggestions" && (
+            <div className="trade-content">
+              <h2 className="trade-title">🤝 Para Trade</h2>
+              <div className="trade-suggestion-toolbar">
+                <label className="trade-filter-label">Valor mínimo (USD)</label>
+                <input type="number" min="0.5" step="0.5" value={tradeMinPrice} className="trade-filter-input"
+                  onChange={e => setTradeMinPrice(parseFloat(e.target.value) || 2)}
+                  onBlur={() => { setTradeSuggestions(null); getTradeSuggestions(tradeMinPrice).then(setTradeSuggestions).catch(() => setTradeSuggestions([])); }}
+                />
+              </div>
+              {tradeLoading && <div className="trade-loading">Carregando…</div>}
+              {!tradeLoading && tradeSuggestions && tradeSuggestions.length === 0 && (
+                <div className="trade-empty">Nenhuma carta acima de ${tradeMinPrice} com histórico de preço.</div>
+              )}
+              {!tradeLoading && tradeSuggestions && tradeSuggestions.length > 0 && (
+                <div className="trade-table-wrap">
+                  <table className="trade-table">
+                    <thead><tr>
+                      <th>Carta</th><th>Preço Atual</th><th>Valor Sugerido</th><th>Variação</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>{tradeSuggestions.map(s => (
+                      <tr key={s.card_id} className="trade-row" onClick={() => openTradeHistory(s)}>
+                        <td className="trade-cell-name">
+                          {s.image_url && <img src={s.image_url} alt="" className="trade-thumb" />}
+                          <div>
+                            <div className="trade-name">{s.name}{s.foil && <span className="foil-text"> ✦</span>}</div>
+                            <div className="trade-meta">
+                              <span className="trade-set">{(s.set_code||"").toUpperCase()}</span>
+                              {s.rarity && <span className="rarity" style={{color: rarityColor[s.rarity]}}>{s.rarity}</span>}
+                              <span className="trade-qty">×{s.quantity}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="trade-cell-price trade-price-curr">${s.current_price.toFixed(2)}</td>
+                        <td className="trade-cell-price trade-suggested">${s.suggested_value.toFixed(2)}</td>
+                        <td className={`trade-cell-pct ${s.change_pct >= 0 ? "trade-up" : "trade-down"}`}>
+                          {s.change_pct >= 0 ? "▲" : "▼"} {Math.abs(s.change_pct).toFixed(1)}%
+                        </td>
+                        <td className="trade-cell-peak">
+                          {s.at_peak ? <span className="trade-peak-badge" title="No pico histórico">🔝 Pico</span> : "—"}
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+          {activeTab === "trade-history" && (
+            <div className="trade-content">
+              <h2 className="trade-title">📊 Histórico</h2>
+              <div className="trade-history-search-row">
+                <input type="text" placeholder="Buscar carta pelo nome…" value={tradeHistorySearch}
+                  className="trade-history-search" onChange={e => setTradeHistorySearch(e.target.value)} />
+                {tradeHistorySearch.length >= 2 && (() => {
+                  const q = tradeHistorySearch.toLowerCase();
+                  const pool = [...(tradeGainers||[]), ...(tradeLosers||[]), ...(tradeStable||[]), ...(tradeSuggestions||[])];
+                  const seen = new Set();
+                  const results = pool.filter(c => { if (seen.has(c.card_id)) return false; seen.add(c.card_id); return c.name.toLowerCase().includes(q); }).slice(0, 8);
+                  return results.length > 0 ? (
+                    <div className="trade-search-results">
+                      {results.map(c => (
+                        <button key={c.card_id} type="button" className="trade-search-item" onClick={() => { openTradeHistory(c); setTradeHistorySearch(""); }}>
+                          {c.name} <span className="trade-set">{(c.set_code||"").toUpperCase()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+              {tradeHistoryCard && (
+                <div className="trade-history-card">
+                  <div className="trade-history-card-header">
+                    {tradeHistoryCard.image_url && <img src={tradeHistoryCard.image_url} alt="" className="trade-history-img" />}
+                    <div>
+                      <h3 className="trade-history-card-name">{tradeHistoryCard.name}{tradeHistoryCard.foil && <span className="foil-text"> ✦</span>}</h3>
+                      <p className="trade-meta">{(tradeHistoryCard.set_code||"").toUpperCase()} · ×{tradeHistoryCard.quantity} · ${(tradeHistoryCard.current_price||tradeHistoryCard.price_usd||0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                  {tradeHistoryLoading && <div className="trade-loading">Carregando histórico…</div>}
+                  {!tradeHistoryLoading && tradeHistoryData && (
+                    tradeHistoryData.length < 2
+                      ? <div className="trade-empty">Dados insuficientes para o gráfico (mínimo 2 registros).</div>
+                      : <div className="trade-chart-wrap">
+                          <PriceChart history={tradeHistoryData} width={520} height={160} label={tradeHistoryCard.name} />
+                          <table className="trade-history-table">
+                            <thead><tr><th>Data</th><th>Preço USD</th></tr></thead>
+                            <tbody>{[...tradeHistoryData].reverse().map((p, i) => (
+                              <tr key={i}><td>{p.date}</td><td>${p.price_usd.toFixed(2)}</td></tr>
+                            ))}</tbody>
+                          </table>
+                        </div>
+                  )}
+                </div>
+              )}
+              <div className="trade-portfolio-section">
+                <h3 className="trade-portfolio-title">📈 Valor total da coleção ao longo do tempo</h3>
+                {tradeLoading && <div className="trade-loading">Carregando…</div>}
+                {!tradeLoading && portfolioHistory && portfolioHistory.length >= 2 && (
+                  <div className="trade-chart-wrap">
+                    <PriceChart history={portfolioHistory.map(p => ({ date: p.date, price_usd: p.total_value_usd }))} width={520} height={160} label="Portfólio" />
+                  </div>
+                )}
+                {!tradeLoading && portfolioHistory && portfolioHistory.length < 2 && (
+                  <div className="trade-empty">Dados insuficientes. Execute o refresh de preços mais de uma vez.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ══════════════════════ DASHBOARD ══════════════════════ */}
+      {activeTab === "dashboard" && (() => {
+        const s = statsData;
+        const battles = dashBattles || [];
+        const topCards = s?.top_cards || [];
+        const byRarity = s?.by_rarity || [];
+        const totalValue = s?.estimated_value_usd || 0;
+        const totalUnique = s?.unique_cards || 0;
+        const totalQty = s?.total_quantity || 0;
+        const foilQty = s?.foil_quantity || 0;
+        const thisWeek = s?.cards_this_week || 0;
+        return (
+          <section className="dashboard-section tab-content">
+            {dashLoading && !s && <div className="dash-loading"><div className="eval-spinner">⚙</div><p>Carregando…</p></div>}
+            {s && (<>
+              {/* ── Tiles de estatísticas ── */}
+              <div className="dash-tiles">
+                <div className="dash-tile dash-tile-value">
+                  <div className="dash-tile-icon">💎</div>
+                  <div className="dash-tile-data">
+                    <div className="dash-tile-label">Valor estimado</div>
+                    <div className="dash-tile-num"><AnimatedNumber value={totalValue} prefix="$" decimals={2} /></div>
+                  </div>
+                </div>
+                <div className="dash-tile">
+                  <div className="dash-tile-icon">🃏</div>
+                  <div className="dash-tile-data">
+                    <div className="dash-tile-label">Cartas únicas</div>
+                    <div className="dash-tile-num"><AnimatedNumber value={totalUnique} /></div>
+                  </div>
+                </div>
+                <div className="dash-tile">
+                  <div className="dash-tile-icon">✦</div>
+                  <div className="dash-tile-data">
+                    <div className="dash-tile-label">Total com foil</div>
+                    <div className="dash-tile-num"><AnimatedNumber value={foilQty} /></div>
+                  </div>
+                </div>
+                <div className="dash-tile">
+                  <div className="dash-tile-icon">📅</div>
+                  <div className="dash-tile-data">
+                    <div className="dash-tile-label">Esta semana</div>
+                    <div className="dash-tile-num">+<AnimatedNumber value={thisWeek} /></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Linha principal ── */}
+              <div className="dash-main-row">
+                {/* Top 3 cartas mais valiosas */}
+                <div className="dash-card dash-top-cards">
+                  <h3 className="dash-card-title">🏆 Mais Valiosas</h3>
+                  {topCards.length === 0 && <p className="dash-empty">Nenhuma carta com preço cadastrado.</p>}
+                  {topCards.map(c => (
+                    <div key={c.id} className="dash-top-card-row" onClick={() => { setSelectedCardId(c.id); setShowCardDetail(true); }}>
+                      {c.image_url
+                        ? <img src={c.image_url} alt="" className="dash-top-card-img" />
+                        : <div className="dash-top-card-img dash-top-card-img-placeholder">?</div>
+                      }
+                      <div className="dash-top-card-info">
+                        <div className="dash-top-card-name">{c.name}{c.foil && <span className="foil-text"> ✦</span>}</div>
+                        <div className="dash-top-card-meta">
+                          <span className="dash-top-card-set">{(c.set_code||"").toUpperCase()}</span>
+                          {c.rarity && <span className="rarity" style={{color: rarityColor[c.rarity]}}>{c.rarity}</span>}
+                        </div>
+                      </div>
+                      <div className="dash-top-card-price">${c.price_usd.toFixed(2)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Distribuição por raridade */}
+                <div className="dash-card dash-rarity-chart">
+                  <h3 className="dash-card-title">💠 Por Raridade</h3>
+                  {byRarity.map(r => {
+                    const max = Math.max(...byRarity.map(x => x.quantity));
+                    return (
+                      <div key={r.rarity} className="dash-rarity-row">
+                        <span className="dash-rarity-label" style={{color: rarityColor[r.rarity]}}>{r.rarity}</span>
+                        <div className="dash-rarity-bar-wrap">
+                          <div className="dash-rarity-bar" style={{width:`${(r.quantity/max)*100}%`, background: rarityColor[r.rarity]}} />
+                        </div>
+                        <span className="dash-rarity-count">{r.quantity}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Últimas batalhas */}
+                <div className="dash-card dash-battles">
+                  <h3 className="dash-card-title">⚔ Últimas Batalhas</h3>
+                  {battles.length === 0 && <p className="dash-empty">Nenhuma batalha registrada ainda.</p>}
+                  {battles.map((b, i) => (
+                    <div key={i} className={`dash-battle-row dash-battle-${b.result}`}>
+                      <span className="dash-battle-icon">{b.result === 'win' ? '✅' : b.result === 'loss' ? '❌' : '🤝'}</span>
+                      <span className="dash-battle-style">{b.game_style || 'Commander'}</span>
+                      {b.opponent && <span className="dash-battle-opp">vs {b.opponent}</span>}
+                      <span className="dash-battle-date">{(b.played_at||'').slice(0,10)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Ações rápidas ── */}
+              <div className="dash-actions">
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("collection")}>🃏 Ver Coleção</button>
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("decks")}>🗂 Decks</button>
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("trade-gainers")}>💱 Trade</button>
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("stats")}>📊 Estatísticas</button>
+              </div>
+            </>)}
+          </section>
+        );
+      })()}
 
       {activeTab === "decks" && (
         managingDeck ? (
@@ -3015,6 +3816,7 @@ export default function App() {
 
             <div className="deck-inner-tabs">
               <button type="button" className={`deck-inner-tab${deckInnerTab === "cards" ? " active" : ""}`} onClick={() => setDeckInnerTab("cards")}>🃏 Cartas</button>
+              <button type="button" className={`deck-inner-tab${deckInnerTab === "curve" ? " active" : ""}`} onClick={() => setDeckInnerTab("curve")}>📊 Curva</button>
               <button type="button" className={`deck-inner-tab${deckInnerTab === "eval" ? " active" : ""}`} onClick={() => setDeckInnerTab("eval")}>
                 🤖 Avaliação IA
                 {managingDeck.evaluated_at && <span className="eval-badge">✓</span>}
@@ -3234,6 +4036,50 @@ export default function App() {
                 </section>
               </div>
             )}
+
+            {deckInnerTab === "curve" && (() => {
+              const deckCards = filteredDeckCards;
+              const nonLandCards = deckCards.filter(c => !getCardMainType(c.type).includes('Land'));
+              const totalInDeck = deckCards.reduce((s,c) => s+(c.quantity||1), 0);
+              return (
+                <div className="deck-curve-section tab-content">
+                  <div className="deck-curve-row">
+                    <div className="deck-curve-block">
+                      <h4 className="deck-curve-title">📈 Curva de Mana</h4>
+                      <p className="deck-curve-sub">{nonLandCards.length} cartas (sem terrenos) · {totalInDeck} no total</p>
+                      <ManaCurveChart cards={nonLandCards} />
+                    </div>
+                    <div className="deck-curve-block">
+                      <h4 className="deck-curve-title">📦 Tipos</h4>
+                      <DeckTypeChart cards={deckCards} />
+                    </div>
+                  </div>
+                  {/* Distribuição de cores */}
+                  <div className="deck-curve-block deck-curve-colors">
+                    <h4 className="deck-curve-title">🎨 Cores</h4>
+                    <div className="deck-curve-color-row">
+                      {(() => {
+                        const colorMap = {};
+                        for (const c of deckCards) {
+                          try {
+                            const cols = JSON.parse(c.colors || '[]');
+                            if (cols.length === 0) colorMap['C'] = (colorMap['C']||0) + (c.quantity||1);
+                            else cols.forEach(col => { colorMap[col] = (colorMap[col]||0) + (c.quantity||1); });
+                          } catch {}
+                        }
+                        const colorMeta = { W:{label:'Branco',bg:'#f9f7e8',fg:'#333'}, U:{label:'Azul',bg:'#1a4f8a',fg:'#fff'}, B:{label:'Preto',bg:'#1a1a1a',fg:'#ddd'}, R:{label:'Vermelho',bg:'#b22222',fg:'#fff'}, G:{label:'Verde',bg:'#2d6a2d',fg:'#fff'}, C:{label:'Incolor',bg:'#888',fg:'#fff'} };
+                        return Object.entries(colorMap).map(([col, n]) => (
+                          <div key={col} className="deck-curve-color-pill" style={{background: colorMeta[col]?.bg||'#555', color: colorMeta[col]?.fg||'#fff'}}>
+                            <span className="deck-curve-color-name">{colorMeta[col]?.label||col}</span>
+                            <span className="deck-curve-color-n">{n}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {deckInnerTab === "eval" && (
               <div className="eval-panel">
@@ -3479,6 +4325,72 @@ export default function App() {
                 <span className="bstat-label">Taxa de vitória</span>
               </div>
             </div>
+
+            {/* ── Painel de estatísticas avançadas ── */}
+            {battleStatsLoading && <div className="battle-stats-loading"><span className="eval-spinner">⚙</span> Calculando…</div>}
+            {battleStats && battleStats.total > 0 && (() => {
+              const bs = battleStats;
+              const maxDeckTotal = Math.max(...(bs.by_deck||[]).map(d => d.total), 1);
+              const maxMonth = Math.max(...(bs.by_month||[]).map(m => m.total), 1);
+              return (
+                <div className="bstats-panel">
+                  {/* Win rate por deck */}
+                  {bs.by_deck && bs.by_deck.length > 0 && (
+                    <div className="bstats-block">
+                      <h4 className="bstats-title">🗂 Win Rate por Deck</h4>
+                      <div className="bstats-deck-list">
+                        {bs.by_deck.slice(0,8).map(d => (
+                          <div key={d.deck_name} className="bstats-deck-row">
+                            <span className="bstats-deck-name" title={d.deck_name}>{d.deck_name || "Sem deck"}</span>
+                            <div className="bstats-deck-bar-wrap">
+                              <div className="bstats-deck-bar" style={{width: `${(d.total/maxDeckTotal)*100}%`}}>
+                                <div className="bstats-deck-bar-win" style={{width: `${d.win_rate}%`}} />
+                              </div>
+                            </div>
+                            <span className="bstats-deck-rate">{Math.round(d.win_rate)}%</span>
+                            <span className="bstats-deck-count">{d.wins}/{d.total}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Evolução mensal */}
+                  {bs.by_month && bs.by_month.length > 1 && (
+                    <div className="bstats-block">
+                      <h4 className="bstats-title">📅 Evolução Mensal</h4>
+                      <div className="bstats-month-chart">
+                        {bs.by_month.slice(-12).map(m => (
+                          <div key={m.month} className="bstats-month-col">
+                            <div className="bstats-month-bar-wrap">
+                              <div className="bstats-month-bar-total" style={{height: `${(m.total/maxMonth)*100}%`}} />
+                              <div className="bstats-month-bar-win" style={{height: `${(m.wins/maxMonth)*100}%`}} />
+                            </div>
+                            <span className="bstats-month-label">{m.month.slice(5)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top adversários */}
+                  {bs.top_opponents && bs.top_opponents.length > 0 && (
+                    <div className="bstats-block">
+                      <h4 className="bstats-title">🏆 Adversários Mais Derrotados</h4>
+                      <div className="bstats-opponents">
+                        {bs.top_opponents.map((op, i) => (
+                          <div key={op.name} className="bstats-opponent-row">
+                            <span className="bstats-opp-rank">#{i+1}</span>
+                            <span className="bstats-opp-name">{op.name}</span>
+                            <span className="bstats-opp-count">{op.losses}×</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="battles-grid">
               {/* Formulário */}
@@ -4632,6 +5544,7 @@ export default function App() {
                       <p className="score-session-date">
                         {new Date(s.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
                         {s.ended_at && ` — Encerrada ${new Date(s.ended_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`}
+                        {s.duration_seconds > 0 && ` · ⏱ ${formatTimer(s.duration_seconds)}`}
                       </p>
                       <div className="score-session-actions">
                         <button type="button" className="score-btn-primary" onClick={() => handleOpenSession(s.id)}>
@@ -4972,6 +5885,30 @@ export default function App() {
               </div>
 
               {sessionError && <p className="score-error score-error-inline">{sessionError}</p>}
+
+              {/* ── Timer de turno ── */}
+              {activeSession.status === "active" && (
+                <div className="turn-timer-bar">
+                  {!turnTimerActive ? (
+                    <button type="button" className="turn-timer-btn start" onClick={startTurnTimer}>
+                      ⏱ Iniciar cronômetro de turno
+                    </button>
+                  ) : (
+                    <>
+                      <div className="turn-timer-info">
+                        <span className="turn-timer-turn">Turno {turnNumber}</span>
+                        <span className="turn-timer-elapsed">{formatTimer(turnElapsed)}</span>
+                        <span className="turn-timer-sep">·</span>
+                        <span className="turn-timer-session">Sessão: {formatTimer(sessionTimerSecs)}</span>
+                      </div>
+                      <div className="turn-timer-actions">
+                        <button type="button" className="turn-timer-btn next" onClick={nextTurn}>⏭ Próximo turno</button>
+                        <button type="button" className="turn-timer-btn stop" onClick={stopTurnTimer} title="Parar cronômetro">✕</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Resumo pós-jogo */}
               {showGameSummary && (() => {
@@ -6504,7 +7441,28 @@ export default function App() {
               value={search}
               onChange={handleSearchChange}
             />
+            {/* ── Filtros salvos ── */}
+            {savedFilters.length > 0 && (
+              <div className="saved-filters-bar">
+                <span className="saved-filters-label">Filtros:</span>
+                {savedFilters.map((f, i) => (
+                  <span key={i} className="saved-filter-chip">
+                    <button type="button" className="saved-filter-apply" onClick={() => applySavedFilter(f)}>{f.name}</button>
+                    <button type="button" className="saved-filter-del" title="Remover" onClick={() => deleteSavedFilter(i)}>✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="filter-bar">
+              {/* Botão selecionar */}
+              <button
+                type="button"
+                className={`filter-select select-mode-btn${selectMode ? " active" : ""}`}
+                onClick={() => { if (selectMode) exitSelectMode(); else setSelectMode(true); }}
+                title="Modo de seleção múltipla"
+              >
+                {selectMode ? `✓ ${selectedCards.size} selecionada${selectedCards.size !== 1 ? "s" : ""}` : "☐ Selecionar"}
+              </button>
               <select className="filter-select" value={filterDeck} onChange={(e) => { setFilterDeck(e.target.value); setPage(1); }}>
                 <option value="">Todos os decks</option>
                 <option value="0">Sem deck</option>
@@ -6548,7 +7506,27 @@ export default function App() {
                 <option value="played">Played</option>
                 <option value="damaged">Damaged</option>
               </select>
+              {hasActiveFilters && (
+                <button type="button" className="filter-select save-filter-btn" onClick={() => setShowSaveFilter(v => !v)} title="Salvar este filtro">
+                  💾
+                </button>
+              )}
             </div>
+            {showSaveFilter && (
+              <div className="save-filter-row">
+                <input
+                  type="text"
+                  className="save-filter-input"
+                  placeholder="Nome do filtro (ex: Rares foil DMU)…"
+                  value={saveFilterName}
+                  onChange={e => setSaveFilterName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") saveCurrentFilter(); if (e.key === "Escape") setShowSaveFilter(false); }}
+                  autoFocus
+                />
+                <button type="button" className="save-filter-confirm" onClick={saveCurrentFilter} disabled={!saveFilterName.trim()}>Salvar</button>
+                <button type="button" className="save-filter-cancel" onClick={() => setShowSaveFilter(false)}>✕</button>
+              </div>
+            )}
             {availableColors.length > 0 && (
               <div className="color-filter-bar">
                 <button
@@ -6611,9 +7589,9 @@ export default function App() {
               {cards.map((card, index) => (
                 <div
                   key={card.id}
-                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()} ${colorGlowClass(card.colors)} ${cardTypeClass(card.type)}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}`}
+                  className={`card-grid-item item-r-${(card.rarity || "x").toLowerCase()} ${colorGlowClass(card.colors)} ${cardTypeClass(card.type)}${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.double_faced ? " is-dfc" : ""}${card.proxy ? " is-proxy" : ""}${selectMode && selectedCards.has(card.id) ? " card-selected" : ""}${duplicateIds.has(card.id) ? " card-has-dup" : ""}`}
                   style={{ '--i': index % 16 }}
-                  onClick={() => handleDetails(card.id)}
+                  onClick={(e) => selectMode ? handleCardSelect(card.id, index, e) : handleDetails(card.id)}
                   title={card.name}
                 >
                   {(() => {
@@ -6626,6 +7604,18 @@ export default function App() {
                           <span className="card-grid-placeholder-name">{card.name}</span>
                         </div>;
                   })()}
+                  {selectMode && (
+                    <div className={`card-select-check${selectedCards.has(card.id) ? " checked" : ""}`}
+                      onClick={(e) => handleCardSelect(card.id, index, e)}>
+                      {selectedCards.has(card.id) ? "✓" : ""}
+                    </div>
+                  )}
+                  {!selectMode && card.quantity > 1 && (
+                    <div className="card-qty-badge" title={`${card.quantity} cópias`}>×{card.quantity}</div>
+                  )}
+                  {!selectMode && duplicateIds.has(card.id) && (
+                    <div className="card-dup-badge" title="Esta carta está em múltiplas entradas da coleção">🔁</div>
+                  )}
                   {card.double_faced && card.image_url_back && (
                     <button type="button" className="grid-flip-btn" title="Virar carta"
                       onClick={(e) => toggleFlip(card.id, e)}>
@@ -6663,9 +7653,15 @@ export default function App() {
                 const assignedDeck = card.deck_id > 0 ? decks.find((d) => d.id === card.deck_id) : null;
                 return (
                   <div
-                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.proxy ? " is-proxy" : ""} item-r-${(card.rarity || "x").toLowerCase()}`}
+                    className={`list-item${card.foil ? " is-foil" : ""}${card.full_art ? " is-full-art" : ""}${card.proxy ? " is-proxy" : ""} item-r-${(card.rarity || "x").toLowerCase()}${selectMode && selectedCards.has(card.id) ? " card-selected" : ""}${duplicateIds.has(card.id) ? " card-has-dup" : ""}`}
                     key={card.id}
+                    onClick={selectMode ? (e) => handleCardSelect(card.id, cards.indexOf(card), e) : undefined}
                   >
+                    {selectMode && (
+                      <div className={`card-select-check${selectedCards.has(card.id) ? " checked" : ""}`}>
+                        {selectedCards.has(card.id) ? "✓" : ""}
+                      </div>
+                    )}
                     <div className="list-item-info">
                       <div className="list-item-name">
                         <strong className={card.foil ? "foil-text" : ""}>
@@ -6685,6 +7681,7 @@ export default function App() {
                             {assignedDeck.name}
                           </span>
                         )}
+                        {duplicateIds.has(card.id) && <span className="card-dup-badge-inline" title="Múltiplas entradas">🔁</span>}
                       </div>
                       <div className="list-item-meta">
                         <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
@@ -6732,6 +7729,36 @@ export default function App() {
           )}
       </section>
       }
+
+      {/* ── Floating action bar (multi-select) ── */}
+      {selectMode && selectedCards.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-count">{selectedCards.size} carta{selectedCards.size !== 1 ? "s" : ""}</span>
+          <button type="button" className="bulk-btn bulk-btn-deck" onClick={() => setBulkDeckModal(true)}>🗂 Mover para deck</button>
+          <button type="button" className="bulk-btn bulk-btn-export" onClick={handleBulkExport}>📄 Exportar CSV</button>
+          <button type="button" className="bulk-btn bulk-btn-delete" onClick={handleBulkDelete}>🗑 Deletar</button>
+          <button type="button" className="bulk-btn bulk-btn-cancel" onClick={exitSelectMode}>✕ Cancelar</button>
+          {bulkProgress && (
+            <span className="bulk-progress">{bulkProgress.done}/{bulkProgress.total}</span>
+          )}
+        </div>
+      )}
+
+      {/* ── Bulk: modal de deck ── */}
+      {bulkDeckModal && (
+        <div className="modal-overlay" onClick={() => setBulkDeckModal(false)}>
+          <div className="modal" style={{maxWidth:'340px'}} onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">Mover para deck</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'.5rem',maxHeight:'340px',overflowY:'auto'}}>
+              <button type="button" className="deck-pick-btn" onClick={() => handleBulkMoveToDeck(0)}>— Sem deck</button>
+              {decks.map(d => (
+                <button key={d.id} type="button" className="deck-pick-btn" onClick={() => handleBulkMoveToDeck(d.id)}>{d.name}</button>
+              ))}
+            </div>
+            <button type="button" className="modal-close" onClick={() => setBulkDeckModal(false)}>✕</button>
+          </div>
+        </div>
+      )}
 
       {/* ── ABA PROXIES ─────────────────────────────────────────────────── */}
       {activeTab === "proxies" && (
@@ -6948,8 +7975,11 @@ export default function App() {
 
                 {priceHistory.length >= 2 && (
                   <div className="modal-price-history">
-                    <span>Histórico de preço</span>
-                    <PriceSparkline data={priceHistory} />
+                    <div className="modal-price-history-header">
+                      <span className="modal-price-history-label">Histórico de preço</span>
+                      <span className="modal-price-history-count">{priceHistory.length} registros</span>
+                    </div>
+                    <PriceChart history={priceHistory} width={340} height={120} label={selectedCard?.local?.name} />
                   </div>
                 )}
 

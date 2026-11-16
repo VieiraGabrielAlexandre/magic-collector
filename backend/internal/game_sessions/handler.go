@@ -142,3 +142,19 @@ func (h *Handler) RevivePlayer(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, player)
 }
+
+func (h *Handler) UpdateDuration(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var body struct {
+		DurationSeconds int `json:"duration_seconds"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "dados inválidos"})
+		return
+	}
+	if err := h.svc.UpdateDuration(id, body.DurationSeconds); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

@@ -13,6 +13,7 @@ type gsRepository interface {
 	Finish(sessionID int64) (*GameSession, error)
 	Restore(sessionID int64) (*GameSession, error)
 	RevivePlayer(sessionID, playerID int64) (*Player, error)
+	UpdateDuration(sessionID int64, seconds int) error
 }
 
 // gameSessionService abstrai o Service para o Handler.
@@ -28,4 +29,5 @@ type gameSessionService interface {
 	Finish(sessionID int64) (*GameSession, error)
 	Restore(sessionID int64) (*GameSession, error)
 	RevivePlayer(sessionID, playerID int64) (*Player, error)
+	UpdateDuration(sessionID int64, seconds int) error
 }

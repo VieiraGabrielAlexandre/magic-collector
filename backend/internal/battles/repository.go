@@ -76,3 +76,124 @@ func (r *Repository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM battles WHERE id = ?`, id)
 	return err
 }
+
+func (r *Repository) GetStats() (BattleStats, error) {
+	var s BattleStats
+
+	battles, err := r.List()
+	if err != nil {
+		return s, err
+	}
+
+	deckMap := map[string]*DeckStat{}
+	monthMap := map[string]*MonthStat{}
+	opponentMap := map[string]int{}
+
+	for _, b := range battles {
+		s.Total++
+		switch b.Result {
+		case "win":
+			s.Wins++
+		case "loss":
+			s.Losses++
+		case "draw":
+			s.Draws++
+		}
+
+		// Por deck
+		if b.DeckName != "" {
+			if _, ok := deckMap[b.DeckName]; !ok {
+				deckMap[b.DeckName] = &DeckStat{DeckName: b.DeckName}
+			}
+			deckMap[b.DeckName].Total++
+			if b.Result == "win" {
+				deckMap[b.DeckName].Wins++
+			}
+		}
+
+		// Por mês
+		month := ""
+		if len(b.PlayedAt) >= 7 {
+			month = b.PlayedAt[:7]
+		}
+		if month != "" {
+			if _, ok := monthMap[month]; !ok {
+				monthMap[month] = &MonthStat{Month: month}
+			}
+			monthMap[month].Total++
+			if b.Result == "win" {
+				monthMap[month].Wins++
+			}
+		}
+
+		// Adversários derrotados
+		if b.Result == "win" {
+			for _, op := range b.Opponents {
+				if op != "" {
+					opponentMap[op]++
+				}
+			}
+		}
+	}
+
+	if s.Total > 0 {
+		s.WinRate = float64(s.Wins) / float64(s.Total) * 100
+	}
+
+	for _, d := range deckMap {
+		if d.Total > 0 {
+			d.WinRate = float64(d.Wins) / float64(d.Total) * 100
+		}
+		s.ByDeck = append(s.ByDeck, *d)
+	}
+	// sort ByDeck descending by Total
+	for i := 0; i < len(s.ByDeck)-1; i++ {
+		for j := i + 1; j < len(s.ByDeck); j++ {
+			if s.ByDeck[j].Total > s.ByDeck[i].Total {
+				s.ByDeck[i], s.ByDeck[j] = s.ByDeck[j], s.ByDeck[i]
+			}
+		}
+	}
+
+	// Sort months ascending
+	var months []string
+	for m := range monthMap {
+		months = append(months, m)
+	}
+	for i := 0; i < len(months)-1; i++ {
+		for j := i + 1; j < len(months); j++ {
+			if months[j] < months[i] {
+				months[i], months[j] = months[j], months[i]
+			}
+		}
+	}
+	for _, m := range months {
+		s.ByMonth = append(s.ByMonth, *monthMap[m])
+	}
+
+	// Top 5 adversários mais derrotados
+	type kv struct {
+		name   string
+		losses int
+	}
+	var opList []kv
+	for name, count := range opponentMap {
+		opList = append(opList, kv{name, count})
+	}
+	for i := 0; i < len(opList)-1; i++ {
+		for j := i + 1; j < len(opList); j++ {
+			if opList[j].losses > opList[i].losses {
+				opList[i], opList[j] = opList[j], opList[i]
+			}
+		}
+	}
+	limit := 5
+	if len(opList) < limit {
+		limit = len(opList)
+	}
+	for _, item := range opList[:limit] {
+		s.TopOpponents = append(s.TopOpponents, OpponentStat{Name: item.name, Losses: item.losses})
+	}
+
+	return s, nil
+}

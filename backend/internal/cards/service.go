@@ -335,6 +335,10 @@ func (s *Service) GetStats() (CollectionStats, error) {
 	return s.repository.GetStats()
 }
 
+func (s *Service) GetDuplicates() ([]int, error) {
+	return s.repository.GetDuplicates()
+}
+
 // Preview busca a carta na Scryfall sem salvar no banco — usado para confirmar antes de cadastrar.
 func (s *Service) Preview(input PreviewCardInput) (*mtgapi.ExternalCard, error) {
 	if input.PreRelease {

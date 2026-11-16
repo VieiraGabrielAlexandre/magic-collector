@@ -19,7 +19,8 @@ func (r *Repository) List() ([]GameSession, error) {
 		SELECT id, name, format, status, starting_life,
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s'),
-			DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s')
+			DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s'),
+			COALESCE(duration_seconds,0)
 		FROM game_sessions ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -33,7 +34,7 @@ func (r *Repository) List() ([]GameSession, error) {
 		var s GameSession
 		var endedAt sql.NullString
 		if err := rows.Scan(&s.ID, &s.Name, &s.Format, &s.Status, &s.StartingLife,
-			&s.CreatedAt, &s.UpdatedAt, &endedAt); err != nil {
+			&s.CreatedAt, &s.UpdatedAt, &endedAt, &s.DurationSeconds); err != nil {
 			return nil, err
 		}
 		if endedAt.Valid {
@@ -91,10 +92,11 @@ func (r *Repository) GetByID(id int64) (*GameSession, error) {
 		SELECT id, name, format, status, starting_life,
 			DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s'),
 			DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s'),
-			DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s')
+			DATE_FORMAT(ended_at, '%Y-%m-%dT%H:%i:%s'),
+			COALESCE(duration_seconds,0)
 		FROM game_sessions WHERE id = ?
 	`, id).Scan(&s.ID, &s.Name, &s.Format, &s.Status, &s.StartingLife,
-		&s.CreatedAt, &s.UpdatedAt, &endedAt)
+		&s.CreatedAt, &s.UpdatedAt, &endedAt, &s.DurationSeconds)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -320,4 +322,9 @@ func (r *Repository) Restore(sessionID int64) (*GameSession, error) {
 		return nil, err
 	}
 	return r.GetByID(sessionID)
+}
+
+func (r *Repository) UpdateDuration(sessionID int64, seconds int) error {
+	_, err := r.db.Exec(`UPDATE game_sessions SET duration_seconds = ? WHERE id = ?`, seconds, sessionID)
+	return err
 }

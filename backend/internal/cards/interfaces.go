@@ -30,6 +30,7 @@ type cardRepository interface {
 	UpdateColorsAndMTGID(id int, mtgID, colors, color string) error
 	ListColorCombos() ([]ColorCombo, error)
 	GetStats() (CollectionStats, error)
+	GetDuplicates() ([]int, error)
 	ListForDeckBuilder() ([]DeckBuilderCard, error)
 	ListAllForAnalysis() ([]AnalysisCard, error)
 	ListProxies() ([]Card, error)
@@ -63,6 +64,7 @@ type cardService interface {
 	SetQuantity(id string, quantity int) error
 	Preview(input PreviewCardInput) (*mtgapi.ExternalCard, error)
 	GetStats() (CollectionStats, error)
+	GetDuplicates() ([]int, error)
 	RefreshImages() (ImageRefreshResult, error)
 	RefreshPrices(emptyOnly bool) (PriceRefreshResult, error)
 	GetCardsForDeckBuilder() ([]DeckBuilderCard, error)

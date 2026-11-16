@@ -10,7 +10,7 @@ type Handler struct {
 	repo battleRepo
 }
 
-func NewHandler(repo *Repository) *Handler {
+func NewHandler(repo battleRepo) *Handler {
 	return &Handler{repo: repo}
 }
 
@@ -46,4 +46,13 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Batalha removida"})
+}
+
+func (h *Handler) Stats(c *gin.Context) {
+	s, err := h.repo.GetStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao calcular estatísticas"})
+		return
+	}
+	c.JSON(http.StatusOK, s)
 }
