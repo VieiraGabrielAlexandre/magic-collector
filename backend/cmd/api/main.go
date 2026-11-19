@@ -22,6 +22,7 @@ import (
 	"magic-collection-api/internal/reports"
 	"magic-collection-api/internal/storage"
 	"magic-collection-api/internal/trade"
+	"magic-collection-api/internal/gamechangers"
 	"magic-collection-api/internal/wishlist"
 	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 
@@ -210,6 +211,12 @@ func main() {
 	api.POST("/game-sessions/:id/restore", gameSessionHandler.Restore)
 	api.POST("/game-sessions/:id/players/:player_id/revive", gameSessionHandler.RevivePlayer)
 	api.PATCH("/game-sessions/:id/duration", gameSessionHandler.UpdateDuration)
+
+	gcRepo := gamechangers.NewRepository(db)
+	gcSvc  := gamechangers.NewService(gcRepo)
+	gcHandler := gamechangers.NewHandler(gcSvc)
+	api.GET("/gamechangers", gcHandler.List)
+	api.POST("/gamechangers/sync", gcHandler.Sync)
 
 	api.GET("/trade/gainers", tradeHandler.Gainers)
 	api.GET("/trade/losers", tradeHandler.Losers)

@@ -43,6 +43,18 @@ export async function getMe() {
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 
+export async function getGameChangers() {
+  const res = await authFetch(`${BASE_URL}/gamechangers`);
+  if (!res.ok) return { data: [], total: 0, synced_at: "" };
+  return res.json();
+}
+
+export async function syncGameChangers() {
+  const res = await authFetch(`${BASE_URL}/gamechangers/sync`, { method: "POST", headers: authHeaders() });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getSubtypes() {
   const res = await authFetch(`${BASE_URL}/cards/subtypes`);
   if (!res.ok) return [];

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, getBattleStats, getCardDuplicates, getPriceSpikes, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCardPriceHistory, getCollectionStats, getGameSession, getMe, getPriceHistory, getPortfolioHistory, getSubtypes, getTradeGainers, getTradeLosers, getTradeStable, getTradeSuggestions, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, setPreconOriginal, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateSessionDuration, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
+import { acquireWishlistDeck, getBattleStats, getCardDuplicates, getPriceSpikes, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCardPriceHistory, getCollectionStats, getGameSession, getGameChangers, getMe, getPriceHistory, getPortfolioHistory, getSubtypes, getTradeGainers, getTradeLosers, getTradeStable, getTradeSuggestions, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, setPreconOriginal, suggestDecks, syncGameChangers, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateSessionDuration, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
@@ -2305,15 +2305,29 @@ export default function App() {
   const [statsData, setStatsData] = useState(null);
   const [dashBattles, setDashBattles] = useState(null);
   const [dashRecentCards, setDashRecentCards] = useState(null);
+  const [dashGameChangers, setDashGameChangers] = useState(null);
+  const [gcSyncing, setGcSyncing] = useState(false);
   const [battleStats, setBattleStats] = useState(null);
   const [battleStatsLoading, setBattleStatsLoading] = useState(false);
   const [statsDecks, setStatsDecks] = useState([]);
   const [dashLoading, setDashLoading] = useState(false);
 
+  function loadGameChangers() {
+    getGameChangers().then(r => setDashGameChangers(r)).catch(() => setDashGameChangers({ data: [], total: 0, synced_at: "" }));
+  }
+
+  async function handleGcSync() {
+    setGcSyncing(true);
+    await syncGameChangers();
+    await loadGameChangers();
+    setGcSyncing(false);
+  }
+
   useEffect(() => {
     if ((activeTab === "dashboard" || activeTab === "stats") && !statsData) loadStats();
     if (activeTab === "dashboard" && !dashBattles) listBattles().then(b => setDashBattles((b||[]).slice(0,5))).catch(() => setDashBattles([]));
     if (activeTab === "dashboard" && !dashRecentCards) listCards({ page: 1, pageSize: 6, sort: "created_at", order: "desc" }).then(r => setDashRecentCards(r?.data ?? [])).catch(() => setDashRecentCards([]));
+    if (activeTab === "dashboard" && !dashGameChangers) loadGameChangers();
     if (activeTab === "trade-gainers"     && !tradeGainers)     { setTradeLoading(true); getTradeGainers().then(setTradeGainers).catch(() => setTradeGainers([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-losers"      && !tradeLosers)      { setTradeLoading(true); getTradeLosers().then(setTradeLosers).catch(() => setTradeLosers([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-stable"      && !tradeStable)      { setTradeLoading(true); getTradeStable().then(setTradeStable).catch(() => setTradeStable([])).finally(() => setTradeLoading(false)); }
@@ -4252,6 +4266,72 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Game Changers ── */}
+              {(() => {
+                const gc = dashGameChangers;
+                const gcList   = gc?.data || [];
+                const gcOwned  = gcList.filter(c => c.owned_count > 0);
+                const gcTotal  = gc?.total || 0;
+                const syncedAt = gc?.synced_at ? gc.synced_at.slice(0,10) : null;
+                const COLOR_MAP_GC = { W:"#f9fafb", U:"#3b82f6", B:"#8b5cf6", R:"#ef4444", G:"#22c55e", C:"#9ca3af" };
+
+                return (
+                  <div className="dash-gc-section">
+                    <div className="dash-gc-header">
+                      <div>
+                        <h3 className="dash-card-title" style={{marginBottom:".15rem"}}>⚡ Game Changers</h3>
+                        <span className="dash-gc-meta">
+                          {gcTotal > 0
+                            ? <>{gcOwned.length} <span style={{color:"var(--text-muted)"}}>de {gcTotal} possuídas</span></>
+                            : <span style={{color:"var(--text-muted)"}}>Nenhum dado. Sincronize.</span>}
+                          {syncedAt && <span className="dash-gc-sync-date"> · atualizado em {syncedAt}</span>}
+                        </span>
+                      </div>
+                      <button
+                        className={`btn-secondary btn-sm${gcSyncing ? " loading" : ""}`}
+                        onClick={handleGcSync}
+                        disabled={gcSyncing}
+                        title="Sincronizar com Scryfall"
+                      >
+                        {gcSyncing ? "⟳ Sincronizando…" : "⟳ Sincronizar"}
+                      </button>
+                    </div>
+
+                    {gcOwned.length > 0 && (
+                      <div className="dash-gc-grid">
+                        {gcOwned.map(c => {
+                          const colors = (() => { try { return JSON.parse(c.colors); } catch { return []; } })();
+                          const mainColor = colors[0] || "C";
+                          return (
+                            <div key={c.id} className="dash-gc-card" title={c.name}
+                              onClick={() => { setSearch(c.name); setActiveTab("collection"); }}>
+                              {c.image_url
+                                ? <img src={c.image_url} alt={c.name} className="dash-gc-img" />
+                                : <div className="dash-gc-img dash-gc-img-ph" style={{background: COLOR_MAP_GC[mainColor] + "22"}}>?</div>
+                              }
+                              <div className="dash-gc-info">
+                                <div className="dash-gc-name">{c.name}</div>
+                                <div className="dash-gc-badges">
+                                  {c.rarity && <span className="rarity" style={{color:rarityColor[c.rarity]}}>{c.rarity}</span>}
+                                  {colors.map(col => (
+                                    <span key={col} className="dash-gc-color-dot" style={{background: COLOR_MAP_GC[col] || "#888"}} title={col} />
+                                  ))}
+                                  {c.owned_count > 1 && <span className="dash-gc-owned-count">×{c.owned_count}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {gcTotal > 0 && gcOwned.length === 0 && (
+                      <p className="dash-empty">Você ainda não possui nenhum Game Changer na coleção.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ── Trade summary ── */}
               {(tradeGainers || tradeLosers) && (

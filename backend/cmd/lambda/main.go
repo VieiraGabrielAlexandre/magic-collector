@@ -27,6 +27,7 @@ import (
 	"magic-collection-api/internal/mtgapi"
 	"magic-collection-api/internal/tokens"
 	"magic-collection-api/internal/wishlist"
+	"magic-collection-api/internal/gamechangers"
 	wishlist_decks "magic-collection-api/internal/wishlist_decks"
 )
 
@@ -222,6 +223,12 @@ func main() {
 	api.PATCH("/game-sessions/:id/duration", gameSessionHandler.UpdateDuration)
 
 	// Reports: próprio middleware que aceita SERVICE_TOKEN ou sessão normal.
+	gcRepo := gamechangers.NewRepository(db)
+	gcSvc  := gamechangers.NewService(gcRepo)
+	gcHandler := gamechangers.NewHandler(gcSvc)
+	api.GET("/gamechangers", gcHandler.List)
+	api.POST("/gamechangers/sync", gcHandler.Sync)
+
 	api.GET("/trade/gainers", tradeHandler.Gainers)
 	api.GET("/trade/losers", tradeHandler.Losers)
 	api.GET("/trade/stable", tradeHandler.Stable)

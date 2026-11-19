@@ -308,6 +308,23 @@ func Open(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	db.Exec(`
+		CREATE TABLE IF NOT EXISTS gamechanger_cards (
+			id          INT          NOT NULL AUTO_INCREMENT,
+			scryfall_id VARCHAR(36)  NOT NULL,
+			name        VARCHAR(255) NOT NULL,
+			set_code    VARCHAR(10)  NOT NULL DEFAULT '',
+			rarity      VARCHAR(1)   NOT NULL DEFAULT '',
+			colors      TEXT         NOT NULL DEFAULT '',
+			image_url   TEXT,
+			mana_cost   VARCHAR(100) NOT NULL DEFAULT '',
+			type_line   TEXT         NOT NULL DEFAULT '',
+			synced_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY uq_scryfall_id (scryfall_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+	`)
+
 	seedUsers(db)
 
 	return db, nil
