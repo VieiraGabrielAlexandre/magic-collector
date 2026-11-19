@@ -43,7 +43,14 @@ export async function getMe() {
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 
-export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors, typeFilter, conditionFilter } = {}) {
+export async function getSubtypes() {
+  const res = await authFetch(`${BASE_URL}/cards/subtypes`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.subtypes || [];
+}
+
+export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name", order = "asc", deckId, foil, full_art, rarity, colors, typeFilter, subtypeFilter, conditionFilter, lang, prerelease, proxy, commanderFilter, priced } = {}) {
   const params = new URLSearchParams({ q, page, page_size: pageSize, sort, order });
   if (deckId !== undefined) params.set("deck_id", deckId);
   if (foil) params.set("foil", "1");
@@ -51,7 +58,13 @@ export async function listCards({ q = "", page = 1, pageSize = 20, sort = "name"
   if (rarity) params.set("rarity", rarity);
   if (colors) params.set("colors", colors);
   if (typeFilter) params.set("type_filter", typeFilter);
+  if (subtypeFilter) params.set("subtype", subtypeFilter);
   if (conditionFilter) params.set("condition_filter", conditionFilter);
+  if (lang) params.set("lang", lang);
+  if (prerelease) params.set("prerelease", prerelease);
+  if (proxy) params.set("proxy", proxy);
+  if (commanderFilter) params.set("commander_filter", commanderFilter);
+  if (priced) params.set("priced", priced);
   const res = await authFetch(`${BASE_URL}/cards?${params}`);
   if (!res.ok) return { data: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 };
   return res.json();
@@ -132,6 +145,14 @@ export async function updateCardQuantity(id, quantity) {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify({ quantity }),
+  });
+}
+
+export async function setPreconOriginal(id, value) {
+  await authFetch(`${BASE_URL}/cards/${id}/precon-original`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ precon_original: value }),
   });
 }
 

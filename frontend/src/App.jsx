@@ -1,22 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { acquireWishlistDeck, getBattleStats, getCardDuplicates, getPriceSpikes, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCardPriceHistory, getCollectionStats, getGameSession, getMe, getPriceHistory, getPortfolioHistory, getTradeGainers, getTradeLosers, getTradeStable, getTradeSuggestions, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateSessionDuration, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
+import { acquireWishlistDeck, getBattleStats, getCardDuplicates, getPriceSpikes, acquireWishlistDeckCard, acquireWishlistItem, addDeckWishCard, addGameSessionPlayer, analyzeCollectionDeck, assignCardToDeck, createBattle, createCard, createDeck, createGameSession, createToken, createWishlistDeck, createWishlistItem, createStorage, deleteCard, deleteBattle, deleteDeck, deleteDeckWishCard, deleteGameSession, deleteGameSessionPlayer, deleteStorage, deleteToken, deleteWishlistDeck, deleteWishlistItem, evaluateDeck, exportCards, fetchDeckIcon, finishGameSession, getCard, getCardPriceHistory, getCollectionStats, getGameSession, getMe, getPriceHistory, getPortfolioHistory, getSubtypes, getTradeGainers, getTradeLosers, getTradeStable, getTradeSuggestions, importDeckList, importPrecon, importWishDeckList, listBattles, listCards, listColorCombos, listDecks, listDeckWishCards, listGameSessions, listProxyCards, listStorage, listTokens, listWishlist, listWishlistDecks, logout, previewCard, previewToken, refreshImages, refreshPrices, resetGameSession, restoreGameSession, reviveGameSessionPlayer, searchDeckWishCards, setCardCommander, setCardStorage, setPreconOriginal, suggestDecks, toggleDeckWishCardAcquired, updateCard, updateCardQuantity, updateDeck, updateGameSessionPlayer, updateSessionDuration, updateStorage, updateTokenQuantity, validateDeck } from "./services/api";
 import LandingPage from "./LandingPage.jsx";
 import LorePage from "./LorePage.jsx";
 import "./App.css";
 
 
 const SORT_OPTIONS = [
-  { value: "name", label: "Nome" },
-  { value: "set_code", label: "Coleção" },
-  { value: "color", label: "Cor" },
-  { value: "rarity", label: "Raridade" },
-  { value: "quantity", label: "Qtd" },
-  { value: "price_usd", label: "💰 Preço" },
-  { value: "year", label: "Ano" },
-  { value: "collection_number", label: "Nº" },
+  { value: "name",              label: "Nome"      },
+  { value: "set_code",          label: "Coleção"   },
+  { value: "color",             label: "Cor"       },
+  { value: "rarity",            label: "Raridade"  },
+  { value: "quantity",          label: "Qtd"       },
+  { value: "price_usd",         label: "💰 Preço"  },
+  { value: "year",              label: "Ano"       },
+  { value: "collection_number", label: "Nº"        },
+  { value: "created_at",        label: "Recentes"  },
 ];
+const DEFAULT_SORT = "created_at";
+const DEFAULT_ORDER = "desc";
 
 const MTG_COLORS = [
   { code: "W", cls: "w", label: "W" },
@@ -1129,25 +1132,91 @@ function MovementRow({ item, onHistory }) {
   );
 }
 
-function MovementTable({ data, loading, emptyMsg, onHistory }) {
+function MovementTable({ data, loading, emptyMsg, onHistory, search, rarityFilter, foilFilter, sortKey, sortOrder, onSortChange }) {
   if (loading) return <div className="trade-loading">Carregando…</div>;
   if (!data) return null;
-  if (data.length === 0) return <div className="trade-empty">{emptyMsg}</div>;
+
+  let rows = data;
+  if (search) { const q = search.toLowerCase(); rows = rows.filter(r => r.name.toLowerCase().includes(q) || (r.set_code||"").toLowerCase().includes(q)); }
+  if (rarityFilter) rows = rows.filter(r => r.rarity === rarityFilter);
+  if (foilFilter === "1") rows = rows.filter(r => r.foil);
+  if (foilFilter === "0") rows = rows.filter(r => !r.foil);
+
+  const sk = sortKey || "change_pct";
+  const so = sortOrder || "desc";
+  rows = [...rows].sort((a, b) => {
+    const av = a[sk] ?? 0, bv = b[sk] ?? 0;
+    if (typeof av === "string") return so === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    return so === "asc" ? av - bv : bv - av;
+  });
+
+  function SortTh({ field, label }) {
+    const active = sk === field;
+    const icon = !active ? "" : so === "asc" ? " ↑" : " ↓";
+    return (
+      <th className={`trade-th-sortable${active ? " trade-th-active" : ""}`}
+        onClick={() => onSortChange && onSortChange(field)}>
+        {label}{icon}
+      </th>
+    );
+  }
+
+  if (rows.length === 0) return <div className="trade-empty">{data.length === 0 ? emptyMsg : "Nenhuma carta com esse filtro."}</div>;
   return (
     <div className="trade-table-wrap">
       <table className="trade-table">
         <thead><tr>
-          <th>Carta</th>
-          <th>Anterior</th>
-          <th>Atual</th>
-          <th>Variação</th>
+          <SortTh field="name" label="Carta" />
+          <SortTh field="prev_price" label="Anterior" />
+          <SortTh field="current_price" label="Atual" />
+          <SortTh field="change_pct" label="Variação" />
           <th></th>
         </tr></thead>
-        <tbody>{data.map(item => <MovementRow key={item.card_id} item={item} onHistory={onHistory} />)}</tbody>
+        <tbody>{rows.map(item => <MovementRow key={item.card_id} item={item} onHistory={onHistory} />)}</tbody>
       </table>
     </div>
   );
 }
+
+// Componente isolado para cada linha do lote — memo evita re-render do App inteiro
+// quando o usuário clica no stepper, foil ou idioma de uma entrada.
+const BatchEntryRow = memo(function BatchEntryRow({ en, i, globalFoil, globalLang, validation, onQtyChange, onFoilToggle, onLangChange, onRemove }) {
+  const entryFoil = en.foil !== undefined ? en.foil : globalFoil;
+  const entryLang = en.language || globalLang;
+  const entryQty  = en.quantity || 1;
+  const hasOverride = en.foil !== undefined || en.language || (en.quantity && en.quantity > 1);
+  const v = validation || {};
+  return (
+    <li className={`batch-entry-item${hasOverride ? " batch-entry-override" : ""}`}>
+      <span className="batch-entry-num">{i + 1}</span>
+      <span className="batch-entry-set">{en.set_code}</span>
+      <span className="batch-entry-col">#{en.collection_number}</span>
+      <span className={`batch-entry-valid bev-${v.status || "idle"}`}>
+        {v.status === "loading" ? "⟳"
+          : v.status === "found" ? <span title={v.formData?.name}>✓</span>
+          : v.status === "notfound" ? "✗" : ""}
+      </span>
+      <div className="batch-entry-stepper">
+        <button type="button" className="bqs-btn" onClick={() => onQtyChange(en.id, Math.max(1, entryQty - 1))}>−</button>
+        <span className="bqs-val">{entryQty}</span>
+        <button type="button" className="bqs-btn" onClick={() => onQtyChange(en.id, Math.min(99, entryQty + 1))}>+</button>
+      </div>
+      <button type="button" className={`batch-entry-foil-btn${entryFoil ? " active" : ""}`}
+        title={entryFoil ? "Foil (clique para remover)" : "Normal (clique para foil)"}
+        onClick={() => onFoilToggle(en.id, !entryFoil)}>✦</button>
+      <select className="batch-entry-lang" value={entryLang} title="Idioma desta carta"
+        onChange={e => onLangChange(en.id, e.target.value)}>
+        <option value="EN">EN</option>
+        <option value="PT">PT</option>
+        <option value="JP">JP</option>
+        <option value="ES">ES</option>
+        <option value="FR">FR</option>
+        <option value="DE">DE</option>
+      </select>
+      <button type="button" className="batch-entry-remove" onClick={() => onRemove(en.id)} aria-label="Remover">✕</button>
+    </li>
+  );
+});
 
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────────────
@@ -1203,9 +1272,16 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("created_at");
-  const [order, setOrder] = useState("desc");
+  const [sort, setSort] = useState(DEFAULT_SORT);
+  const [order, setOrder] = useState(DEFAULT_ORDER);
+  const [filterLang, setFilterLang] = useState("");
+  const [filterPrerelease, setFilterPrerelease] = useState("");
+  const [filterProxy, setFilterProxy] = useState("");
+  const [filterCommander, setFilterCommander] = useState("");
+  const [filterPriced, setFilterPriced] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterSubtype, setFilterSubtype] = useState("");
+  const [subtypeOptions, setSubtypeOptions] = useState([]);
   const [filterFoil, setFilterFoil] = useState("");
   const [filterFullArt, setFilterFullArt] = useState(false);
   const [filterRarity, setFilterRarity] = useState("");
@@ -1233,6 +1309,8 @@ export default function App() {
   });
   const [saveFilterName, setSaveFilterName] = useState("");
   const [showSaveFilter, setShowSaveFilter] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [deckFiltersExpanded, setDeckFiltersExpanded] = useState(false);
 
   // ── Duplicates ───────────────────────────────────────────────────────────
   const [duplicateIds, setDuplicateIds] = useState(new Set());
@@ -1245,6 +1323,13 @@ export default function App() {
   const [tradeSuggestions, setTradeSuggestions] = useState(null);
   const [portfolioHistory, setPortfolioHistory] = useState(null);
   const [tradeLoading, setTradeLoading] = useState(false);
+  // filtros + ordenação das tabelas de trade
+  const [tradeSearch, setTradeSearch] = useState("");
+  const [tradeRarityFilter, setTradeRarityFilter] = useState("");
+  const [tradeFoilFilter, setTradeFoilFilter] = useState("");
+  const [tradeFiltersExpanded, setTradeFiltersExpanded] = useState(false);
+  const [tradeSort, setTradeSort] = useState("change_pct");
+  const [tradeSortOrder, setTradeSortOrder] = useState("desc");
   // ── Price spike alerts ────────────────────────────────────────────────────
   const [priceSpikes, setPriceSpikes] = useState(null);
   const [spikeThreshold, setSpikeThreshold] = useState(() => {
@@ -1331,8 +1416,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [openNavGroup, setOpenNavGroup] = useState(null);
   const [decks, setDecks] = useState([]);
-  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
+  const [deckForm, setDeckForm] = useState({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "", deck_origin: "custom" });
   const [editDeckModal, setEditDeckModal] = useState(null);
+
+  // Filtros e paginação da listagem de decks
+  const [deckListSearch, setDeckListSearch] = useState("");
+  const [deckListFilterOrigin, setDeckListFilterOrigin] = useState("");
+  const [deckListFilterCommander, setDeckListFilterCommander] = useState("");
+  const [deckListFilterColor, setDeckListFilterColor] = useState("");
+  const [deckListPage, setDeckListPage] = useState(1);
+  const DECK_LIST_PAGE_SIZE = 12;
 
   const [managingDeck, setManagingDeck] = useState(null);
   const [edhplayCopied, setEdhplayCopied] = useState(false);
@@ -1349,6 +1442,7 @@ export default function App() {
   const [deckColorFilter, setDeckColorFilter] = useState("");
   const [deckSetFilter, setDeckSetFilter] = useState("");
   const [deckNameSearch, setDeckNameSearch] = useState("");
+  const [deckOnlyAdded, setDeckOnlyAdded] = useState(false);
   const [deckNameInput, setDeckNameInput] = useState("");
   const [deckCardsLoading, setDeckCardsLoading] = useState(false);
   const [deckPage, setDeckPage] = useState(1);
@@ -1494,7 +1588,13 @@ export default function App() {
       rarity: opts.filterRarity ?? filterRarity,
       colors: opts.filterColors ?? filterColors,
       typeFilter: opts.filterType ?? filterType,
+      subtypeFilter: opts.filterSubtype ?? filterSubtype,
       conditionFilter: opts.filterCondition ?? filterCondition,
+      lang: opts.filterLang ?? filterLang,
+      prerelease: opts.filterPrerelease ?? filterPrerelease,
+      proxy: opts.filterProxy ?? filterProxy,
+      commanderFilter: opts.filterCommander ?? filterCommander,
+      priced: opts.filterPriced ?? filterPriced,
       deckId,
     });
     setCards(result.data ?? []);
@@ -2135,7 +2235,7 @@ export default function App() {
     setUnassignedTotal(result.total ?? 0);
   }
 
-  useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType, filterCondition]);
+  useEffect(() => { if (authReady && authUser) loadCards(); }, [authReady, authUser, sort, order, filterFoil, filterFullArt, filterRarity, filterDeck, filterColors, filterType, filterSubtype, filterCondition, filterLang, filterPrerelease, filterProxy, filterCommander, filterPriced]);
   useEffect(() => {
     fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL")
       .then(r => r.json())
@@ -2143,6 +2243,9 @@ export default function App() {
       .catch(() => {});
   }, []);
   useEffect(() => { if (authReady && authUser) loadDecks(); }, [authReady, authUser]);
+  useEffect(() => {
+    if (authReady && authUser) getSubtypes().then(setSubtypeOptions).catch(() => {});
+  }, [authReady, authUser]);
   useEffect(() => { if (authReady && authUser) loadStorage(); }, [authReady, authUser]);
   useEffect(() => {
     if (authReady && authUser && !stats) {
@@ -2201,6 +2304,7 @@ export default function App() {
   // ── Dashboard de estatísticas ────────────────────────────────────────────
   const [statsData, setStatsData] = useState(null);
   const [dashBattles, setDashBattles] = useState(null);
+  const [dashRecentCards, setDashRecentCards] = useState(null);
   const [battleStats, setBattleStats] = useState(null);
   const [battleStatsLoading, setBattleStatsLoading] = useState(false);
   const [statsDecks, setStatsDecks] = useState([]);
@@ -2209,12 +2313,22 @@ export default function App() {
   useEffect(() => {
     if ((activeTab === "dashboard" || activeTab === "stats") && !statsData) loadStats();
     if (activeTab === "dashboard" && !dashBattles) listBattles().then(b => setDashBattles((b||[]).slice(0,5))).catch(() => setDashBattles([]));
+    if (activeTab === "dashboard" && !dashRecentCards) listCards({ page: 1, pageSize: 6, sort: "created_at", order: "desc" }).then(r => setDashRecentCards(r?.data ?? [])).catch(() => setDashRecentCards([]));
     if (activeTab === "trade-gainers"     && !tradeGainers)     { setTradeLoading(true); getTradeGainers().then(setTradeGainers).catch(() => setTradeGainers([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-losers"      && !tradeLosers)      { setTradeLoading(true); getTradeLosers().then(setTradeLosers).catch(() => setTradeLosers([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-stable"      && !tradeStable)      { setTradeLoading(true); getTradeStable().then(setTradeStable).catch(() => setTradeStable([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-suggestions" && !tradeSuggestions) { setTradeLoading(true); getTradeSuggestions(tradeMinPrice).then(setTradeSuggestions).catch(() => setTradeSuggestions([])).finally(() => setTradeLoading(false)); }
     if (activeTab === "trade-history"     && !portfolioHistory) { setTradeLoading(true); getPortfolioHistory().then(setPortfolioHistory).catch(() => setPortfolioHistory([])).finally(() => setTradeLoading(false)); }
   }, [activeTab]);
+
+  function handleTradeSort(field) {
+    if (tradeSort === field) {
+      setTradeSortOrder(o => o === "asc" ? "desc" : "asc");
+    } else {
+      setTradeSort(field);
+      setTradeSortOrder("desc");
+    }
+  }
 
   async function openTradeHistory(card) {
     setActiveTab("trade-history");
@@ -2402,11 +2516,24 @@ export default function App() {
 
   function handleSort(field) {
     if (field === sort) {
-      setOrder((o) => (o === "asc" ? "desc" : "asc"));
+      if (order === "desc") {
+        // já estava em desc → reset ao padrão
+        setSort(DEFAULT_SORT);
+        setOrder(DEFAULT_ORDER);
+      } else {
+        // estava em asc → inverte para desc
+        setOrder("desc");
+      }
     } else {
       setSort(field);
-      setOrder("asc");
+      setOrder(field === DEFAULT_SORT ? DEFAULT_ORDER : "asc");
     }
+    setPage(1);
+  }
+
+  function resetSort() {
+    setSort(DEFAULT_SORT);
+    setOrder(DEFAULT_ORDER);
     setPage(1);
   }
 
@@ -2444,13 +2571,16 @@ export default function App() {
 
   // Valida e armazena os dados completos da carta em cache (batchValidation).
   // Essa é a ÚNICA chamada ao Scryfall por carta — o "Buscar todas" apenas lê esse cache.
-  async function validateBatchEntry(entry, language) {
+  async function validateBatchEntry(entry) {
+    const lang = entry.language || batchGlobal.language;
+    const foil = entry.foil !== undefined ? entry.foil : batchGlobal.foil;
     const payload = {
       ...batchGlobal,
       deck_id: batchGlobal.deck_id || 0,
       set_code: entry.set_code,
       collection_number: entry.collection_number,
-      language,
+      language: lang,
+      foil,
       quantity: 1,
     };
     setBatchValidation(prev => ({ ...prev, [entry.id]: { status: "loading", card: null, formData: payload } }));
@@ -2487,13 +2617,33 @@ export default function App() {
     const entry = { set_code: s, collection_number: n, id: Date.now() };
     setBatchEntries(prev => [...prev, entry]);
     setBatchInputSet(""); setBatchInputNum("");
-    validateBatchEntry(entry, batchGlobal.language);
+    validateBatchEntry(entry);
+  }
+
+  function batchUpdateEntry(id, field, value) {
+    setBatchEntries(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, [field]: value } : e);
+      // Só re-valida na Scryfall quando o idioma muda (foil/quantity não afetam a busca)
+      if (field === "language") {
+        const entry = updated.find(e => e.id === id);
+        if (entry) setTimeout(() => validateBatchEntry(entry), 0);
+      }
+      return updated;
+    });
   }
 
   function batchRemoveEntry(id) {
     setBatchEntries(prev => prev.filter(e => e.id !== id));
     setBatchValidation(prev => { const n = { ...prev }; delete n[id]; return n; });
   }
+
+  // Callbacks estáveis para BatchEntryRow (não recriam a cada render do App)
+  const handleBatchQtyChange = useMemo(() => (id, qty) =>
+    setBatchEntries(prev => prev.map(x => x.id === id ? { ...x, quantity: qty } : x)), []);
+  const handleBatchFoilToggle = useMemo(() => (id, val) =>
+    batchUpdateEntry(id, "foil", val), []);
+  const handleBatchLangChange = useMemo(() => (id, val) =>
+    batchUpdateEntry(id, "language", val), []);
 
   function batchPasteLines(text) {
     const lines = text.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean);
@@ -2505,7 +2655,7 @@ export default function App() {
     if (parsed.length) {
       setBatchEntries(prev => [...prev, ...parsed]);
       const lang = batchGlobal.language;
-      parsed.forEach((entry, i) => setTimeout(() => validateBatchEntry(entry, lang), i * 120));
+      parsed.forEach((entry, i) => setTimeout(() => validateBatchEntry(entry), i * 120));
     }
   }
 
@@ -2517,9 +2667,11 @@ export default function App() {
     const results = batchEntries.map(entry => {
       const v = batchValidation[entry.id];
       // Aplica deck/foil atuais (podem ter mudado após a validação)
+      const entryFoil = entry.foil !== undefined ? entry.foil : batchGlobal.foil;
+      const entryQty  = entry.quantity || 1;
       const formData = v?.formData
-        ? { ...v.formData, deck_id: batchGlobal.deck_id || 0, foil: batchGlobal.foil }
-        : { set_code: entry.set_code, collection_number: entry.collection_number, language: batchGlobal.language, deck_id: batchGlobal.deck_id || 0, foil: batchGlobal.foil, quantity: 1, name: `${entry.set_code} ${entry.collection_number}` };
+        ? { ...v.formData, deck_id: batchGlobal.deck_id || 0, foil: entryFoil, quantity: entryQty }
+        : { set_code: entry.set_code, collection_number: entry.collection_number, language: entry.language || batchGlobal.language, deck_id: batchGlobal.deck_id || 0, foil: entryFoil, quantity: entryQty, name: `${entry.set_code} ${entry.collection_number}` };
       return {
         entry,
         found: v?.status === "found",
@@ -2651,11 +2803,33 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }
 
+  // Deck atualmente filtrado (para exibir badge de pré-con alterado)
+  const activeDeck = filterDeck !== "" ? decks.find(d => String(d.id) === String(filterDeck)) : null;
+  const isPreconModifiedDeck = activeDeck?.deck_origin === "precon_modified";
+
+  // Listagem de decks filtrada e paginada (client-side)
+  const filteredDecks = decks.filter(d => {
+    if (deckListSearch) {
+      const q = deckListSearch.toLowerCase();
+      if (!d.name.toLowerCase().includes(q) && !(d.description || "").toLowerCase().includes(q)) return false;
+    }
+    if (deckListFilterOrigin && d.deck_origin !== deckListFilterOrigin) return false;
+    if (deckListFilterCommander === "1" && !d.commander) return false;
+    if (deckListFilterCommander === "0" && d.commander) return false;
+    if (deckListFilterColor) {
+      const deckColors = (d.colors || "").split(",").map(c => c.trim().toUpperCase()).filter(Boolean);
+      if (!deckColors.includes(deckListFilterColor.toUpperCase())) return false;
+    }
+    return true;
+  });
+  const deckListTotalPages = Math.max(1, Math.ceil(filteredDecks.length / DECK_LIST_PAGE_SIZE));
+  const pagedDecks = filteredDecks.slice((deckListPage - 1) * DECK_LIST_PAGE_SIZE, deckListPage * DECK_LIST_PAGE_SIZE);
+
   // ── Saved filters ─────────────────────────────────────────────────────────
-  const hasActiveFilters = filterDeck !== "" || filterFoil !== "" || filterRarity !== "" || filterColors !== "" || filterType !== "" || filterCondition !== "" || filterFullArt || search !== "";
+  const hasActiveFilters = filterDeck !== "" || filterFoil !== "" || filterRarity !== "" || filterColors !== "" || filterType !== "" || filterSubtype !== "" || filterCondition !== "" || filterFullArt || search !== "" || filterLang !== "" || filterPrerelease !== "" || filterProxy !== "" || filterCommander !== "" || filterPriced !== "";
 
   function getCurrentFilter() {
-    return { name: saveFilterName, q: search, filterDeck, filterFoil, filterFullArt, filterRarity, filterColors, filterType, filterCondition, sort, order };
+    return { name: saveFilterName, q: search, filterDeck, filterFoil, filterFullArt, filterRarity, filterColors, filterType, filterSubtype, filterCondition, filterLang, filterPrerelease, filterProxy, filterCommander, filterPriced, sort, order };
   }
 
   function applySavedFilter(f) {
@@ -2666,7 +2840,13 @@ export default function App() {
     if (f.filterRarity !== undefined) setFilterRarity(f.filterRarity);
     if (f.filterColors !== undefined) setFilterColors(f.filterColors);
     if (f.filterType !== undefined) setFilterType(f.filterType);
+    if (f.filterSubtype !== undefined) setFilterSubtype(f.filterSubtype);
     if (f.filterCondition !== undefined) setFilterCondition(f.filterCondition);
+    if (f.filterLang !== undefined) setFilterLang(f.filterLang);
+    if (f.filterPrerelease !== undefined) setFilterPrerelease(f.filterPrerelease);
+    if (f.filterProxy !== undefined) setFilterProxy(f.filterProxy);
+    if (f.filterCommander !== undefined) setFilterCommander(f.filterCommander);
+    if (f.filterPriced !== undefined) setFilterPriced(f.filterPriced);
     if (f.sort !== undefined) setSort(f.sort);
     if (f.order !== undefined) setOrder(f.order);
     setPage(1);
@@ -2711,7 +2891,7 @@ export default function App() {
       name: c.name, color: colorToWUBRGCodes(c), type: c.type, subtitle: c.subtitle,
       collection_number: c.collection_number, rarity: c.rarity, set_code: c.set_code,
       language: c.language, year: c.year, artist: c.artist,
-      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition || "near_mint", notes: c.notes, storage_id: c.storage_id ?? 0,
+      foil: c.foil, full_art: c.full_art || false, prerelease: c.prerelease, commander: c.commander, proxy: c.proxy || false, precon_original: c.precon_original !== false, deck_id: c.deck_id ?? 0, quantity: c.quantity, condition: c.condition || "near_mint", notes: c.notes, storage_id: c.storage_id ?? 0,
     });
     setEditMode(true);
   }
@@ -2734,10 +2914,18 @@ export default function App() {
             c.commander ? "sim" : "nao", deckName];
   }
 
+  function setDeckListFilter(key, value) {
+    if (key === "search") setDeckListSearch(value);
+    else if (key === "origin") setDeckListFilterOrigin(value);
+    else if (key === "commander") setDeckListFilterCommander(value);
+    else if (key === "color") setDeckListFilterColor(value);
+    setDeckListPage(1);
+  }
+
   async function handleDeckCreate(e) {
     e.preventDefault();
     await createDeck(deckForm);
-    setDeckForm({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "" });
+    setDeckForm({ name: "", description: "", commander: false, colors: "", set_code: "", theme_color: "", deck_origin: "custom" });
     loadDecks();
   }
 
@@ -2756,6 +2944,7 @@ export default function App() {
       set_code: editDeckModal.set_code || "",
       theme_color: editDeckModal.theme_color || "",
       deckbox_color: editDeckModal.deckbox_color || "",
+      deck_origin: editDeckModal.deck_origin || "custom",
     });
     setEditDeckModal(null);
     loadDecks();
@@ -2785,6 +2974,7 @@ export default function App() {
     setDeckSetFilter("");
     setDeckNameSearch("");
     setDeckNameInput("");
+    setDeckOnlyAdded(false);
     setDeckPage(1);
     await Promise.all([loadDeckCards(deck.id), loadUnassigned(1, "")]);
     if (deck.set_code && !deck.icon_uri) {
@@ -2987,6 +3177,8 @@ export default function App() {
           rarity: filterRarity,
           deckId: filterDeck !== "" ? filterDeck : undefined,
           colors: filterColors, type: filterType, conditionFilter: filterCondition,
+          lang: filterLang, prerelease: filterPrerelease, proxy: filterProxy,
+          commanderFilter: filterCommander, priced: filterPriced,
         });
         const batch = result.data ?? [];
         if (batch.length === 0) break;
@@ -3267,49 +3459,57 @@ export default function App() {
   };
 
   const deckTotalQuantity = deckCards.reduce((sum, c) => sum + (c.quantity || 1), 0);
+  const isDeckManagingPreconMod = managingDeck?.deck_origin === "precon_modified";
+  const deckAddedCount = isDeckManagingPreconMod ? deckCards.filter(c => !c.precon_original).length : 0;
 
-  function deckCardTypeGroup(type) {
+  // Verifica se a carta bate com o filtro de tipo do deck (mesma lógica do backend)
+  function deckMatchesTypeFilter(type, filterValue) {
+    if (!filterValue) return true;
     const t = type || "";
-    if (t.includes("Land")) return "Terreno";
-    if (t.includes("Legendary") && t.includes("Creature")) return "Criatura Lendária";
-    if (t.includes("Creature")) return "Criatura";
-    if (t.includes("Planeswalker")) return "Planeswalker";
-    if (t.includes("Legendary") && t.includes("Enchantment")) return "Encantamento Lendário";
-    if (t.includes("Enchantment")) return "Encantamento";
-    if (t.includes("Legendary") && t.includes("Artifact")) return "Artefato Lendário";
-    if (t.includes("Artifact")) return "Artefato";
-    if (t.includes("Instant")) return "Instantâneo";
-    if (t.includes("Sorcery")) return "Feitiço";
-    if (t.includes("Battle")) return "Batalha";
-    return "Outro";
+    if (filterValue === "Nonbasic Land") return t.includes("Land") && !t.includes("Basic");
+    return t.includes(filterValue);
   }
 
-  const _deckTypeCounts = {};
-  const _deckColorCounts = {};
-  const _deckSetCounts = {};
-  for (const c of deckCards) {
-    const qty = c.quantity || 1;
-    const tg = deckCardTypeGroup(c.type);
-    _deckTypeCounts[tg] = (_deckTypeCounts[tg] || 0) + qty;
-    try {
-      const cols = JSON.parse(c.colors || "[]");
-      if (cols.length === 0) { _deckColorCounts["C"] = (_deckColorCounts["C"] || 0) + qty; }
-      else { for (const col of cols) _deckColorCounts[col] = (_deckColorCounts[col] || 0) + qty; }
-    } catch {}
-    const sc = (c.set_code || "").toUpperCase();
-    if (sc) _deckSetCounts[sc] = (_deckSetCounts[sc] || 0) + qty;
-  }
-  const DECK_TYPE_ORDER = ["Criatura Lendária","Criatura","Planeswalker","Encantamento Lendário","Encantamento","Artefato Lendário","Artefato","Instantâneo","Feitiço","Batalha","Terreno","Outro"];
-  const deckTypeCounts = DECK_TYPE_ORDER.filter(t => _deckTypeCounts[t]).map(t => ({ label: t, count: _deckTypeCounts[t] }));
-  const DECK_COLOR_ORDER = ["W","U","B","R","G","C"];
-  const deckColorCounts = DECK_COLOR_ORDER.filter(col => _deckColorCounts[col]).map(col => ({ code: col, count: _deckColorCounts[col] }));
-  const deckSetCounts = Object.entries(_deckSetCounts).sort(([,a],[,b]) => b - a).map(([set, count]) => ({ set, count }));
+  // Contagem por VALOR de filtro (mesmo conjunto que a coleção)
+  const DECK_TYPE_FILTER_VALUES = [
+    "Creature","Instant","Sorcery","Enchantment","Artifact","Land","Planeswalker","Battle",
+    "Legendary Creature","Artifact Creature","Enchantment Creature",
+    "Legendary Artifact","Equipment","Vehicle",
+    "Legendary Enchantment","Legendary Planeswalker",
+    "Basic Land","Nonbasic Land","Legendary Land","Artifact Land",
+    "Legendary","Token",
+  ];
+  const { _deckTypeFilterCounts, deckColorCounts, deckSetCounts } = useMemo(() => {
+    const typeCounts = {};
+    for (const v of DECK_TYPE_FILTER_VALUES) typeCounts[v] = 0;
+    const colorCounts = {};
+    const setCounts = {};
+    for (const c of deckCards) {
+      const qty = c.quantity || 1;
+      for (const v of DECK_TYPE_FILTER_VALUES) {
+        if (deckMatchesTypeFilter(c.type, v)) typeCounts[v] += qty;
+      }
+      try {
+        const cols = JSON.parse(c.colors || "[]");
+        if (cols.length === 0) { colorCounts["C"] = (colorCounts["C"] || 0) + qty; }
+        else { for (const col of cols) colorCounts[col] = (colorCounts[col] || 0) + qty; }
+      } catch {}
+      const sc = (c.set_code || "").toUpperCase();
+      if (sc) setCounts[sc] = (setCounts[sc] || 0) + qty;
+    }
+    const DECK_COLOR_ORDER = ["W","U","B","R","G","C"];
+    return {
+      _deckTypeFilterCounts: typeCounts,
+      deckColorCounts: DECK_COLOR_ORDER.filter(col => colorCounts[col]).map(col => ({ code: col, count: colorCounts[col] })),
+      deckSetCounts: Object.entries(setCounts).sort(([,a],[,b]) => b - a).map(([set, count]) => ({ set, count })),
+    };
+  }, [deckCards]);
 
   // Anomalias do deck
   const BASIC_LAND_NAMES = new Set(["Plains","Island","Swamp","Mountain","Forest","Wastes",
     "Snow-Covered Plains","Snow-Covered Island","Snow-Covered Swamp",
     "Snow-Covered Mountain","Snow-Covered Forest"]);
-  const deckAnomalies = (() => {
+  const deckAnomalies = useMemo(() => {
     const anomalies = [];
     const total = deckCards.reduce((s, c) => s + (c.quantity || 1), 0);
     if (total > 100) {
@@ -3320,11 +3520,10 @@ export default function App() {
         anomalies.push({ icon: "📋", label: `"${c.name}" tem ${c.quantity} cópias`, detail: "Regra singleton: apenas 1 cópia de cada carta não-terreno básico." });
       }
     }
-    // Cor fora da identidade — apenas Commander com cores definidas
     if (managingDeck?.commander && managingDeck.colors) {
       const allowed = new Set(managingDeck.colors.split(",").map(x => x.trim()).filter(Boolean));
       for (const c of deckCards) {
-        if (c.commander) continue; // o próprio comandante define a identidade
+        if (c.commander) continue;
         try {
           const cardColors = JSON.parse(c.colors || "[]");
           const outside = cardColors.filter(col => col !== "C" && !allowed.has(col));
@@ -3339,14 +3538,17 @@ export default function App() {
       }
     }
     return anomalies;
-  })();
+  }, [deckCards, managingDeck]);
 
   // Comandantes sobem para o topo da lista
-  const deckCardsSorted = [...deckCards].sort((a, b) => (b.commander ? 1 : 0) - (a.commander ? 1 : 0));
+  const deckCardsSorted = useMemo(() =>
+    [...deckCards].sort((a, b) => (b.commander ? 1 : 0) - (a.commander ? 1 : 0)),
+    [deckCards]
+  );
 
-  const filteredDeckCards = deckCardsSorted.filter(c => {
+  const filteredDeckCards = useMemo(() => deckCardsSorted.filter(c => {
     if (deckNameSearch && !(c.name || "").toLowerCase().includes(deckNameSearch.toLowerCase())) return false;
-    if (deckTypeFilter && deckCardTypeGroup(c.type) !== deckTypeFilter) return false;
+    if (deckTypeFilter && !deckMatchesTypeFilter(c.type, deckTypeFilter)) return false;
     if (deckColorFilter) {
       try {
         const cols = JSON.parse(c.colors || "[]");
@@ -3354,11 +3556,20 @@ export default function App() {
       } catch { return false; }
     }
     if (deckSetFilter && (c.set_code || "").toUpperCase() !== deckSetFilter) return false;
+    if (deckOnlyAdded && c.precon_original) return false;
     return true;
-  });
+  }), [deckCardsSorted, deckNameSearch, deckTypeFilter, deckColorFilter, deckSetFilter, deckOnlyAdded]);
+
+  const filteredDeckQty = useMemo(() =>
+    filteredDeckCards.reduce((s, c) => s + (c.quantity || 1), 0),
+    [filteredDeckCards]
+  );
   const DECK_PAGE_SIZE = 20;
   const deckTotalPages = Math.max(1, Math.ceil(filteredDeckCards.length / DECK_PAGE_SIZE));
-  const pagedDeckCards = filteredDeckCards.slice((deckPage - 1) * DECK_PAGE_SIZE, deckPage * DECK_PAGE_SIZE);
+  const pagedDeckCards = useMemo(() =>
+    filteredDeckCards.slice((deckPage - 1) * DECK_PAGE_SIZE, deckPage * DECK_PAGE_SIZE),
+    [filteredDeckCards, deckPage]
+  );
 
   // ── Guarda de autenticação (todos os hooks já foram chamados acima) ───
   if (!authReady) return (
@@ -3536,27 +3747,89 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === "trade-gainers" && (
-            <div className="trade-content">
-              <h2 className="trade-title">📈 Valorizaram</h2>
-              <div className="trade-section-desc">Cartas que mais valorizaram desde o primeiro registro. Clique em 📊 para ver o histórico completo.</div>
-              <MovementTable data={tradeGainers} loading={tradeLoading} emptyMsg="Nenhuma carta com valorização ≥10% registrada ainda." onHistory={openTradeHistory} />
-            </div>
-          )}
-          {activeTab === "trade-losers" && (
-            <div className="trade-content">
-              <h2 className="trade-title">📉 Desvalorizaram</h2>
-              <div className="trade-section-desc">Cartas que mais desvalorizaram. Bom para adquirir ou remover do deck.</div>
-              <MovementTable data={tradeLosers} loading={tradeLoading} emptyMsg="Nenhuma carta com queda ≥10% registrada ainda." onHistory={openTradeHistory} />
-            </div>
-          )}
-          {activeTab === "trade-stable" && (
-            <div className="trade-content">
-              <h2 className="trade-title">➡️ Estáveis</h2>
-              <div className="trade-section-desc">Cartas com variação inferior a 5% — valor previsível, bom para trades seguros.</div>
-              <MovementTable data={tradeStable} loading={tradeLoading} emptyMsg="Nenhuma carta estável com histórico suficiente." onHistory={openTradeHistory} />
-            </div>
-          )}
+          {(activeTab === "trade-gainers" || activeTab === "trade-losers" || activeTab === "trade-stable") && (() => {
+            const dataMap = { "trade-gainers": tradeGainers, "trade-losers": tradeLosers, "trade-stable": tradeStable };
+            const titleMap = { "trade-gainers": "📈 Valorizaram", "trade-losers": "📉 Desvalorizaram", "trade-stable": "➡️ Estáveis" };
+            const descMap  = { "trade-gainers": "Cartas que mais valorizaram desde o primeiro registro. Clique em 📊 para ver o histórico.", "trade-losers": "Cartas que mais desvalorizaram. Bom para adquirir ou remover do deck.", "trade-stable": "Cartas com variação inferior a 5% — valor previsível, bom para trades seguros." };
+            const emptyMap = { "trade-gainers": "Nenhuma carta com valorização ≥10% registrada ainda.", "trade-losers": "Nenhuma carta com queda ≥10% registrada ainda.", "trade-stable": "Nenhuma carta estável com histórico suficiente." };
+            const data = dataMap[activeTab];
+            const hasFilter = tradeSearch !== "" || tradeRarityFilter !== "" || tradeFoilFilter !== "";
+            const activeFilterCount = [tradeSearch, tradeRarityFilter, tradeFoilFilter].filter(Boolean).length;
+            const visibleCount = (() => {
+              if (!data) return 0;
+              let r = data;
+              if (tradeSearch) { const q = tradeSearch.toLowerCase(); r = r.filter(x => x.name.toLowerCase().includes(q) || (x.set_code||"").toLowerCase().includes(q)); }
+              if (tradeRarityFilter) r = r.filter(x => x.rarity === tradeRarityFilter);
+              if (tradeFoilFilter === "1") r = r.filter(x => x.foil);
+              if (tradeFoilFilter === "0") r = r.filter(x => !x.foil);
+              return r.length;
+            })();
+            return (
+              <div className="trade-content">
+                <h2 className="trade-title">{titleMap[activeTab]}</h2>
+                <div className="trade-section-desc">{descMap[activeTab]}</div>
+
+                {/* Painel de filtros */}
+                <div className="filter-panel" style={{marginBottom:"12px"}}>
+                  <div className="filter-panel-header">
+                    <span className="filter-result-count">
+                      <strong>{visibleCount.toLocaleString("pt-BR")}</strong> carta{visibleCount !== 1 ? "s" : ""}
+                      {data && data.length !== visibleCount && <span className="filter-qty-sub"> de {data.length}</span>}
+                    </span>
+                    <div className="filter-panel-actions">
+                      <button type="button"
+                        className={`filter-toggle-btn${tradeFiltersExpanded ? " active" : ""}${hasFilter ? " has-active" : ""}`}
+                        onClick={() => setTradeFiltersExpanded(v => !v)}>
+                        ⚙ Filtros{hasFilter ? ` (${activeFilterCount})` : ""}{tradeFiltersExpanded ? " ▲" : " ▼"}
+                      </button>
+                    </div>
+                  </div>
+                  {tradeFiltersExpanded && (
+                    <div className="filter-panel-body">
+                      <div className="filter-row">
+                        <div className="filter-group" style={{flex:"1 1 180px"}}>
+                          <label className="filter-group-label">Busca</label>
+                          <input className="filter-select" type="search" placeholder="Nome ou set…"
+                            value={tradeSearch} onChange={e => setTradeSearch(e.target.value)} />
+                        </div>
+                        <div className="filter-group">
+                          <label className="filter-group-label">Raridade</label>
+                          <select className="filter-select" value={tradeRarityFilter} onChange={e => setTradeRarityFilter(e.target.value)}>
+                            <option value="">Todas</option>
+                            <option value="L">🌿 Land</option>
+                            <option value="C">◆ Common</option>
+                            <option value="U">◈ Uncommon</option>
+                            <option value="R">◇ Rare</option>
+                            <option value="M">★ Mythic</option>
+                          </select>
+                        </div>
+                        <div className="filter-group">
+                          <label className="filter-group-label">Foil</label>
+                          <select className="filter-select" value={tradeFoilFilter} onChange={e => setTradeFoilFilter(e.target.value)}>
+                            <option value="">Todas</option>
+                            <option value="1">✦ Somente Foil</option>
+                            <option value="0">Sem Foil</option>
+                          </select>
+                        </div>
+                      </div>
+                      {hasFilter && (
+                        <div className="filter-row filter-clear-row">
+                          <button type="button" className="filter-clear-all-btn"
+                            onClick={() => { setTradeSearch(""); setTradeRarityFilter(""); setTradeFoilFilter(""); }}>
+                            ✕ Limpar filtros
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <MovementTable data={data} loading={tradeLoading} emptyMsg={emptyMap[activeTab]} onHistory={openTradeHistory}
+                  search={tradeSearch} rarityFilter={tradeRarityFilter} foilFilter={tradeFoilFilter}
+                  sortKey={tradeSort} sortOrder={tradeSortOrder} onSortChange={handleTradeSort} />
+              </div>
+            );
+          })()}
           {activeTab === "trade-suggestions" && (
             <div className="trade-content">
               <h2 className="trade-title">🤝 Para Trade</h2>
@@ -3673,111 +3946,350 @@ export default function App() {
       {activeTab === "dashboard" && (() => {
         const s = statsData;
         const battles = dashBattles || [];
-        const topCards = s?.top_cards || [];
-        const byRarity = s?.by_rarity || [];
-        const totalValue = s?.estimated_value_usd || 0;
-        const totalUnique = s?.unique_cards || 0;
-        const totalQty = s?.total_quantity || 0;
-        const foilQty = s?.foil_quantity || 0;
-        const thisWeek = s?.cards_this_week || 0;
+        const topCards   = s?.top_cards     || [];
+        const topByRarity = s?.top_by_rarity || [];
+        const byRarity   = s?.by_rarity     || [];
+        const byColor    = s?.by_color      || [];
+        const byType     = s?.by_type       || [];
+        const topQty     = s?.top_quantity  || [];
+        const totalValue    = s?.estimated_value_usd || 0;
+        const deckValue     = s?.deck_value_usd      || 0;
+        const nonDeckValue  = s?.non_deck_value_usd  || 0;
+        const totalUnique = s?.unique_cards    || 0;
+        const totalQty    = s?.total_quantity  || 0;
+        const foilQty     = s?.foil_quantity   || 0;
+        const thisWeek    = s?.cards_this_week || 0;
+
+        // helper: formata valor monetário de forma compacta ($1.2k)
+        function fmtVal(v) {
+          if (v >= 10000) return `$${(v/1000).toFixed(1)}k`;
+          if (v >= 1000)  return `$${(v/1000).toFixed(2)}k`;
+          return `$${v.toFixed(2)}`;
+        }
+
+        // Decks mais caros (top 5)
+        const topDecks = [...decks].filter(d => d.estimated_value_usd > 0)
+          .sort((a, b) => b.estimated_value_usd - a.estimated_value_usd).slice(0, 5);
+        // Decks mais recentes (top 4)
+        const recentDecks = [...decks].sort((a, b) => (b.id || 0) - (a.id || 0)).slice(0, 4);
+        // Trade summary
+        const biggestGainer = (tradeGainers || []).reduce((best, c) => (!best || c.change_pct > best.change_pct ? c : best), null);
+        const biggestLoser  = (tradeLosers  || []).reduce((best, c) => (!best || c.change_pct < best.change_pct ? c : best), null);
+
+        // ── Gráfico SVG: barras horizontais ─────────────────────────────
+        function BarChart({ data, colorFn, labelKey, valueKey, title }) {
+          const max = Math.max(...data.map(d => d[valueKey]), 1);
+          return (
+            <div className="dash-chart-card">
+              <h3 className="dash-card-title">{title}</h3>
+              <div className="dash-bar-list">
+                {data.map((d, i) => (
+                  <div key={i} className="dash-bar-row">
+                    <span className="dash-bar-label">{d[labelKey]}</span>
+                    <div className="dash-bar-track">
+                      <div className="dash-bar-fill" style={{ width: `${(d[valueKey]/max)*100}%`, background: colorFn(d) }} />
+                    </div>
+                    <span className="dash-bar-val">{d[valueKey].toLocaleString("pt-BR")}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        // ── Gráfico SVG: donut ───────────────────────────────────────────
+        function DonutChart({ data, colorFn, labelKey, valueKey, title, centerLabel }) {
+          const total = data.reduce((s, d) => s + d[valueKey], 0) || 1;
+          const r = 44, cx = 56, cy = 56, stroke = 14;
+          const circ = 2 * Math.PI * r;
+          let offset = 0;
+          const slices = data.map(d => {
+            const pct = d[valueKey] / total;
+            const dash = pct * circ;
+            const gap = circ - dash;
+            const slice = { d, dash, gap, offset, color: colorFn(d) };
+            offset += dash;
+            return slice;
+          });
+          return (
+            <div className="dash-chart-card">
+              <h3 className="dash-card-title">{title}</h3>
+              <div className="dash-donut-wrap">
+                <svg viewBox="0 0 112 112" width="112" height="112" style={{flexShrink:0}}>
+                  <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke}/>
+                  {slices.map((sl, i) => (
+                    <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+                      stroke={sl.color} strokeWidth={stroke}
+                      strokeDasharray={`${sl.dash} ${sl.gap}`}
+                      strokeDashoffset={circ/4 - sl.offset}
+                      style={{transition:"stroke-dasharray .4s"}} />
+                  ))}
+                  <text x={cx} y={cy-5} textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--text)">{centerLabel || total.toLocaleString("pt-BR")}</text>
+                  <text x={cx} y={cy+10} textAnchor="middle" fontSize="8" fill="var(--text-muted)">total</text>
+                </svg>
+                <div className="dash-donut-legend">
+                  {data.map((d, i) => (
+                    <div key={i} className="dash-legend-row">
+                      <span className="dash-legend-dot" style={{background: colorFn(d)}}/>
+                      <span className="dash-legend-label">{d[labelKey]}</span>
+                      <span className="dash-legend-val">{d[valueKey].toLocaleString("pt-BR")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const COLOR_MAP = { W:"#f9fafb", U:"#3b82f6", B:"#6b21a8", R:"#ef4444", G:"#22c55e", C:"#9ca3af" };
+        const COLOR_LABEL = { W:"Branco", U:"Azul", B:"Preto", R:"Vermelho", G:"Verde", C:"Incolor" };
+        const TYPE_COLOR = {
+          "Criatura":"#4ade80","Instantâneo":"#60a5fa","Feitiço":"#f87171",
+          "Encantamento":"#c084fc","Artefato":"#94a3b8","Terreno":"#a3e635",
+          "Planeswalker":"#fb923c","Battle":"#f43f5e","Outro":"#64748b",
+        };
+
         return (
           <section className="dashboard-section tab-content">
             {dashLoading && !s && <div className="dash-loading"><div className="eval-spinner">⚙</div><p>Carregando…</p></div>}
             {s && (<>
-              {/* ── Tiles de estatísticas ── */}
-              <div className="dash-tiles">
-                <div className="dash-tile dash-tile-value">
+
+              {/* ── KPI tiles: linha financeira ── */}
+              <div className="dash-value-row">
+                <div className="dash-tile dash-tile-hero">
+                  <div className="dash-tile-shimmer" />
                   <div className="dash-tile-icon">💎</div>
                   <div className="dash-tile-data">
-                    <div className="dash-tile-label">Valor estimado</div>
-                    <div className="dash-tile-num"><AnimatedNumber value={totalValue} prefix="$" decimals={2} /></div>
+                    <div className="dash-tile-label">Valor da coleção</div>
+                    <div className="dash-tile-num">{fmtVal(totalValue)}</div>
                   </div>
                 </div>
-                <div className="dash-tile">
-                  <div className="dash-tile-icon">🃏</div>
+                <div className="dash-tile dash-tile-fin">
+                  <div className="dash-tile-icon">🗂</div>
                   <div className="dash-tile-data">
-                    <div className="dash-tile-label">Cartas únicas</div>
-                    <div className="dash-tile-num"><AnimatedNumber value={totalUnique} /></div>
+                    <div className="dash-tile-label">Em decks</div>
+                    <div className="dash-tile-num">{fmtVal(deckValue)}</div>
+                    {totalValue > 0 && <div className="dash-tile-pct">{Math.round(deckValue/totalValue*100)}% do total</div>}
                   </div>
                 </div>
-                <div className="dash-tile">
-                  <div className="dash-tile-icon">✦</div>
+                <div className="dash-tile dash-tile-fin">
+                  <div className="dash-tile-icon">📤</div>
                   <div className="dash-tile-data">
-                    <div className="dash-tile-label">Total com foil</div>
-                    <div className="dash-tile-num"><AnimatedNumber value={foilQty} /></div>
-                  </div>
-                </div>
-                <div className="dash-tile">
-                  <div className="dash-tile-icon">📅</div>
-                  <div className="dash-tile-data">
-                    <div className="dash-tile-label">Esta semana</div>
-                    <div className="dash-tile-num">+<AnimatedNumber value={thisWeek} /></div>
+                    <div className="dash-tile-label">Fora de decks</div>
+                    <div className="dash-tile-num">{fmtVal(nonDeckValue)}</div>
+                    {totalValue > 0 && <div className="dash-tile-pct">{Math.round(nonDeckValue/totalValue*100)}% do total</div>}
                   </div>
                 </div>
               </div>
 
-              {/* ── Linha principal ── */}
-              <div className="dash-main-row">
-                {/* Top 3 cartas mais valiosas */}
-                <div className="dash-card dash-top-cards">
-                  <h3 className="dash-card-title">🏆 Mais Valiosas</h3>
-                  {topCards.length === 0 && <p className="dash-empty">Nenhuma carta com preço cadastrado.</p>}
-                  {topCards.map(c => (
-                    <div key={c.id} className="dash-top-card-row" onClick={() => { setSelectedCardId(c.id); setShowCardDetail(true); }}>
-                      {c.image_url
-                        ? <img src={c.image_url} alt="" className="dash-top-card-img" />
-                        : <div className="dash-top-card-img dash-top-card-img-placeholder">?</div>
-                      }
-                      <div className="dash-top-card-info">
-                        <div className="dash-top-card-name">{c.name}{c.foil && <span className="foil-text"> ✦</span>}</div>
-                        <div className="dash-top-card-meta">
-                          <span className="dash-top-card-set">{(c.set_code||"").toUpperCase()}</span>
-                          {c.rarity && <span className="rarity" style={{color: rarityColor[c.rarity]}}>{c.rarity}</span>}
-                        </div>
-                      </div>
-                      <div className="dash-top-card-price">${c.price_usd.toFixed(2)}</div>
+              {/* ── KPI tiles: linha de stats ── */}
+              <div className="dash-stats-row">
+                {[
+                  { icon:"🃏", label:"Cartas únicas", val: totalUnique.toLocaleString("pt-BR") },
+                  { icon:"📦", label:"Total cópias",  val: totalQty.toLocaleString("pt-BR") },
+                  { icon:"✦",  label:"Foil",          val: foilQty.toLocaleString("pt-BR") },
+                  { icon:"📅", label:"Esta semana",   val: `+${thisWeek}` },
+                  { icon:"🗂", label:"Decks",         val: decks.length.toString() },
+                ].map(t => (
+                  <div key={t.label} className="dash-tile dash-tile-stat">
+                    <div className="dash-tile-icon">{t.icon}</div>
+                    <div className="dash-tile-data">
+                      <div className="dash-tile-label">{t.label}</div>
+                      <div className="dash-tile-num">{t.val}</div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Linha 1: 3 gráficos ── */}
+              <div className="dash-charts-row">
+                {/* Gráfico: Por Tipo */}
+                <BarChart
+                  title="🃏 Por Tipo"
+                  data={byType}
+                  labelKey="type_group"
+                  valueKey="count"
+                  colorFn={d => TYPE_COLOR[d.type_group] || "#64748b"}
+                />
+
+                {/* Gráfico: Por Cor */}
+                <DonutChart
+                  title="🎨 Por Cor"
+                  data={byColor.map(d => ({ ...d, label: COLOR_LABEL[d.color] || d.color }))}
+                  labelKey="label"
+                  valueKey="count"
+                  colorFn={d => COLOR_MAP[d.color] || "#888"}
+                />
+
+                {/* Gráfico: Por Raridade */}
+                <BarChart
+                  title="💠 Por Raridade"
+                  data={byRarity}
+                  labelKey="rarity"
+                  valueKey="quantity"
+                  colorFn={d => rarityColor[d.rarity] || "#888"}
+                />
+              </div>
+
+              {/* ── Linha 2: cartas valiosas + mais caras por raridade + mais cópias + batalhas ── */}
+              <div className="dash-main-row dash-row-fixed">
+                {/* Top cartas mais valiosas */}
+                <div className="dash-card">
+                  <h3 className="dash-card-title">🏆 Mais Valiosas</h3>
+                  <div className="dash-card-scroll">
+                    {topCards.length === 0 && <p className="dash-empty">Nenhuma carta com preço.</p>}
+                    {topCards.map(c => (
+                      <div key={c.id} className="dash-top-card-row" onClick={() => { setSelectedCardId(c.id); setShowCardDetail(true); }}>
+                        {c.image_url ? <img src={c.image_url} alt="" className="dash-top-card-img" /> : <div className="dash-top-card-img dash-top-card-img-placeholder">?</div>}
+                        <div className="dash-top-card-info">
+                          <div className="dash-top-card-name">{c.name}{c.foil && <span className="foil-text"> ✦</span>}</div>
+                          <div className="dash-top-card-meta">
+                            <span className="dash-top-card-set">{(c.set_code||"").toUpperCase()}</span>
+                            {c.rarity && <span className="rarity" style={{color:rarityColor[c.rarity]}}>{c.rarity}</span>}
+                          </div>
+                        </div>
+                        <div className="dash-top-card-price">${c.price_usd.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Distribuição por raridade */}
-                <div className="dash-card dash-rarity-chart">
-                  <h3 className="dash-card-title">💠 Por Raridade</h3>
-                  {byRarity.map(r => {
-                    const max = Math.max(...byRarity.map(x => x.quantity));
-                    return (
-                      <div key={r.rarity} className="dash-rarity-row">
-                        <span className="dash-rarity-label" style={{color: rarityColor[r.rarity]}}>{r.rarity}</span>
-                        <div className="dash-rarity-bar-wrap">
-                          <div className="dash-rarity-bar" style={{width:`${(r.quantity/max)*100}%`, background: rarityColor[r.rarity]}} />
+                {/* Cartas com mais cópias */}
+                <div className="dash-card">
+                  <h3 className="dash-card-title">📋 Mais Cópias</h3>
+                  <div className="dash-card-scroll">
+                    {topQty.length === 0 && <p className="dash-empty">Nenhuma carta com mais de 1 cópia.</p>}
+                    {topQty.map(c => (
+                      <div key={c.id} className="dash-top-card-row" onClick={() => { setSelectedCardId(c.id); setShowCardDetail(true); }}>
+                        {c.image_url ? <img src={c.image_url} alt="" className="dash-top-card-img" /> : <div className="dash-top-card-img dash-top-card-img-placeholder">?</div>}
+                        <div className="dash-top-card-info">
+                          <div className="dash-top-card-name">{c.name}{c.foil && <span className="foil-text"> ✦</span>}</div>
+                          <div className="dash-top-card-meta">
+                            <span className="dash-top-card-set">{(c.set_code||"").toUpperCase()}</span>
+                            {c.rarity && <span className="rarity" style={{color:rarityColor[c.rarity]}}>{c.rarity}</span>}
+                          </div>
                         </div>
-                        <span className="dash-rarity-count">{r.quantity}</span>
+                        <div className="dash-top-card-price" style={{color:"var(--gold)"}}>×{c.quantity}</div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Últimas batalhas */}
-                <div className="dash-card dash-battles">
+                <div className="dash-card">
                   <h3 className="dash-card-title">⚔ Últimas Batalhas</h3>
-                  {battles.length === 0 && <p className="dash-empty">Nenhuma batalha registrada ainda.</p>}
-                  {battles.map((b, i) => (
-                    <div key={i} className={`dash-battle-row dash-battle-${b.result}`}>
-                      <span className="dash-battle-icon">{b.result === 'win' ? '✅' : b.result === 'loss' ? '❌' : '🤝'}</span>
-                      <span className="dash-battle-style">{b.game_style || 'Commander'}</span>
-                      {b.opponent && <span className="dash-battle-opp">vs {b.opponent}</span>}
-                      <span className="dash-battle-date">{(b.played_at||'').slice(0,10)}</span>
-                    </div>
-                  ))}
+                  <div className="dash-card-scroll">
+                    {battles.length === 0 && <p className="dash-empty">Nenhuma batalha registrada.</p>}
+                    {battles.map((b, i) => (
+                      <div key={i} className={`dash-battle-row dash-battle-${b.result}`}>
+                        <span className="dash-battle-icon">{b.result==='win'?'✅':b.result==='loss'?'❌':'🤝'}</span>
+                        <span className="dash-battle-style">{b.game_style||'Commander'}</span>
+                        {b.opponent && <span className="dash-battle-opp">vs {b.opponent}</span>}
+                        <span className="dash-battle-date">{(b.played_at||'').slice(0,10)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
+              {/* ── Linha 3: decks ── */}
+              <div className="dash-main-row dash-row-fixed">
+                <div className="dash-card">
+                  <h3 className="dash-card-title">💰 Decks Mais Caros</h3>
+                  <div className="dash-card-scroll">
+                    {topDecks.length === 0 && <p className="dash-empty">Nenhum deck precificado.</p>}
+                    {topDecks.map(d => (
+                      <div key={d.id} className="dash-deck-row" onClick={() => setActiveTab("decks")}>
+                        {d.icon_uri ? <img src={d.icon_uri} alt="" className="dash-deck-icon" /> : <span className="dash-deck-icon-placeholder">🗂</span>}
+                        <div className="dash-deck-info">
+                          <div className="dash-deck-name">{d.name}</div>
+                          <div className="dash-deck-meta">{d.card_count} cartas</div>
+                        </div>
+                        <div className="dash-deck-value">${d.estimated_value_usd.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dash-card">
+                  <h3 className="dash-card-title">🆕 Decks Recentes</h3>
+                  <div className="dash-card-scroll">
+                    {recentDecks.length === 0 && <p className="dash-empty">Nenhum deck cadastrado.</p>}
+                    {recentDecks.map(d => (
+                      <div key={d.id} className="dash-deck-row" onClick={() => setActiveTab("decks")}>
+                        {d.icon_uri ? <img src={d.icon_uri} alt="" className="dash-deck-icon" /> : <span className="dash-deck-icon-placeholder">🗂</span>}
+                        <div className="dash-deck-info">
+                          <div className="dash-deck-name">{d.name}</div>
+                          <div className="dash-deck-meta">{d.card_count} cartas
+                            {d.deck_origin === "precon" && <span style={{marginLeft:"6px",fontSize:".68rem",color:"var(--gold-dim)"}}>📦</span>}
+                            {d.deck_origin === "precon_modified" && <span style={{marginLeft:"6px",fontSize:".68rem",color:"var(--gold-dim)"}}>✂</span>}
+                          </div>
+                        </div>
+                        {d.estimated_value_usd > 0 && <div className="dash-deck-value">${d.estimated_value_usd.toFixed(2)}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dash-card">
+                  <h3 className="dash-card-title">🕐 Cadastradas Recentemente</h3>
+                  <div className="dash-card-scroll">
+                    {!dashRecentCards && <p className="dash-empty">Carregando…</p>}
+                    {(dashRecentCards||[]).length === 0 && dashRecentCards && <p className="dash-empty">Nenhuma carta.</p>}
+                    {(dashRecentCards||[]).map(c => (
+                      <div key={c.id} className="dash-top-card-row" onClick={() => { setSelectedCardId(c.id); setShowCardDetail(true); }}>
+                        {c.image_url ? <img src={c.image_url} alt="" className="dash-top-card-img" /> : <div className="dash-top-card-img dash-top-card-img-placeholder">?</div>}
+                        <div className="dash-top-card-info">
+                          <div className="dash-top-card-name">{c.name}{c.foil && <span className="foil-text"> ✦</span>}</div>
+                          <div className="dash-top-card-meta">
+                            <span className="dash-top-card-set">{(c.set_code||"").toUpperCase()}</span>
+                            {c.rarity && <span className="rarity" style={{color:rarityColor[c.rarity]}}>{c.rarity}</span>}
+                          </div>
+                        </div>
+                        {c.price_usd > 0 && <div className="dash-top-card-price">${c.price_usd.toFixed(2)}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Trade summary ── */}
+              {(tradeGainers || tradeLosers) && (
+                <div className="dash-main-row">
+                  <div className="dash-card" style={{flex:"1 1 100%"}}>
+                    <h3 className="dash-card-title">💱 Resumo de Trade</h3>
+                    <div className="dash-trade-row">
+                      <div className="dash-trade-block dash-trade-up" onClick={() => setActiveTab("trade-gainers")}>
+                        <div className="dash-trade-block-label">📈 Valorizaram</div>
+                        <div className="dash-trade-block-num">{(tradeGainers||[]).length}</div>
+                        {biggestGainer && <div className="dash-trade-block-best">Maior: <strong>{biggestGainer.name}</strong> <span className="trade-up">▲{Math.abs(biggestGainer.change_pct).toFixed(1)}%</span></div>}
+                      </div>
+                      <div className="dash-trade-block dash-trade-down" onClick={() => setActiveTab("trade-losers")}>
+                        <div className="dash-trade-block-label">📉 Desvalorizaram</div>
+                        <div className="dash-trade-block-num">{(tradeLosers||[]).length}</div>
+                        {biggestLoser && <div className="dash-trade-block-best">Maior: <strong>{biggestLoser.name}</strong> <span className="trade-down">▼{Math.abs(biggestLoser.change_pct).toFixed(1)}%</span></div>}
+                      </div>
+                      <div className="dash-trade-block" onClick={() => setActiveTab("trade-stable")}>
+                        <div className="dash-trade-block-label">➡️ Estáveis</div>
+                        <div className="dash-trade-block-num">{(tradeStable||[]).length}</div>
+                        <div className="dash-trade-block-best">Variação &lt;5%</div>
+                      </div>
+                      <div className="dash-trade-block" onClick={() => setActiveTab("trade-suggestions")}>
+                        <div className="dash-trade-block-label">🤝 Para Trade</div>
+                        <div className="dash-trade-block-num">{(tradeSuggestions||[]).length || "—"}</div>
+                        <div className="dash-trade-block-best">Acima de ${tradeMinPrice}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── Ações rápidas ── */}
               <div className="dash-actions">
-                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("collection")}>🃏 Ver Coleção</button>
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("collection")}>🃏 Coleção</button>
                 <button type="button" className="dash-action-btn" onClick={() => setActiveTab("decks")}>🗂 Decks</button>
                 <button type="button" className="dash-action-btn" onClick={() => setActiveTab("trade-gainers")}>💱 Trade</button>
-                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("stats")}>📊 Estatísticas</button>
+                <button type="button" className="dash-action-btn" onClick={() => setActiveTab("stats")}>📊 Stats</button>
               </div>
             </>)}
           </section>
@@ -3862,73 +4374,156 @@ export default function App() {
                   </div>
 
                   {deckCards.length > 0 && (
-                    <div className="deck-filter-bar">
-                      <input
-                        type="search"
-                        className="deck-name-search"
-                        placeholder="Filtrar por nome…"
-                        value={deckNameInput}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setDeckNameInput(v);
-                          clearTimeout(deckNameTimer.current);
-                          deckNameTimer.current = setTimeout(() => { setDeckNameSearch(v); setDeckPage(1); }, 250);
-                        }}
-                      />
-                      {deckTypeCounts.length > 0 && (
-                        <div className="deck-filter-group">
-                          <span className="deck-filter-label">Tipo</span>
-                          <div className="deck-filter-chips">
-                            {deckTypeCounts.map(({label, count}) => (
-                              <button key={label} type="button"
-                                className={`deck-filter-chip${deckTypeFilter === label ? " active" : ""}`}
-                                onClick={() => { setDeckTypeFilter(deckTypeFilter === label ? "" : label); setDeckPage(1); }}>
-                                {label} <span className="dfc-count">({count})</span>
-                              </button>
-                            ))}
-                          </div>
+                    <div className="filter-panel">
+                      {/* Header: counter + badge modificadas + toggle */}
+                      <div className="filter-panel-header">
+                        <span className="filter-result-count">
+                          <strong>{filteredDeckCards.length.toLocaleString("pt-BR")}</strong> carta{filteredDeckCards.length !== 1 ? "s" : ""}{" "}
+                          <span className="filter-qty-sub">· {filteredDeckQty.toLocaleString("pt-BR")} cópia{filteredDeckQty !== 1 ? "s" : ""}</span>
+                        </span>
+                        {isDeckManagingPreconMod && deckAddedCount > 0 && (
+                          <button
+                            type="button"
+                            className={`deck-added-info-btn${deckOnlyAdded ? " active" : ""}`}
+                            onClick={() => { setDeckOnlyAdded(v => !v); setDeckPage(1); }}
+                            title={deckOnlyAdded ? "Mostrar todas as cartas" : "Mostrar somente cartas adicionadas"}
+                          >
+                            ✚ {deckAddedCount} modificada{deckAddedCount !== 1 ? "s" : ""}
+                          </button>
+                        )}
+                        <div className="filter-panel-actions">
+                          <button
+                            type="button"
+                            className={`filter-toggle-btn${deckFiltersExpanded ? " active" : ""}${(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) ? " has-active" : ""}`}
+                            onClick={() => setDeckFiltersExpanded(v => !v)}
+                          >
+                            ⚙ Filtros{(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) ? ` (${[deckTypeFilter, deckColorFilter, deckSetFilter, deckNameSearch].filter(Boolean).length})` : ""}
+                            {deckFiltersExpanded ? " ▲" : " ▼"}
+                          </button>
                         </div>
-                      )}
-                      {deckColorCounts.length > 0 && (
-                        <div className="deck-filter-group">
-                          <span className="deck-filter-label">Cor</span>
-                          <div className="deck-filter-chips">
-                            {deckColorCounts.map(({code, count}) => (
-                              <button key={code} type="button"
-                                className={`deck-filter-chip deck-color-chip dc-${code.toLowerCase()}${deckColorFilter === code ? " active" : ""}`}
-                                onClick={() => { setDeckColorFilter(deckColorFilter === code ? "" : code); setDeckPage(1); }}>
-                                {code} <span className="dfc-count">({count})</span>
-                              </button>
-                            ))}
+                      </div>
+
+                      {/* Painel expansível */}
+                      {deckFiltersExpanded && (
+                        <div className="filter-panel-body">
+                          {/* Busca por nome */}
+                          <div className="filter-row">
+                            <div className="filter-group" style={{flex:"1 1 200px"}}>
+                              <label className="filter-group-label">Nome</label>
+                              <input
+                                type="search"
+                                className="filter-select"
+                                placeholder="Filtrar por nome…"
+                                value={deckNameInput}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setDeckNameInput(v);
+                                  clearTimeout(deckNameTimer.current);
+                                  deckNameTimer.current = setTimeout(() => { setDeckNameSearch(v); setDeckPage(1); }, 250);
+                                }}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {deckSetCounts.length > 1 && (
-                        <div className="deck-filter-group">
-                          <span className="deck-filter-label">Coleção</span>
-                          <div className="deck-filter-chips">
-                            {deckSetCounts.map(({set, count}) => (
-                              <button key={set} type="button"
-                                className={`deck-filter-chip${deckSetFilter === set ? " active" : ""}`}
-                                onClick={() => { setDeckSetFilter(deckSetFilter === set ? "" : set); setDeckPage(1); }}>
-                                {set} <span className="dfc-count">({count})</span>
-                              </button>
-                            ))}
+
+                          {/* Tipo — select com optgroups igual à coleção */}
+                          <div className="filter-row">
+                            <div className="filter-group filter-group-wide">
+                              <label className="filter-group-label">Tipo</label>
+                              <select className="filter-select" value={deckTypeFilter} onChange={(e) => { setDeckTypeFilter(e.target.value); setDeckPage(1); }}>
+                                <option value="">Todos{_deckTypeFilterCounts["Creature"] !== undefined ? "" : ""}</option>
+                                <optgroup label="── Básicos ──">
+                                  {_deckTypeFilterCounts["Creature"] > 0 && <option value="Creature">Criatura ({_deckTypeFilterCounts["Creature"]})</option>}
+                                  {_deckTypeFilterCounts["Instant"] > 0 && <option value="Instant">Instantâneo ({_deckTypeFilterCounts["Instant"]})</option>}
+                                  {_deckTypeFilterCounts["Sorcery"] > 0 && <option value="Sorcery">Feitiço ({_deckTypeFilterCounts["Sorcery"]})</option>}
+                                  {_deckTypeFilterCounts["Enchantment"] > 0 && <option value="Enchantment">Encantamento ({_deckTypeFilterCounts["Enchantment"]})</option>}
+                                  {_deckTypeFilterCounts["Artifact"] > 0 && <option value="Artifact">Artefato ({_deckTypeFilterCounts["Artifact"]})</option>}
+                                  {_deckTypeFilterCounts["Land"] > 0 && <option value="Land">Terreno ({_deckTypeFilterCounts["Land"]})</option>}
+                                  {_deckTypeFilterCounts["Planeswalker"] > 0 && <option value="Planeswalker">Planeswalker ({_deckTypeFilterCounts["Planeswalker"]})</option>}
+                                  {_deckTypeFilterCounts["Battle"] > 0 && <option value="Battle">Batalha ({_deckTypeFilterCounts["Battle"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Criaturas ──">
+                                  {_deckTypeFilterCounts["Legendary Creature"] > 0 && <option value="Legendary Creature">Criatura Lendária ({_deckTypeFilterCounts["Legendary Creature"]})</option>}
+                                  {_deckTypeFilterCounts["Artifact Creature"] > 0 && <option value="Artifact Creature">Criatura Artefato ({_deckTypeFilterCounts["Artifact Creature"]})</option>}
+                                  {_deckTypeFilterCounts["Enchantment Creature"] > 0 && <option value="Enchantment Creature">Criatura Encantamento ({_deckTypeFilterCounts["Enchantment Creature"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Artefatos ──">
+                                  {_deckTypeFilterCounts["Legendary Artifact"] > 0 && <option value="Legendary Artifact">Artefato Lendário ({_deckTypeFilterCounts["Legendary Artifact"]})</option>}
+                                  {_deckTypeFilterCounts["Equipment"] > 0 && <option value="Equipment">Equipamento ({_deckTypeFilterCounts["Equipment"]})</option>}
+                                  {_deckTypeFilterCounts["Vehicle"] > 0 && <option value="Vehicle">Veículo ({_deckTypeFilterCounts["Vehicle"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Encantamentos ──">
+                                  {_deckTypeFilterCounts["Legendary Enchantment"] > 0 && <option value="Legendary Enchantment">Encantamento Lendário ({_deckTypeFilterCounts["Legendary Enchantment"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Planeswalkers ──">
+                                  {_deckTypeFilterCounts["Legendary Planeswalker"] > 0 && <option value="Legendary Planeswalker">Planeswalker Lendário ({_deckTypeFilterCounts["Legendary Planeswalker"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Terrenos ──">
+                                  {_deckTypeFilterCounts["Basic Land"] > 0 && <option value="Basic Land">Terreno Básico ({_deckTypeFilterCounts["Basic Land"]})</option>}
+                                  {_deckTypeFilterCounts["Nonbasic Land"] > 0 && <option value="Nonbasic Land">Terreno Não Básico ({_deckTypeFilterCounts["Nonbasic Land"]})</option>}
+                                  {_deckTypeFilterCounts["Legendary Land"] > 0 && <option value="Legendary Land">Terreno Lendário ({_deckTypeFilterCounts["Legendary Land"]})</option>}
+                                  {_deckTypeFilterCounts["Artifact Land"] > 0 && <option value="Artifact Land">Terreno Artefato ({_deckTypeFilterCounts["Artifact Land"]})</option>}
+                                </optgroup>
+                                <optgroup label="── Outros ──">
+                                  {_deckTypeFilterCounts["Legendary"] > 0 && <option value="Legendary">Lendário (qualquer) ({_deckTypeFilterCounts["Legendary"]})</option>}
+                                  {_deckTypeFilterCounts["Token"] > 0 && <option value="Token">Token ({_deckTypeFilterCounts["Token"]})</option>}
+                                </optgroup>
+                              </select>
+                            </div>
                           </div>
+
+                          {/* Cor */}
+                          {deckColorCounts.length > 0 && (
+                            <div className="filter-row">
+                              <div className="filter-group" style={{flex:"1 1 100%"}}>
+                                <label className="filter-group-label">Cor</label>
+                                <div className="deck-filter-chips">
+                                  {deckColorCounts.map(({code, count}) => (
+                                    <button key={code} type="button"
+                                      className={`deck-filter-chip deck-color-chip dc-${code.toLowerCase()}${deckColorFilter === code ? " active" : ""}`}
+                                      onClick={() => { setDeckColorFilter(deckColorFilter === code ? "" : code); setDeckPage(1); }}>
+                                      {code} <span className="dfc-count">({count})</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Coleção (set) */}
+                          {deckSetCounts.length > 1 && (
+                            <div className="filter-row">
+                              <div className="filter-group" style={{flex:"1 1 100%"}}>
+                                <label className="filter-group-label">Coleção (Set)</label>
+                                <div className="deck-filter-chips">
+                                  {deckSetCounts.map(({set, count}) => (
+                                    <button key={set} type="button"
+                                      className={`deck-filter-chip${deckSetFilter === set ? " active" : ""}`}
+                                      onClick={() => { setDeckSetFilter(deckSetFilter === set ? "" : set); setDeckPage(1); }}>
+                                      {set} <span className="dfc-count">({count})</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Limpar */}
+                          {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
+                            <div className="filter-row filter-clear-row">
+                              <button type="button" className="filter-clear-all-btn"
+                                onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckNameSearch(""); setDeckNameInput(""); setDeckOnlyAdded(false); setDeckPage(1); }}>
+                                ✕ Limpar todos os filtros
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {(deckTypeFilter || deckColorFilter || deckSetFilter || deckNameSearch) && (
-                        <button type="button" className="deck-filter-clear"
-                          onClick={() => { setDeckTypeFilter(""); setDeckColorFilter(""); setDeckSetFilter(""); setDeckNameSearch(""); setDeckNameInput(""); setDeckPage(1); }}>
-                          ✕ Limpar filtros
-                        </button>
                       )}
                     </div>
                   )}
 
                   <div className="list">
                     {pagedDeckCards.map((card) => (
-                      <div className={`list-item deck-card-item${card.commander ? " deck-card-commander" : ""}${card.foil ? " is-foil" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
+                      <div className={`list-item deck-card-item${card.commander ? " deck-card-commander" : ""}${card.foil ? " is-foil" : ""}${isDeckManagingPreconMod && !card.precon_original ? " deck-card-added" : ""} item-r-${(card.rarity || "x").toLowerCase()}`} key={card.id}>
                         {card.image_url && (
                           <div className={`deck-card-thumb${card.double_faced ? " dfc-thumb" : ""}`}>
                             <img
@@ -3949,6 +4544,13 @@ export default function App() {
                             <CardColorIcons card={card} />
                             {card.rarity && <span className={`rarity r-${card.rarity.toLowerCase()}`}>{card.rarity}</span>}
                             {card.mana_cost && <span className="deck-card-mana">{card.mana_cost}</span>}
+                            {isDeckManagingPreconMod && !card.precon_original && (
+                              <span
+                                className="precon-tag precon-tag-added"
+                                title="Adicionada/substituída — clique para marcar como do pré-con original"
+                                onClick={(e) => { e.stopPropagation(); setPreconOriginal(card.id, true).then(() => loadDeckCards(managingDeck.id)); }}
+                              >✚ Adicionada</span>
+                            )}
                           </div>
                           {card.type && <div className="deck-card-type">{card.type}</div>}
                           <small>
@@ -3961,6 +4563,14 @@ export default function App() {
                             className={`cmd-toggle-btn${card.commander ? " active" : ""}`}
                             title={card.commander ? "Remover como comandante" : "Marcar como comandante"}
                             onClick={() => handleToggleCommander(card)}>👑</button>
+                          {isDeckManagingPreconMod && card.precon_original && (
+                            <button type="button"
+                              className="precon-mark-btn"
+                              title="Marcar como adicionada (não era do pré-con original)"
+                              onClick={() => setPreconOriginal(card.id, false).then(() => loadDeckCards(managingDeck.id))}>
+                              ✚
+                            </button>
+                          )}
                           <button type="button" onClick={() => handleDeckDetails(card.id)}>Ver</button>
                           <button type="button" className="danger" onClick={() => handleUnassignCard(card.id)}>Remover</button>
                         </div>
@@ -4190,21 +4800,62 @@ export default function App() {
                 </div>
               </div>
               <DeckColorSelect value={deckForm.theme_color} onChange={(v) => setDeckForm({ ...deckForm, theme_color: v })} />
+              <label>
+                Tipo do deck
+                <select value={deckForm.deck_origin} onChange={(e) => setDeckForm({ ...deckForm, deck_origin: e.target.value })}>
+                  <option value="custom">🛠 Personalizado</option>
+                  <option value="precon">📦 Pré-con (original)</option>
+                  <option value="precon_modified">✂ Pré-con com alterações</option>
+                </select>
+              </label>
               <button type="submit">Criar Deck</button>
             </form>
 
             <section className="card list-section">
               <div className="list-header">
                 <div className="list-header-top">
-                  <h2>Meus Decks <span className="total-badge">{decks.length}</span></h2>
+                  <h2>Meus Decks <span className="total-badge">{filteredDecks.length}/{decks.length}</span></h2>
                   <div className="deck-import-btns">
                     <button type="button" className="import-precon-btn" onClick={() => { setImportModal(true); setImportResult(null); setImportError(""); setImportForm(EMPTY_IMPORT_FORM); }}>Importar Pré-con</button>
                     <button type="button" className="import-precon-btn" onClick={() => { setListModal(true); setListResult(null); setListError(""); setListForm(EMPTY_LIST_FORM); }}>Importar Lista</button>
                   </div>
                 </div>
+
+                {/* Filtros da listagem de decks */}
+                <div className="deck-list-filters">
+                  <input
+                    className="deck-list-search"
+                    placeholder="Buscar deck..."
+                    value={deckListSearch}
+                    onChange={(e) => setDeckListFilter("search", e.target.value)}
+                  />
+                  <select className="filter-select" value={deckListFilterOrigin} onChange={(e) => setDeckListFilter("origin", e.target.value)}>
+                    <option value="">Todos os tipos</option>
+                    <option value="custom">🛠 Personalizado</option>
+                    <option value="precon">📦 Pré-con</option>
+                    <option value="precon_modified">✂ Pré-con mod.</option>
+                  </select>
+                  <select className="filter-select" value={deckListFilterCommander} onChange={(e) => setDeckListFilter("commander", e.target.value)}>
+                    <option value="">Commander / Outros</option>
+                    <option value="1">★ Commander</option>
+                    <option value="0">Outros formatos</option>
+                  </select>
+                  <select className="filter-select" value={deckListFilterColor} onChange={(e) => setDeckListFilter("color", e.target.value)}>
+                    <option value="">Todas as cores</option>
+                    <option value="W">⬜ Branco (W)</option>
+                    <option value="U">🔵 Azul (U)</option>
+                    <option value="B">⚫ Preto (B)</option>
+                    <option value="R">🔴 Vermelho (R)</option>
+                    <option value="G">🟢 Verde (G)</option>
+                    <option value="C">◇ Incolor (C)</option>
+                  </select>
+                  {(deckListSearch || deckListFilterOrigin || deckListFilterCommander || deckListFilterColor) && (
+                    <button type="button" className="filter-clear-btn" onClick={() => { setDeckListSearch(""); setDeckListFilterOrigin(""); setDeckListFilterCommander(""); setDeckListFilterColor(""); setDeckListPage(1); }}>✕ Limpar</button>
+                  )}
+                </div>
               </div>
               <div className="list deck-list">
-                {decks.map((deck) => (
+                {pagedDecks.map((deck) => (
                   <div className="deck-list-item" key={deck.id} style={getDeckItemStyle(deck.theme_color)}>
                     <div className="deck-list-icon">
                       {deck.icon_uri
@@ -4216,6 +4867,8 @@ export default function App() {
                       <div className="deck-list-name">
                         <strong>{deck.name}</strong>
                         {deck.commander && <span className="commander-badge">CMD</span>}
+                        {deck.deck_origin === "precon" && <span className="deck-origin-badge precon">📦 Pré-con</span>}
+                        {deck.deck_origin === "precon_modified" && <span className="deck-origin-badge precon-mod">✂ Pré-con mod.</span>}
                         {deck.deckbox_color && <span className="deckbox-color-badge deckbox-swatch-{deck.deckbox_color}" title={`Deckbox: ${deck.deckbox_color}`} style={{ background: deck.deckbox_color.startsWith("#") ? deck.deckbox_color : undefined }}>📦 {deck.deckbox_color}</span>}
                         <ColorPips colors={deck.colors} />
                       </div>
@@ -4257,7 +4910,29 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                {filteredDecks.length === 0 && decks.length > 0 && (
+                  <p className="empty">Nenhum deck encontrado com esses filtros.</p>
+                )}
                 {decks.length === 0 && <p className="empty">Nenhum deck cadastrado.</p>}
+
+                {/* Paginação da lista de decks */}
+                {deckListTotalPages > 1 && (
+                  <div className="deck-list-pagination">
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={deckListPage <= 1}
+                      onClick={() => setDeckListPage(p => p - 1)}
+                    >‹</button>
+                    <span className="page-info">{deckListPage} / {deckListTotalPages}</span>
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={deckListPage >= deckListTotalPages}
+                      onClick={() => setDeckListPage(p => p + 1)}
+                    >›</button>
+                  </div>
+                )}
 
                 {/* Decks desejados ainda não montados */}
                 {deckWishList.filter(d => !d.acquired).length > 0 && (
@@ -6340,7 +7015,14 @@ export default function App() {
                 <div className="batch-global-row">
                   <label>
                     Idioma
-                    <select value={batchGlobal.language} onChange={e => setBatchGlobal({ ...batchGlobal, language: e.target.value })}>
+                    <select value={batchGlobal.language} onChange={e => {
+                      const newLang = e.target.value;
+                      setBatchGlobal(g => ({ ...g, language: newLang }));
+                      // Re-valida entradas que não têm idioma próprio
+                      batchEntries.filter(en => !en.language).forEach((en, i) =>
+                        setTimeout(() => validateBatchEntry({ ...en, language: undefined }), i * 100)
+                      );
+                    }}>
                       <option value="EN">Inglês</option>
                       <option value="PT">Português</option>
                       <option value="ES">Espanhol</option>
@@ -6366,18 +7048,18 @@ export default function App() {
                 {batchEntries.length > 0 && (
                   <ul className="batch-entry-list">
                     {batchEntries.map((en, i) => (
-                      <li key={en.id} className="batch-entry-item">
-                        <span className="batch-entry-num">{i + 1}</span>
-                        <span className="batch-entry-set">{en.set_code}</span>
-                        <span className="batch-entry-col">#{en.collection_number}</span>
-                        <span className={`batch-entry-valid bev-${batchValidation[en.id]?.status || "idle"}`}>
-                          {batchValidation[en.id]?.status === "loading" ? "⟳"
-                            : batchValidation[en.id]?.status === "found" ? "✓"
-                            : batchValidation[en.id]?.status === "notfound" ? "✗"
-                            : ""}
-                        </span>
-                        <button type="button" className="batch-entry-remove" onClick={() => batchRemoveEntry(en.id)} aria-label="Remover">✕</button>
-                      </li>
+                      <BatchEntryRow
+                        key={en.id}
+                        en={en}
+                        i={i}
+                        globalFoil={batchGlobal.foil}
+                        globalLang={batchGlobal.language}
+                        validation={batchValidation[en.id]}
+                        onQtyChange={handleBatchQtyChange}
+                        onFoilToggle={handleBatchFoilToggle}
+                        onLangChange={handleBatchLangChange}
+                        onRemove={batchRemoveEntry}
+                      />
                     ))}
                   </ul>
                 )}
@@ -6777,6 +7459,14 @@ export default function App() {
                 </div>
               </div>
               <DeckColorSelect value={editDeckModal.theme_color || ""} onChange={(v) => setEditDeckModal({ ...editDeckModal, theme_color: v })} />
+              <label>
+                Tipo do deck
+                <select value={editDeckModal.deck_origin || "custom"} onChange={(e) => setEditDeckModal({ ...editDeckModal, deck_origin: e.target.value })}>
+                  <option value="custom">🛠 Personalizado</option>
+                  <option value="precon">📦 Pré-con (original)</option>
+                  <option value="precon_modified">✂ Pré-con com alterações</option>
+                </select>
+              </label>
               <label>Cor da Deckbox
                 <div className="deckbox-color-picker">
                   {["","preto","branco","vermelho","azul","verde","roxo","marrom","laranja","amarelo","cinza","rosa","transparente"].map(c => (
@@ -7453,63 +8143,197 @@ export default function App() {
                 ))}
               </div>
             )}
-            <div className="filter-bar">
-              {/* Botão selecionar */}
-              <button
-                type="button"
-                className={`filter-select select-mode-btn${selectMode ? " active" : ""}`}
-                onClick={() => { if (selectMode) exitSelectMode(); else setSelectMode(true); }}
-                title="Modo de seleção múltipla"
-              >
-                {selectMode ? `✓ ${selectedCards.size} selecionada${selectedCards.size !== 1 ? "s" : ""}` : "☐ Selecionar"}
-              </button>
-              <select className="filter-select" value={filterDeck} onChange={(e) => { setFilterDeck(e.target.value); setPage(1); }}>
-                <option value="">Todos os decks</option>
-                <option value="0">Sem deck</option>
-              </select>
-              <select className="filter-select" value={filterFoil} onChange={(e) => { setFilterFoil(e.target.value); setPage(1); }}>
-                <option value="">Todas as cartas</option>
-                <option value="1">✦ Somente Foil</option>
-              </select>
-              <button
-                type="button"
-                className={`filter-select filter-fullart-btn${filterFullArt ? " active" : ""}`}
-                onClick={() => { setFilterFullArt(v => !v); setPage(1); }}
-              >
-                ◈ Full Art
-              </button>
-              <select className="filter-select" value={filterRarity} onChange={(e) => { setFilterRarity(e.target.value); setPage(1); }}>
-                <option value="">Todas as raridades</option>
-                <option value="L">Land (L)</option>
-                <option value="C">Common (C)</option>
-                <option value="U">Uncommon (U)</option>
-                <option value="R">Rare (R)</option>
-                <option value="M">Mythic (M)</option>
-                <option value="T">Token (T)</option>
-              </select>
-              <select className="filter-select" value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
-                <option value="">Todos os tipos</option>
-                <option value="Creature">Criatura</option>
-                <option value="Instant">Instantâneo</option>
-                <option value="Sorcery">Feitiço</option>
-                <option value="Enchantment">Encantamento</option>
-                <option value="Artifact">Artefato</option>
-                <option value="Land">Terreno</option>
-                <option value="Planeswalker">Planeswalker</option>
-                <option value="Battle">Batalha</option>
-                <option value="Legendary">Lendário</option>
-              </select>
-              <select className="filter-select" value={filterCondition} onChange={(e) => { setFilterCondition(e.target.value); setPage(1); }}>
-                <option value="">Todas as condições</option>
-                <option value="mint">Mint</option>
-                <option value="near_mint">Near Mint</option>
-                <option value="played">Played</option>
-                <option value="damaged">Damaged</option>
-              </select>
-              {hasActiveFilters && (
-                <button type="button" className="filter-select save-filter-btn" onClick={() => setShowSaveFilter(v => !v)} title="Salvar este filtro">
-                  💾
-                </button>
+            <div className="filter-panel">
+              {/* Linha do cabeçalho: counter + toggle + selecionar + salvar */}
+              <div className="filter-panel-header">
+                <span className="filter-result-count">
+                  <strong>{total.toLocaleString("pt-BR")}</strong> carta{total !== 1 ? "s" : ""}{" "}
+                  <span className="filter-qty-sub">· {totalQuantity.toLocaleString("pt-BR")} cópia{totalQuantity !== 1 ? "s" : ""}</span>
+                </span>
+                <div className="filter-panel-actions">
+                  <button
+                    type="button"
+                    className={`filter-select select-mode-btn${selectMode ? " active" : ""}`}
+                    onClick={() => { if (selectMode) exitSelectMode(); else setSelectMode(true); }}
+                    title="Modo de seleção múltipla"
+                  >
+                    {selectMode ? `✓ ${selectedCards.size}` : "☐ Selecionar"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-toggle-btn${filtersExpanded ? " active" : ""}${hasActiveFilters ? " has-active" : ""}`}
+                    onClick={() => setFiltersExpanded(v => !v)}
+                    title={filtersExpanded ? "Recolher filtros" : "Expandir filtros"}
+                  >
+                    ⚙ Filtros{hasActiveFilters ? ` (${[filterDeck,filterFoil,filterFullArt,filterRarity,filterType,filterSubtype,filterCondition,filterLang,filterPrerelease,filterProxy,filterCommander,filterPriced].filter(Boolean).length})` : ""}
+                    {filtersExpanded ? " ▲" : " ▼"}
+                  </button>
+                  {hasActiveFilters && (
+                    <button type="button" className="filter-select save-filter-btn" onClick={() => setShowSaveFilter(v => !v)} title="Salvar este filtro">💾</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Painel expansível de filtros */}
+              {filtersExpanded && (
+                <div className="filter-panel-body">
+                  {/* Linha 1: Deck, Foil, Raridade, Tipo */}
+                  <div className="filter-row">
+                    <div className="filter-group">
+                      <label className="filter-group-label">Deck</label>
+                      <select className="filter-select" value={filterDeck} onChange={(e) => { setFilterDeck(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="0">Sem deck</option>
+                        {decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Foil</label>
+                      <select className="filter-select" value={filterFoil} onChange={(e) => { setFilterFoil(e.target.value); setPage(1); }}>
+                        <option value="">Todas</option>
+                        <option value="1">✦ Somente Foil</option>
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Raridade</label>
+                      <select className="filter-select" value={filterRarity} onChange={(e) => { setFilterRarity(e.target.value); setPage(1); }}>
+                        <option value="">Todas</option>
+                        <option value="L">🌿 Land</option>
+                        <option value="C">◆ Common</option>
+                        <option value="U">◈ Uncommon</option>
+                        <option value="R">◇ Rare</option>
+                        <option value="M">★ Mythic</option>
+                        <option value="T">◉ Token</option>
+                      </select>
+                    </div>
+                    <div className="filter-group filter-group-wide">
+                      <label className="filter-group-label">Tipo</label>
+                      <select className="filter-select" value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <optgroup label="── Básicos ──">
+                          <option value="Creature">Criatura</option>
+                          <option value="Instant">Instantâneo</option>
+                          <option value="Sorcery">Feitiço</option>
+                          <option value="Enchantment">Encantamento</option>
+                          <option value="Artifact">Artefato</option>
+                          <option value="Land">Terreno</option>
+                          <option value="Planeswalker">Planeswalker</option>
+                          <option value="Battle">Batalha</option>
+                        </optgroup>
+                        <optgroup label="── Criaturas ──">
+                          <option value="Legendary Creature">Criatura Lendária</option>
+                          <option value="Artifact Creature">Criatura Artefato</option>
+                          <option value="Enchantment Creature">Criatura Encantamento</option>
+                        </optgroup>
+                        <optgroup label="── Artefatos ──">
+                          <option value="Legendary Artifact">Artefato Lendário</option>
+                          <option value="Equipment">Equipamento</option>
+                          <option value="Vehicle">Veículo</option>
+                        </optgroup>
+                        <optgroup label="── Encantamentos ──">
+                          <option value="Legendary Enchantment">Encantamento Lendário</option>
+                        </optgroup>
+                        <optgroup label="── Planeswalkers ──">
+                          <option value="Legendary Planeswalker">Planeswalker Lendário</option>
+                        </optgroup>
+                        <optgroup label="── Terrenos ──">
+                          <option value="Basic Land">Terreno Básico</option>
+                          <option value="Nonbasic Land">Terreno Não Básico</option>
+                          <option value="Legendary Land">Terreno Lendário</option>
+                          <option value="Artifact Land">Terreno Artefato</option>
+                        </optgroup>
+                        <optgroup label="── Outros ──">
+                          <option value="Legendary">Lendário (qualquer)</option>
+                          <option value="Token">Token</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Linha 2: Condição, Idioma, Estirpe, Pré-release, Proxy, Commander, Preço */}
+                  <div className="filter-row">
+                    <div className="filter-group">
+                      <label className="filter-group-label">Condição</label>
+                      <select className="filter-select" value={filterCondition} onChange={(e) => { setFilterCondition(e.target.value); setPage(1); }}>
+                        <option value="">Todas</option>
+                        <option value="mint">Mint</option>
+                        <option value="near_mint">Near Mint</option>
+                        <option value="played">Played</option>
+                        <option value="damaged">Damaged</option>
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Idioma</label>
+                      <select className="filter-select" value={filterLang} onChange={(e) => { setFilterLang(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="EN">🇺🇸 EN</option>
+                        <option value="PT">🇧🇷 PT</option>
+                        <option value="JP">🇯🇵 JP</option>
+                        <option value="ES">🇪🇸 ES</option>
+                        <option value="FR">🇫🇷 FR</option>
+                        <option value="DE">🇩🇪 DE</option>
+                      </select>
+                    </div>
+                    <div className="filter-group filter-group-wide">
+                      <label className="filter-group-label">Estirpe</label>
+                      <input
+                        type="search"
+                        list="subtype-list"
+                        className="filter-select"
+                        placeholder="Ex: Elf, Zombie, Dragon…"
+                        value={filterSubtype}
+                        onChange={e => { setFilterSubtype(e.target.value); setPage(1); }}
+                      />
+                      <datalist id="subtype-list">
+                        {subtypeOptions.map(s => <option key={s} value={s} />)}
+                      </datalist>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Pré-release</label>
+                      <select className="filter-select" value={filterPrerelease} onChange={(e) => { setFilterPrerelease(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="1">✦ Somente</option>
+                        <option value="0">Excluir</option>
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Proxy</label>
+                      <select className="filter-select" value={filterProxy} onChange={(e) => { setFilterProxy(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="1">⚠ Somente</option>
+                        <option value="0">Excluir</option>
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Commander</label>
+                      <select className="filter-select" value={filterCommander} onChange={(e) => { setFilterCommander(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="1">★ Somente</option>
+                      </select>
+                    </div>
+                    <div className="filter-group">
+                      <label className="filter-group-label">Preço</label>
+                      <select className="filter-select" value={filterPriced} onChange={(e) => { setFilterPriced(e.target.value); setPage(1); }}>
+                        <option value="">Todos</option>
+                        <option value="priced">💰 Com preço</option>
+                        <option value="unpriced">— Sem preço</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Limpar filtros */}
+                  {hasActiveFilters && (
+                    <div className="filter-row filter-clear-row">
+                      <button type="button" className="filter-clear-all-btn" onClick={() => {
+                        setFilterDeck(""); setFilterFoil(""); setFilterFullArt(false);
+                        setFilterRarity(""); setFilterColors(""); setFilterType(""); setFilterSubtype("");
+                        setFilterCondition(""); setFilterLang(""); setFilterPrerelease("");
+                        setFilterProxy(""); setFilterCommander(""); setFilterPriced("");
+                        setSearch(""); setPage(1);
+                      }}>✕ Limpar todos os filtros</button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {showSaveFilter && (
@@ -7577,10 +8401,21 @@ export default function App() {
                   type="button"
                   className={`sort-btn${sort === opt.value ? " active" : ""}`}
                   onClick={() => handleSort(opt.value)}
+                  title={sort === opt.value ? (order === "asc" ? "Clique para inverter; mais um clique volta ao padrão" : "Clique para voltar ao padrão") : `Ordenar por ${opt.label}`}
                 >
                   {opt.label}{orderIcon(opt.value)}
                 </button>
               ))}
+              {sort !== DEFAULT_SORT && (
+                <button
+                  type="button"
+                  className="sort-btn sort-reset-btn"
+                  onClick={resetSort}
+                  title="Voltar à ordenação padrão (Recentes)"
+                >
+                  ✕ Limpar
+                </button>
+              )}
             </div>
           </div>
 
@@ -7615,6 +8450,13 @@ export default function App() {
                   )}
                   {!selectMode && duplicateIds.has(card.id) && (
                     <div className="card-dup-badge" title="Esta carta está em múltiplas entradas da coleção">🔁</div>
+                  )}
+                  {isPreconModifiedDeck && !card.precon_original && (
+                    <div
+                      className="card-added-badge"
+                      title="Carta adicionada (não era do pré-con original) — clique para marcar como original"
+                      onClick={(e) => { e.stopPropagation(); setPreconOriginal(card.id, true).then(() => loadCards()); }}
+                    >+</div>
                   )}
                   {card.double_faced && card.image_url_back && (
                     <button type="button" className="grid-flip-btn" title="Virar carta"
@@ -7682,6 +8524,13 @@ export default function App() {
                           </span>
                         )}
                         {duplicateIds.has(card.id) && <span className="card-dup-badge-inline" title="Múltiplas entradas">🔁</span>}
+                        {isPreconModifiedDeck && !card.precon_original && (
+                          <span
+                            className="card-added-badge-inline"
+                            title="Adicionada ao deck — clique para marcar como original"
+                            onClick={(e) => { e.stopPropagation(); setPreconOriginal(card.id, true).then(() => loadCards()); }}
+                          >✚ Adicionada</span>
+                        )}
                       </div>
                       <div className="list-item-meta">
                         <span>{card.set_code || "—"} · #{card.collection_number || "—"} · {card.language || "—"} · ×{card.quantity}</span>
@@ -8065,6 +8914,18 @@ export default function App() {
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.full_art || false} onChange={(e) => setEditForm({ ...editForm, full_art: e.target.checked })} />Full Art</label>
                   <label className="checkbox-label"><input type="checkbox" checked={editForm.prerelease} onChange={(e) => setEditForm({ ...editForm, prerelease: e.target.checked })} />Pré-release</label>
                   <label className="checkbox-label proxy-checkbox"><input type="checkbox" checked={editForm.proxy || false} onChange={(e) => setEditForm({ ...editForm, proxy: e.target.checked })} />⚠ Proxy</label>
+                  {(() => {
+                    const cardDeck = decks.find(d => d.id === (editForm.deck_id || selectedCard?.deck_id));
+                    if (!cardDeck || cardDeck.deck_origin !== "precon_modified") return null;
+                    return (
+                      <label className="checkbox-label precon-original-checkbox">
+                        <input type="checkbox"
+                          checked={editForm.precon_original !== false}
+                          onChange={(e) => setEditForm({ ...editForm, precon_original: e.target.checked })}
+                        />📦 Original do pré-con
+                      </label>
+                    );
+                  })()}
                 </div>
                 <ManaColorPicker value={editForm.color} onChange={(v) => setEditForm({ ...editForm, color: v })} />
                 {storageLocations.length > 0 && (

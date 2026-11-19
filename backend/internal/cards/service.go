@@ -9,6 +9,22 @@ import (
 	"magic-collection-api/internal/mtgapi"
 )
 
+// preconOriginalDefault: nil → true (pré-con original por padrão).
+func preconOriginalDefault(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
+}
+
+// preconOriginalFromUpdate: nil → mantém valor atual; ptr → usa o valor do input.
+func preconOriginalFromUpdate(v *bool, current bool) bool {
+	if v == nil {
+		return current
+	}
+	return *v
+}
+
 func parsePriceUSD(prices map[string]string, foil bool) float64 {
 	if prices == nil {
 		return 0
@@ -61,6 +77,7 @@ func (s *Service) Create(input CreateCardInput) (int64, error) {
 		Condition:        input.Condition,
 		Notes:            input.Notes,
 		Proxy:            input.Proxy,
+		PreconOriginal:   preconOriginalDefault(input.PreconOriginal),
 	}
 
 	card.PreRelease = input.PreRelease
@@ -172,6 +189,7 @@ func (s *Service) Update(id string, input UpdateCardInput) error {
 		Condition:        input.Condition,
 		Notes:            input.Notes,
 		Proxy:            input.Proxy,
+		PreconOriginal:   preconOriginalFromUpdate(input.PreconOriginal, current.PreconOriginal),
 		// Campos externos: preserva os valores do banco até o re-fetch
 		MTGID:    current.MTGID,
 		Type:     current.Type,
@@ -243,6 +261,10 @@ func (s *Service) SetDeck(id string, deckID int) error {
 
 func (s *Service) SetCommander(id string, value bool) error {
 	return s.repository.SetCommander(id, value)
+}
+
+func (s *Service) SetPreconOriginal(id string, value bool) error {
+	return s.repository.SetPreconOriginal(id, value)
 }
 
 func (s *Service) SetStorage(id string, storageID int) error {
@@ -333,6 +355,10 @@ func (s *Service) RefreshColors() (RefreshColorsResult, error) {
 
 func (s *Service) GetStats() (CollectionStats, error) {
 	return s.repository.GetStats()
+}
+
+func (s *Service) GetSubtypes() ([]string, error) {
+	return s.repository.GetSubtypes()
 }
 
 func (s *Service) GetDuplicates() ([]int, error) {

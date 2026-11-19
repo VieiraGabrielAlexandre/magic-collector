@@ -63,12 +63,18 @@ func (h *Handler) List(c *gin.Context) {
 		Sort:            c.DefaultQuery("sort", "name"),
 		Order:           c.DefaultQuery("order", "asc"),
 		DeckIDFilter:    deckIDFilter,
-		FoilOnly:        c.Query("foil") == "1",
-		FullArtOnly:     c.Query("full_art") == "1",
-		RarityFilter:    c.Query("rarity"),
-		ColorsFilter:    c.Query("colors"),
-		TypeFilter:      c.Query("type_filter"),
-		ConditionFilter: c.Query("condition_filter"),
+		FoilOnly:         c.Query("foil") == "1",
+		FullArtOnly:      c.Query("full_art") == "1",
+		RarityFilter:     c.Query("rarity"),
+		ColorsFilter:     c.Query("colors"),
+		TypeFilter:       c.Query("type_filter"),
+		SubtypeFilter:    c.Query("subtype"),
+		ConditionFilter:  c.Query("condition_filter"),
+		LangFilter:       c.Query("lang"),
+		PrereleaseFilter: c.Query("prerelease"),
+		ProxyFilter:      c.Query("proxy"),
+		CommanderFilter:  c.Query("commander_filter"),
+		PricedFilter:     c.Query("priced"),
 	}
 
 	result, err := h.service.List(params)
@@ -165,6 +171,21 @@ func (h *Handler) SetCommander(c *gin.Context) {
 	}
 	if err := h.service.SetCommander(c.Param("id"), input.Commander); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar comandante"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+func (h *Handler) SetPreconOriginal(c *gin.Context) {
+	var input struct {
+		PreconOriginal bool `json:"precon_original"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+		return
+	}
+	if err := h.service.SetPreconOriginal(c.Param("id"), input.PreconOriginal); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao atualizar pré-con original"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
@@ -271,6 +292,15 @@ func (h *Handler) Stats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, stats)
+}
+
+func (h *Handler) Subtypes(c *gin.Context) {
+	subtypes, err := h.service.GetSubtypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar estirpes"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"subtypes": subtypes})
 }
 
 func (h *Handler) Duplicates(c *gin.Context) {

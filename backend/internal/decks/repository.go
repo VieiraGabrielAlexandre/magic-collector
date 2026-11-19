@@ -19,7 +19,7 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) List() ([]Deck, error) {
 	rows, err := r.db.Query(`
 		SELECT d.id, d.name, d.description, d.commander, d.colors, d.set_code, d.icon_uri, d.theme_color,
-		       d.deckbox_color,
+		       d.deckbox_color, COALESCE(d.deck_origin,'custom') AS deck_origin,
 		       COALESCE(SUM(c.quantity), 0) AS card_count,
 		       COALESCE(SUM(c.price_usd * c.quantity), 0) AS estimated_value_usd,
 		       COALESCE(d.evaluation, '') AS evaluation,
@@ -40,7 +40,7 @@ func (r *Repository) List() ([]Deck, error) {
 		    GROUP BY deck_id
 		) bs ON bs.deck_id = d.id
 		GROUP BY d.id, d.name, d.description, d.commander, d.colors, d.set_code,
-		         d.icon_uri, d.theme_color, d.deckbox_color, d.evaluation, d.evaluated_at,
+		         d.icon_uri, d.theme_color, d.deckbox_color, d.deck_origin, d.evaluation, d.evaluated_at,
 		         bs.wins, bs.losses, bs.draws, bs.total
 		ORDER BY d.name ASC
 	`)
@@ -55,7 +55,7 @@ func (r *Repository) List() ([]Deck, error) {
 		var commanderInt int
 		if err := rows.Scan(
 			&d.ID, &d.Name, &d.Description, &commanderInt, &d.Colors, &d.SetCode,
-			&d.IconURI, &d.ThemeColor, &d.DeckboxColor, &d.CardCount, &d.EstimatedValueUSD,
+			&d.IconURI, &d.ThemeColor, &d.DeckboxColor, &d.DeckOrigin, &d.CardCount, &d.EstimatedValueUSD,
 			&d.Evaluation, &d.EvaluatedAt,
 			&d.BattleWins, &d.BattleLosses, &d.BattleDraws, &d.BattleTotal,
 		); err != nil {
@@ -105,9 +105,13 @@ func (r *Repository) Create(input DeckInput) (int64, error) {
 	if input.Commander {
 		commanderInt = 1
 	}
+	origin := input.DeckOrigin
+	if origin == "" {
+		origin = "custom"
+	}
 	res, err := r.db.Exec(
-		`INSERT INTO decks (name, description, commander, colors, set_code, theme_color, deckbox_color) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor, input.DeckboxColor,
+		`INSERT INTO decks (name, description, commander, colors, set_code, theme_color, deckbox_color, deck_origin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor, input.DeckboxColor, origin,
 	)
 	if err != nil {
 		return 0, err
@@ -120,9 +124,13 @@ func (r *Repository) Update(id string, input DeckInput) error {
 	if input.Commander {
 		commanderInt = 1
 	}
+	updateOrigin := input.DeckOrigin
+	if updateOrigin == "" {
+		updateOrigin = "custom"
+	}
 	_, err := r.db.Exec(
-		`UPDATE decks SET name=?, description=?, commander=?, colors=?, set_code=?, theme_color=?, deckbox_color=? WHERE id=?`,
-		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor, input.DeckboxColor, id,
+		`UPDATE decks SET name=?, description=?, commander=?, colors=?, set_code=?, theme_color=?, deckbox_color=?, deck_origin=? WHERE id=?`,
+		input.Name, input.Description, commanderInt, input.Colors, input.SetCode, input.ThemeColor, input.DeckboxColor, updateOrigin, id,
 	)
 	return err
 }

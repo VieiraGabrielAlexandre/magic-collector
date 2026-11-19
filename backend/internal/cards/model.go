@@ -60,6 +60,7 @@ type Card struct {
 	ImageURLBack     string  `json:"image_url_back"`
 	Proxy            bool    `json:"proxy"`
 	StorageID        int     `json:"storage_id"`
+	PreconOriginal   bool    `json:"precon_original"`
 }
 
 type PreviewCardInput struct {
@@ -95,6 +96,7 @@ type CreateCardInput struct {
 	Notes            string `json:"notes"`
 	Proxy            bool   `json:"proxy"`
 	StorageID        int    `json:"storage_id"`
+	PreconOriginal   *bool  `json:"precon_original"`
 }
 
 type UpdateCardInput struct {
@@ -120,5 +122,6 @@ type UpdateCardInput struct {
 	Notes            string `json:"notes"`
 	Proxy            bool   `json:"proxy"`
 	StorageID        int    `json:"storage_id"`
+	PreconOriginal   *bool  `json:"precon_original"`
 	Propagate        bool   `json:"propagate"`
 }

@@ -14,6 +14,7 @@ type cardRepository interface {
 	SetQuantity(id string, quantity int) error
 	SetDeck(id string, deckID int) error
 	SetCommander(id string, value bool) error
+	SetPreconOriginal(id string, value bool) error
 	SetStorage(id string, storageID int) error
 	ListAll() ([]Card, error)
 	ListAllForPriceRefresh() ([]CardForPriceRefresh, error)
@@ -30,6 +31,7 @@ type cardRepository interface {
 	UpdateColorsAndMTGID(id int, mtgID, colors, color string) error
 	ListColorCombos() ([]ColorCombo, error)
 	GetStats() (CollectionStats, error)
+	GetSubtypes() ([]string, error)
 	GetDuplicates() ([]int, error)
 	ListForDeckBuilder() ([]DeckBuilderCard, error)
 	ListAllForAnalysis() ([]AnalysisCard, error)
@@ -57,6 +59,7 @@ type cardService interface {
 	Delete(id string) error
 	SetDeck(id string, deckID int) error
 	SetCommander(id string, value bool) error
+	SetPreconOriginal(id string, value bool) error
 	SetStorage(id string, storageID int) error
 	NormalizeRarities() (NormalizeRarityResult, error)
 	RefreshColors() (RefreshColorsResult, error)
@@ -64,6 +67,7 @@ type cardService interface {
 	SetQuantity(id string, quantity int) error
 	Preview(input PreviewCardInput) (*mtgapi.ExternalCard, error)
 	GetStats() (CollectionStats, error)
+	GetSubtypes() ([]string, error)
 	GetDuplicates() ([]int, error)
 	RefreshImages() (ImageRefreshResult, error)
 	RefreshPrices(emptyOnly bool) (PriceRefreshResult, error)

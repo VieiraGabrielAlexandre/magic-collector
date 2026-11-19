@@ -24,17 +24,19 @@ type Deck struct {
 	BattleTotal       int             `json:"battle_total"`
 	EstimatedValueUSD float64         `json:"estimated_value_usd"`
 	DeckboxColor      string          `json:"deckbox_color"`
+	DeckOrigin        string          `json:"deck_origin"` // custom | precon | precon_modified
 	Commanders        []CommanderCard `json:"commanders,omitempty"`
 }
 
 type DeckInput struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	Commander   bool   `json:"commander"`
-	Colors      string `json:"colors"`
-	SetCode     string `json:"set_code"`
+	Name         string `json:"name" binding:"required"`
+	Description  string `json:"description"`
+	Commander    bool   `json:"commander"`
+	Colors       string `json:"colors"`
+	SetCode      string `json:"set_code"`
 	ThemeColor   string `json:"theme_color"`
 	DeckboxColor string `json:"deckbox_color"`
+	DeckOrigin   string `json:"deck_origin"`
 }
 
 // ValidationIssue descreve um problema encontrado durante a validação do deck.
